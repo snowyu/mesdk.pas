@@ -1,6 +1,66 @@
-{
+{Summary 将字符串序列Token化的通用 Tokenizer 类。
+
+Description
+
    @author  Riceball LEE<riceballl@hotmail.com>
-   @version $Revision: 1.17 $
+   @version $Revision: 1.21 $
+
+分析
+   Token 类型分为两类， 
+
+SimpleToken, 
+ComplexToken。 
+SimpleToken: 是由固定的字符串序列组成, eg, ';' 。 
+
+ComplexToken: 由起始 Token，结束Token 以及夹在其间的字符串组成，如，注释和字符串。 
+
+ComplexToken 的处理方式有： tfEscapeDuplicateToken, tfOneLine, tfEscapeChar。
+
+tfOneLine: 表示只处理1行
+tfEscapeDuplicateToken: 是否处理转义TokenEnd符号，当双写TokenEnd符号时候表示，一个TokenEnd符号，如： ''''，表示一个单引号。 
+tfEscapeChar: 是否启用 EscapeChar 转义字符串序列的下一个字符. 转义字符在属性 EscapeChar 中设置. DeQuotedString只处理转义自身和转义TokenEnd符号，如果有其它字符转义你需要重载 DoEscapedChar或联系OnEscapedChar事件。
+加入新的TokenId
+
+简单类型的TokenId:
+
+ttArgSpliter := 32;
+
+SimpleTokens.AddStandardToken(ttSpliter, ';');
+SimpleTokens.Add(ttArgSpliter, ',');
+
+
+复杂类型的 TokenId：
+Tokens.AddStandardToken(ttComment, '//', '', [tfOneLine]);
+Tokens.Add(aTokenId, aTokenBegin, aTokenEnd, aTokenFlags); 
+
+通过LoadFromXX加载待处理的字符流，调用 ReadToken 方法对字符流进行 Token化。
+
+
+
+属性和事件：
+
+IgnoreCase: 是否忽略大小写
+BlankChars: 哪些字符是需要忽略的空白字符
+EscapeChar: 在 ComplexToken 中的转义字符定义，如果为空，则无转义 
+property Errors: PMeTokenErrors read GetErrors;  收集在Tokenize过程中发生的错误，如果无错误，Errors.Count =0.
+property CurrentToken: TMeToken read FCurrentToken; 
+property SimpleTokens: PMeSimpleTokenTypes read FSimpleTokens;
+property Tokens: PMeComplexTokenTypes read FTokens;
+property OnEscapedChar: TMeEscapedCharEvent read FOnEscapedChar write FOnEscapedChar;
+property OnComment: TMeOnCommentEvent read FOnComment write FOnComment; 
+
+
+方法：
+
+function HasTokens: Boolean;
+function ReadToken: PMeToken;  从字符流中读入一个Token,如果返回nil表示再无Token可读。
+function NextToken: PMeToken;  返回当前字符流中的下一个Token。
+procedure LoadFromStream(const Stream: PMeStream); 加载待处理的字符流。
+procedure LoadFromFile(const FileName: string); 从文件加载待处理的字符流。
+procedure LoadFromString(const aValue: string);
+procedure Clear;
+function DeQuotedString(const aToken: PMeToken): string;  如果aToken是ComplexToken那么将该Token 作 DeQuotedString 处理.
+
 }
 (*
  * The contents of this file are released under a dual license, and
@@ -90,7 +150,8 @@ type
 
   {
     @param tfEscapeDuplicateToken  转义在CompexToken 序列中 双写"TokenEnd"表示一个TokenEnd，不会结束序列。
-    @param tfEscapeChar            是否启用 EscapeChar.
+    @param tfEscapeChar            是否启用 EscapeChar. 转义字符串序列的下一个字符. 转义字符在属性 EscapeChar 中设置. 
+                                   DeQuotedString只处理转义自身和转义TokenEnd符号，如果有其它字符转义你需要重载 DoEscapedChar 方法或联系OnEscapedChar事件。
     @param tfOneLine               在CompexToken 序列中遇到 CRLF则停止，只处理一行。
   }
   TMeTokenFlag = (tfEscapeDuplicateToken, tfOneLine, tfEscapeChar);
@@ -195,8 +256,10 @@ type
   end;
 
   PMeTokenErrors = ^ TMeTokenErrors;
+  TMeTokenErrorEvent = procedure(const Sender: PMeTokenErrors; const aError: PMeTokenErrorInfo) of object;
   TMeTokenErrors = Object(TMeList)
   protected
+    FOnError: TMeTokenErrorEvent;
     function GetItem(const Index: Integer): PMeTokenErrorInfo;
   public
     destructor Destroy; virtual;{override}
@@ -204,6 +267,7 @@ type
     procedure Clear;
   public
     property Items[const Index: Integer]: PMeTokenErrorInfo read GetItem; default;
+    property OnError: TMeTokenErrorEvent read FOnError write FOnError;
   end;
 
   {the Me Tokenizer}
@@ -219,7 +283,7 @@ type
      call ReadToken to read next token. return nil means no more token to get.
      call NextToken to pre-read the next token. return nil means no more token to get.
    search order:
-     BlockToken:
+     SimpleTokenType, ComplexTokenType.
      
   }
   TMeEscapedCharEvent = procedure(const Sender: PMeTokenizer; var EscapedStr: TMeTokenString) of object;
@@ -516,6 +580,7 @@ begin
   vItem.Assign(@aToken);
   vItem.ErrorCode := aErrorCode;
   vItem.ErrorFmt := aErrorFmt;
+  if Assigned(FOnError) then FOnError(@Self, vItem);
 end;
 
 function TMeTokenErrors.GetItem(const Index: Integer): PMeTokenErrorInfo;
@@ -1019,4 +1084,8 @@ begin
 end;
 
 initialization
+  SetMeVirtualMethod(TypeOf(TMeTokenizer), ovtVmtParent, TypeOf(TMeDynamicObject));
+  {$IFDEF MeRTTI_SUPPORT}
+  SetMeVirtualMethod(TypeOf(TMeTokenizer), ovtVmtClassName, nil);
+  {$ENDIF}
 end.
