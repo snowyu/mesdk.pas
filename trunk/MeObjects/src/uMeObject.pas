@@ -1,7 +1,7 @@
 {Summary MeObject - the MeSDK Core - the abstract mini class(dynamic) - PMeDynamicObject.}
 {
    @author  Riceball LEE<riceballl@hotmail.com>
-   @version $Revision: 1.34 $
+   @version $Revision: 1.40 $
 
 if you wanna the ClassParent supports for the class derived from TMeDynamicObject:
 
@@ -18,7 +18,7 @@ if you wanna the ClassName supports for the class derived from TMeDynamicObject:
     * enable the MeRTTI_SUPPORT compiler directive(the default is on).
     * and you must do this in initialization section:
      <code>
-       const cMeInterfacedObjectClassName: PChar = 'TMeInterfacedObject';
+       const cMeInterfacedObjectClassName: ShortString = 'TMeInterfacedObject';
        SetMeVirtualMethod(TypeOf(TMeInterfacedObject), ovtVmtClassName, @cMeInterfacedObjectClassName);
      </code>
        if u wanna hide the ClassName of some class you just need pass nil in it:
@@ -62,7 +62,6 @@ All Object use the EMeError class only!
  * All rights reserved.
  *
  * Contributor(s):
- *  Vladimir Kladov
  *
  *)
 unit uMeObject;
@@ -82,10 +81,21 @@ uses
   {$ENDIF}
   ;
 
+{
+NOTE:
+  Dont use TypeOf() get the VMT address of the object instance, the VMT address is always the first field in the TMeDynamicObject!!
+  and SizeOf() can not used!! use the TMeClass to cast!
+  
+  I abondon the ovtVmtPtrOffs(TypeOf use it) instead of storing the parent vmt address.
+  use MeTypeOf(), MeSizeOf(), instead of the TypeOf, SizeOf()
+
+  in my TMeDynamicObject the ovtVmtPtrOffs is always 0, so i decide use it as ovtVmtParent. It's impossible, if i change the program will be raise critical error.
+}
 const
   //## VMT offset
   ovtVMTAddress   = -12;  { keep the VMT address. here means the address of the ovtVMTInit }
   ovtInstanceSize = -8;   { instance size in OBJECTs    }
+  //in my TMeDynamicObject the ovtVmtPtrOffs is always 0, so i decide use it as ovtVmtParent. It's impossible, if i change the program will be raise critical error.
   ovtVmtPtrOffs   = -4;   { the VMTPtr offset in the instance. It always is 0.}
   ovtVmtParent    = 8;    { point to the VMT of parent object if any }
   ovtVmtInit      = 0;    { the Init virtual method entry.}
@@ -93,6 +103,16 @@ const
   {$IFDEF MeRTTI_SUPPORT}
   ovtVmtClassName = 12;    { the class name PShortString. }
   {$ENDIF}
+{
+FPC:
+   VMT=RECORD
+     Size,NegSize:Longint;
+     ParentLink:PVMT;
+   END;
+
+       vmtInstanceSize         = 0;
+       vmtParent               = sizeof(ptrint)*2;
+}
 
   MaxListSize = Maxint div SizeOf(Pointer);
 
@@ -115,7 +135,7 @@ type
     Destroy: Pointer;
     ParentClass: TMeClass;
   {$IFDEF MeRTTI_SUPPORT}
-    ClassName: PShortString;
+    ClassName: PChar;
   {$ENDIF}
   end;
 
@@ -149,11 +169,13 @@ type
       is what constructors can not be virtual in poor objects). }
     procedure Init;virtual;
   public //Methods
-     {Summary }
+     {Summary Disposes of an object instance.}
      { Description
+       Do not call Destroy directly. Call Free instead. Free verifies that the object reference is not nil before calling Destroy.
      }
      destructor Destroy; virtual;
      {Summary replace 'is' operator, whether is the same object.
+
        Only for the object is derived from TMeVMTHelper.
        Note: the class method of the Object = the method of Object,
          and You CAN NOT use by TMeVMTHelper.ClassMethod. the Self parameter is always a instance, not the VMT pointer,
@@ -189,7 +211,7 @@ type
     }
     class function InheritsFrom(aClass: TMeClass): Boolean;
     {$IFDEF MeRTTI_SUPPORT}
-    class function ClassName: ShortString;
+    class function ClassName: PChar;
     {$ENDIF}
   protected
     class function ParentClassAddress: TMeClass;virtual;abstract;
@@ -199,7 +221,7 @@ type
      NOTE: If you wanna create a new MeClass in Delphi, you should update the VMT like this:
      see initialization section!!
     }
-    class function ClassNameAddress: ShortString;virtual;abstract;
+    class function ClassNameAddress: PChar;virtual;abstract;
     {$ENDIF}
   end;
 
@@ -208,18 +230,20 @@ type
   public //methods
      {Summary Disposes the memory allocated to an object }
      destructor DestroyMem;
-     {Summary Constructor. Do not call it. Instead, use New<objectname> function }
-     {  call for certain object, e.g., NewLabel(AParent, 'caption');
+     {Summary Constructor. Do not call it. Instead, use New(PMeDynamicObject, Create) function. }
+     {  
+     call for certain object, e.g., New(PMeList, Create);
      }
      constructor Create;
 
     {Summary Free the Object. Disposes the memory allocated to an object if aFreeMemRequired.}
-    { Before calling destructor of object, checks if passed pointer is not
+    { 
+      Before calling destructor of object, checks if passed pointer is not
         nil - similar what is done in VCL for TObject. It is ALWAYS recommended
         to use Free instead of Destroy.
 
         Note: It DOES NOT release huge strings, dynamic arrays and so on.
-              you should be freeing in overriden the destructor.
+              you should be freeing in overriden the destructor - Destroy method.
 
       @param aFreeMemRequired whether free memory the default is true. only pointer object can free mem!!
      }
@@ -234,17 +258,21 @@ type
     FName: String;
   public
     destructor Destroy; virtual;
+    procedure Assign(const aObject: PMeNamedObject); virtual;
   public
     property Name: String read FName write FName;
   end;
 
   PMeComponent = ^TMeComponent;
-  TMeComponent = object(TMeNamedObject)
-  protected //private
+  TMeComponent = object(TMeDynamicObject)
+  protected //##private
+    FName: String;
     procedure SetName(const NewName: String);
   public
     destructor Destroy; virtual;
+    procedure Assign(const aObject: PMeNamedObject); virtual; {override}
   public
+    {Summary Specifies the name of the component}
     property Name: String read FName write SetName;
   end;
 
@@ -261,14 +289,16 @@ type
     procedure Done;
 
   public
-     { it will be Destroyed only when reference count < 0 }
-     destructor Destroy; virtual;
+    { it will be Destroyed only when reference count < 0 }
+    destructor Destroy; virtual;
     { Summary Increments the reference count for this instance and returns the new reference count.}
     function AddRef: Integer;
-     {Summary Decrements reference count. If it is becoming <0, and Free
+     {Summary Decrements reference count for this instance.
+
+      If it is becoming <0, and Free
         method was already called, object is (self-) destroyed. Otherwise,
         Free method does not destroy object, but only sets flag
-        "Free was called".
+        "Free was called": Decrements reference count.
 
         Use AddRef..Release to provide a block of code, where
         object can not be destroyed by call of Free method.
@@ -287,12 +317,12 @@ type
     {Summary Adds an object to the DependentList. }
     { Description 
       that means this obj is relying on it. the objects in the the DependentList will be free
-       when the object is destroyed. 
+       when the it is destroyed. 
        
        表明 Obj 依赖于自己. 当自己被释放后, Obj 也将会被释放.
     }
     procedure AddDependent(Obj: PMeDynamicObject);
-    {Summary This Notification Proc will be executed when the object is free. }
+    {Summary This Notification Proc will be executed before the object is free. }
     procedure FreeNotification(Proc: TMeObjectMethod);
   public
     {Summary Indicates the number of instance pointers currently dependent upon the object.}
@@ -342,7 +372,7 @@ type
 
     {Summary Makes Count equal to 0. Not responsible for freeing (or destroying)
        data, referenced by released pointers. }
-    procedure Clear; //virtual; DO NOT USE virtual for common method, so that I can use the TMeList as record object.
+    procedure Clear; //##virtual; DO NOT USE virtual for common method, so that I can use the TMeList as record object.
     {Summary Inserts a new item at the end of the list.}
     { Call Add to insert a new object at the end of the Items array.
       Add increments Count and, if necessary, allocates memory by increasing the value of Capacity.
@@ -538,6 +568,7 @@ type
   public
     {Summary the Clear method only clear FList.count to zero if true.}
     FastClear: Boolean;
+
     {Summary Access to objects associated with strings in the list. }
     property Objects[Idx: Integer]: LongWord read GetObject write SetObject;
     {Summary Returns a value correspondent to the Name an ini-file-like string list
@@ -1056,18 +1087,36 @@ end;
 {$ENDIF PUREPASCAL}
 
 {$IFDEF MeRTTI_SUPPORT}
-class function TMeVMTHelper.ClassName: ShortString;
+class function TMeVMTHelper.ClassName: PChar;
 {$IFDEF PUREPASCAL}
+(*
+var
+  p: PShortString;
 begin
   {$IFDEF Delphi_ObjectTypeClassMethod_BUG}
-  Result := PShortString(PPointer(PInteger(@Self)^ + ovtVmtClassName)^)^;
+  p := PShortString(PPointer(PInteger(@Self)^ + ovtVmtClassName)^);
   {$ELSE}
-  Result := PShortString(PPointer(Integer(@Self) + ovtVmtClassName)^)^;
+  p := PShortString(PPointer(Integer(@Self) + ovtVmtClassName)^);
   {$ENDIF}
   //Result := PShortString(@TMeVMTHelper.ClassNameAddress)^;
+  if Assigned(p) then
+    Result := p^
+  else
+    Result := '';
 end;
+*)
+begin
+  Result := PPointer(PInteger(@Self)^ + ovtVmtClassName)^;
+end;
+
 {$ELSE PUREPASCAL}
 asm
+        {$IFDEF Delphi_ObjectTypeClassMethod_BUG}
+        MOV     EAX, [EAX]  //this is a Delphi Bug: the Class method in Object do not pass the VMT
+        {$ENDIF}
+        MOV     EAX,[EAX].ovtVmtClassName
+  
+(*
         { ->    [EAX] VMT                         }
         {       EDX Pointer to result string    }
         PUSH    ESI
@@ -1078,11 +1127,19 @@ asm
         {$ENDIF}
         MOV     ESI,[EAX].ovtVmtClassName
         XOR     ECX,ECX
+        CMP     ESI, ECX
+        JZ      @@IsZero
+
         MOV     CL,[ESI]
         INC     ECX
         REP     MOVSB
+        JMP     @@exit
+@@IsZero:
+        MOV     [EDI], ECX
+@@exit:
         POP     EDI
         POP     ESI
+*)
 end;
 {$ENDIF PUREPASCAL}
 {$ENDIF}
@@ -1139,6 +1196,15 @@ begin
   FName := '';
 end;
 
+procedure TMeNamedObject.Assign(const aObject: PMeNamedObject); 
+begin
+  if Assigned(aObject) and aObject.InheritsFrom(TypeOf(TMeNamedObject)) then
+    with PMeNamedObject(aObject)^ do
+    begin
+      Self.FName   := FName;
+    end;
+end;
+
 { TMeComponent }
 destructor TMeComponent.Destroy;
 {$IFDEF PUREPASCAL}
@@ -1163,12 +1229,19 @@ begin
     FObjectNameList.Remove(@Self);
     FName := '';
   end;
-  if FindMeComponent(NewName) <> nil then Exit; // prevent duplications!
-  FName := NewName;
-  if FName <> '' then
+  if NewName <> '' then
+  begin
+    if FindMeComponent(NewName) <> nil then Exit; // prevent duplications!
+    FName := NewName;
     FObjectNameList.Add(@Self);
+  end;
 end;
 
+procedure TMeComponent.Assign(const aObject: PMeNamedObject); 
+begin
+end;
+
+{ TMeInterfacedObject }
 destructor TMeInterfacedObject.Destroy;
 {$IFDEF PUREPASCAL}
 begin
@@ -1211,6 +1284,7 @@ end;
 function TMeInterfacedObject.AddRef: Integer;
 begin
   Inc(FRefCount);
+  Result := FRefCount;
 end;
 
 procedure TMeInterfacedObject.Done;
@@ -1634,8 +1708,8 @@ asm
         JECXZ    @@0
         MOV      EDX, [EAX].FItems
         DEC      ECX
-        MOV      ECX, [EDX + ECX*4]
         MOV      [EAX].FCount, ECX
+        MOV      ECX, [EDX + ECX*4]
 @@0:    XCHG     EAX, ECX
 end;
 {$ENDIF PUREPASCAL}
@@ -2956,14 +3030,17 @@ end;
 procedure TMeNamedObjects.Assign(const aObjs: PMeNamedObjects);
 var
   i: integer;
+  vItem: PMeNamedObject;
 begin
   if Assigned(aObjs) then
   begin
     Clear;
-    Count := aObjs.Count;
-    for i := 0 to Count - 1 do
+    for i := 0 to aObjs.Count - 1 do
     begin
-      Add(NewMeObject(PMeNamedObjects(aObjs.List^[i]).ClassType));
+      New(vItem, Create);
+      vItem.Assign(aObjs.List^[i]);
+      Add(vItem);
+      //Add(NewMeObject(PMeNamedObjects(aObjs.List^[i]).ClassType));
     end;
   end;
 end;
@@ -3429,13 +3506,13 @@ end;
 
 {$IFDEF MeRTTI_SUPPORT}
 const
-  cMeObjectClassName: String[16] = 'TMeDynamicObject';
-  cMeInterfacedObjectClassName: String[19] = 'TMeInterfacedObject';
-  cMeContainerClassName: String[12] = 'TMeContainer';
-  cMeListClassName: String[7] = 'TMeList';
-  cMeStringsClassName: String[10] = 'TMeStrings';
-  cMeComponentClassName: String[12] = 'TMeComponent';
-  cMeDynamicMemoryClassName: String[16] = 'TMeDynamicMemory';
+  cMeObjectClassName: PChar = 'TMeDynamicObject';
+  cMeInterfacedObjectClassName: PChar = 'TMeInterfacedObject';
+  cMeContainerClassName: PChar = 'TMeContainer';
+  cMeListClassName: PChar = 'TMeList';
+  cMeStringsClassName: PChar = 'TMeStrings';
+  cMeComponentClassName: PChar = 'TMeComponent';
+  cMeDynamicMemoryClassName: PChar = 'TMeDynamicMemory';
 {$ENDIF}
 
 Function XorStr(const s: string; key: string): string;
@@ -3472,13 +3549,13 @@ begin
   //Update the MeObject VMT Table.
   {$IFDEF MeRTTI_SUPPORT}
   //Make the ovtVmtClassName point to PShortString class name
-  SetMeVirtualMethod(TypeOf(TMeDynamicObject), ovtVmtClassName, @cMeObjectClassName);
-  SetMeVirtualMethod(TypeOf(TMeInterfacedObject), ovtVmtClassName, @cMeInterfacedObjectClassName);
-  SetMeVirtualMethod(TypeOf(TMeContainer), ovtVmtClassName, @cMeContainerClassName);
-  SetMeVirtualMethod(TypeOf(TMeList), ovtVmtClassName, @cMeListClassName);
-  SetMeVirtualMethod(TypeOf(TMeStrings), ovtVmtClassName, @cMeStringsClassName);
-  SetMeVirtualMethod(TypeOf(TMeComponent), ovtVmtClassName, @cMeComponentClassName);
-  SetMeVirtualMethod(TypeOf(TMeDynamicMemory), ovtVmtClassName, @cMeDynamicMemoryClassName);
+  SetMeVirtualMethod(TypeOf(TMeDynamicObject), ovtVmtClassName, cMeObjectClassName);
+  SetMeVirtualMethod(TypeOf(TMeInterfacedObject), ovtVmtClassName, cMeInterfacedObjectClassName);
+  SetMeVirtualMethod(TypeOf(TMeContainer), ovtVmtClassName, cMeContainerClassName);
+  SetMeVirtualMethod(TypeOf(TMeList), ovtVmtClassName, cMeListClassName);
+  SetMeVirtualMethod(TypeOf(TMeStrings), ovtVmtClassName, cMeStringsClassName);
+  SetMeVirtualMethod(TypeOf(TMeComponent), ovtVmtClassName, cMeComponentClassName);
+  SetMeVirtualMethod(TypeOf(TMeDynamicMemory), ovtVmtClassName, cMeDynamicMemoryClassName);
   SetMeVirtualMethod(TypeOf(TMeStream), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeNamedObject), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeNamedObjects), ovtVmtClassName, nil);
