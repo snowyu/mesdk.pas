@@ -1,0 +1,259 @@
+MeSDK - MeScript Engine
+  The Fastest script engine in the world
+
+根据MeAOP的MeProc 作为执行基础，构想能逐个运行 MeProc的机制(MeProc过程流控制)作为 MeScript.
+
+准备将MeScript作为单独为MeKB实现的脚本引擎，也就是说，所有的数据来自数据库！！
+为了执行MeKB的动作而实现。废弃内存变量！
+构建一系列的MeProc, IF 语句等都是MeProc. 然后在 TMeScriptBlock 的控制下逐个运行。
+在理解了JS的实现机制：动态函数式语言后决定采用类似的方式实现，先弄一个原型，不考虑优化速度。
+
+MeScript Prototype V1:
+  1. Function, Variable, Object
+  2. AutoBinding, ManualBinding, LaterBinding
+  3. Operator(can be defined via user)
+  是否需要考虑内存调度问题：将近期没有运行的函数从内存卸载，当需要的时候才加载。
+
+uMeScript.pas
+//uTurboCustomSymbol.pas 抽象出既能在这里用的，也能在TurboScript中用的！
+
+架构：
+动态语言足够小，可以作为中间纯解释语言，就当练手，熟悉后，将它的一些特性加入到 TurboScript 中。
+
+脚本的最小执行块为: 代码块（ScriptBlock）
+TMeScriptCustomBlock： 抽象代码块
+  TMeScriptBlock： 脚本代码块，支持局部变量，无参数
+    TMeScriptFunction：脚本函数，支持参数
+      TMeScriptGlobalFunction： 全局脚本函数，脚本执行必须从此处开始，堆栈，虚拟CPU状态，全在此处。
+  TMeScriptCustomFunction： 抽象函数
+    TMeScriptInternalFunction： 引擎内部预定义函数，通过 TMeScriptFunction.RegisterFunction 方法注册到脚本函数上。
+
+堆栈：分为数据栈(FDataStack), 返回栈(FReturnStack), this 指针栈，在 TMeScriptGlobalFunction 上。
+
+数据栈(FDataStack)：所有数据栈的数据都是PMeScriptValue指针，运算是通过指针运算。注意处理 nil, nil 表示 undefined 值.
+返回栈(FReturnStack)：  当进入某个代码块前需要保存当前代码块的数据（局部变量，参数【如果是函数】，当前代码块的执行地址）(InitExecution)，这些数据被压入返回栈。并在退出代码块前被释放(FinalizeExecution)。
+  局部变量：仅在代码块内存在，局部变量编译后没有名字，没有后期绑定！
+  函数参数：当进入某脚本函数前(InitExecution)将数据栈上的所有参数【参数1..参数n, n(参数个数)】形成一个参数对象(GenerateArgumentsObject)，退出函数前释放(FinalizeExecution)。
+
+只有值和函数。在JS中所有的变量和函数都是后期绑定的（最终我的实现是既有前期绑定，又有后期绑定）。
+系统初始有一个全局函数(TMeScriptGlobalFunction)，执行这个函数就相当于执行程序的Main入口。
+
+
+TMeScriptValue.Ctor -> TMeScriptFunction
+TMeScriptFunction.prototype -> TMeScriptObject
+
+Car1.Ctor -> Car()
+Car().prototype -> CarProtoTypeObject(the TypeInfo Object)
+CarProtoTypeObject.Ctor -> Car()
+实际上 prototype 就是类型信息！
+
+  TMeScriptTypeKind = (mtkUndefined, mtkNumber, mtkBoolean, mtkFunction, mtkObject);
+  TMeScriptValueRecord = record
+    case Integer of
+      0: (
+        case TMeScriptTypeKind of
+          mtkLString:    (VAnsiString: Pointer);
+          mtkBoolean:    (VBool: Boolean);
+          mtkNumber:     (VNumber: Double);
+          mtkFunction:   (VFunc: PMeScriptFunction);
+          mtkObject:     (VFunc: PMeScriptObject);
+      );
+
+  end;
+
+  PMeScriptValue = ^ TMeScriptValue;
+  TMeScriptValue = Object
+    //TypeInfo: TMeScriptTypeKind; //(Number, String, Boolean, Function, Object), 如果为nil表示未定义。
+    Ctor: PMeScriptFunction; //constructor of the value.
+    Value: TMeScriptValueRecord;
+    procedure Clear; //clear value, undefined value.
+  end;
+
+  TMeScriptElement =  Object(TMeInterfacedObject)
+  protected
+    FName: string;
+    FSource: string;
+  end;
+
+  {
+   进入则将局部变量分配空间到数据栈，退出则释放局部变量，如果有的话
+   相关指令： 
+     LDVar index 将指定index号的变量压入数据栈:  push DataStack[_BP-index]
+     如何访问父亲的local var??
+ 
+   源程序：
+     Begin ...块
+     End;
+   编译： Identity 搜索顺序，首先搜LocalVars，然后搜索Parent的。   (这里看不到属性)
+    
+     
+  }
+  PMeScriptBlock = ^ TMeScriptBlock;
+  TMeScriptBlock = Object(TMeScriptElement)
+  protected
+    FGlobalFunction: PMeScriptGlobalFunction;
+    FParent: PMeScriptBlock;
+    FFuncs: array of PMeScriptFunctions; //collec the defined local functions in it.
+    FVarNames: array of string; //the local var names for compile-time.
+    //局部变量初始值：
+    FVars: array of TMeScriptValue;
+    FCodeMem: Pointer; //the compiled binary code. TMeDynamicMemory
+
+    procedure iCompile; virtual;
+  public
+    function Execute(const aParams: TMeScriptArguments): TMeScriptValue;
+    procedure Compile;
+    var
+      vMemory: PMeDynamicMemory;
+    begin
+    end;
+  end;
+
+  PMeScriptFunction = ^MeScriptFunction;
+  TMeScriptFunction = Object(TMeScriptBlock)
+  protected
+    FFlags: TMeScriptFunctionFlags; //ffInternal
+    FPrototype: PMeScriptObject;
+  public
+    function GetLocalVarId(const aName: string): Integer;
+    function GetVar(const aName: string; const SearchParent: Boolean = false): PMeScriptVar;
+    function GetLocalFuncId(const aName): Integer;
+  end;
+
+  TMeScriptPC = record
+    PC: tsInt;
+    Mem: Pointer;
+  end;
+  PMeScriptGlobalFunction = ^ TMeScriptGlobalFunction;
+  TMeScriptGlobalFunction = Object(TMeScriptFunction)
+  protected
+    procedure iVMCall(const aFunc: PMeScriptFunction);
+  public
+    {## the VM instructions ## }
+    procedure VMAssignment;
+    {代码体是在函数上的，如何处理？
+      法1： 进入某函数的时候，压入原来的_Mem和_PC,赋值给全局 _Mem 和 _PC. 修改返回栈的内容为： {_Mem, _PC}，退出函数则还原原来的。
+      //法2： 直接传递给VM指令。 选择法1。
+    }
+    procedure VMCall;
+
+  public
+    {所有数据栈的数据都是PMeScriptValue指针，运算是通过指针运算。
+     局部变量编译后没有名字，没有后期绑定！
+    }
+    DataStack: array of PMeScriptValue;
+    ReturnStack: array of TMeScriptPC;
+    _PC: tsInt;
+    //the ReturnStack Pointer.
+    _RP: tsInt;
+    //the DataStack Pointer
+    _SP: tsInt;
+    //the DataStack Base Pointer
+    _BP: tsInt;
+  end;
+
+  //prototype
+  TMeScriptObject = Object(TMeScriptElement)
+  public
+    Ctor: PMeScriptFunction; //constructor
+    Attributes: PMeList;
+    function GetLocalAttrId(const aName: string): Integer;
+    function GetAttr(const aName: string; const SearchParent: Boolean = false): PMeScriptVar;
+  end;
+
+最小指令集：
+  Push value
+  POP
+  New Func(2) = {var aObj= TMeScriptObject.Create; aObj.Ctor = Func; _Call Func(2);}
+  _Call Func(2) = {var args = _New Arguments; Arguments.Callee = @Self; Arguments[0] = 2;  PMeScriptFunction(Func).Execute(args);args.free}
+  Assign(const aVarId: integer; aValue: PMeScriptValue);
+  GetVarId(const aName)
+  DefineVar
+  DefineAttr
+  DefineFunc
+
+CoreMeScriptProcs = array [] of MeProc;??
+
+TMeScriptBlock = 
+
+参数传递问题：
+参数采用： 参数类型，参数的形式，编入代码流。
+一个过程在代码中的表现：
+ProcId ParamCount <ParamList>
+ParamList= {Param}
+Param = ParamType ParamValue
+
+TMeScriptBlock 解析执行代码流。
+  function RunProc(): MeParamValue;
+    装配参数
+      如果参数是一个过程，那么调用该过程，并返回结果，在赋值给参数。
+    执行并返回结果
+
+
+VM Execute flowchart:
+VMCodes:
+ Load a VM Lib/Function;
+   Load the Lib header; 如果是来自数据库就没有该项。
+   Load the types;??  非后期绑定的
+   Load the Constants;?? 非后期绑定的
+   Load the Variables?? 非后期绑定的
+   Load the functions:
+     Decode the VM codes to TMeScriptFunction, and assign the params to the TMeScriptFunction.
+   run the Init function for Lib.
+
+如果全部存放在数据库中呢：
+  那就意味着所有的符号变量都是后期绑定的么？不是！依然存在普通放于内存中的变量和常量。
+
+Code - Structure
+
+the run-time script types, constants, global variables and procedures can be stored in the memory or database.
+
+RTTI 类型info can be switch off. when rtti is on, the types info can be stored in the memory or database.
+
+Source Script Code -> Compiled Script Code(P-Code) -> Relocated Script Class
+
+
+the run-time code structure:
+
+编译后的：Module(Package/Unit/program/function)
+  Name: string;
+  Path: string; the module path: ParentLib.SubParentLib
+  IsLoaded: Boolean; //建议考虑使用AOP来完成按需加载处理。
+  ChildModules: TMeModules;
+  Variables: 分配的变量内存区域， 内存： [PShortString(变量名称) PMeType] 实际开辟的变量区域
+  Constants: 编译的时候才有，运行的时候也有，存放常量字符串区域。
+  Types(symbolTables):
+  //Procs:
+  MainProc(InitProc): 内存： PMeProcedure(地址) 集合，大部分的参数可以在装载（编译）的时候确定，对于在编译时候不能确定的，纳入后期（运行时刻）绑定或报错处理。
+  FinalProc:
+
+编译前的：Module(Package/Unit/program/function)
+  Name: string;
+  Path: string; the module path: ParentLib.SubParentLib
+  ChildModules: TMeModules;
+  Variables: PMeVariables;
+  Constants: PMeVariables;
+
+TMeVar = record
+  Name: string;
+  VarType: PMeType;
+  Value: ;
+end;
+
+后期（运行时刻）绑定：增加是否支持后期（运行时刻）绑定的编译开关
+对于编译期不能确定的变量、过程、类型，那么就是后期（运行时刻）绑定类型，直接联入该类型的标识符。eg,
+PushFindVar 'lib.var.fghh'
+增加专门处理后期（运行时刻）绑定的单词实现。
+CallFindProc 'action.ssss'
+
+过程/模块按需装载：
+子模块装载只装载名称，不分配内存，不装载程序主体。
+
+核心(Internal)函数总览
+也就是内部关键字（过程）。ID为LongWord（$1-$FFFFFFFF）,可以分为系统关键字过程,ID从1-$FFFF和用户自定义关键字过程，ID($10000-$FFFFFFFF).
+
+系统关键字过程:
+  四则运算过程：
+  逻辑运算过程：
+  字符串处理：
+  流程控制： if...else, while, for...next, repeat...until.
