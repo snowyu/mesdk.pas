@@ -199,6 +199,7 @@ type
     procedure FinalizeExecution; virtual; {override}
 
     //“‘œ¬ «Parser.
+    {}
     function iParser(const aTokenizer: PMeTokenizer): Boolean; virtual;
     //eg, aFunc(a,b);
     function iParserCallFunctionRef(const aTokenizer: PMeTokenizer): Boolean;
@@ -252,7 +253,7 @@ type
     Func: TMeScriptInternalFunctionType;
   end;
 
-  { Summary the useer defined script function.}
+  { Summary the user defined script function.}
   TMeScriptFunction = Object(TMeScriptBlock)
   protected
     //the defined arguments at compile-time. store the argument name.
@@ -876,6 +877,11 @@ begin
 end;
 }
 
+{
+ parser:
+   Function();
+   value
+}
 function TMeScriptBlock.iParser(const aTokenizer: PMeTokenizer): Boolean;
 var
   vToken, vNextToken: PMeToken;
