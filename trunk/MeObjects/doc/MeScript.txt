@@ -14,7 +14,6 @@ MeScript Prototype V1:
 是否需要考虑内存调度问题：将近期没有运行的函数从内存卸载，当需要的时候才加载。
 
 uMeScript.pas
-//uTurboCustomSymbol.pas 抽象出既能在这里用的，也能在TurboScript中用的！
 
 架构：
 动态语言足够小，可以作为中间纯解释语言，就当练手，熟悉后，将它的一些特性加入到 TurboScript 中。
@@ -34,7 +33,7 @@ TMeScriptCustomBlock： 抽象代码块
 值对象：
   TMeScriptValue： 没有名字，只有类型，值，和 Ctor。
 
-函数返回值的处理：如果没有赋值操作，应该直接丢掉返回值。
+函数返回值的处理：在碰到分隔符后，如果没有赋值操作，应该直接丢掉返回值。
 
 堆栈：分为数据栈(FDataStack), 返回栈(FReturnStack), this 指针栈，放在 TMeScriptGlobalFunction 上。
 
