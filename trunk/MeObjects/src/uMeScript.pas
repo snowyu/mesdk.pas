@@ -118,6 +118,7 @@ type
     property Items[const Index: Integer]: PMeScriptValue read GetItem; default;
   end;
 
+  {: the abstract script execution block. }
   TMeScriptCustomBlock = Object(TMeScriptElement)
   protected
     FGlobalFunction: PMeScriptGlobalFunction;
