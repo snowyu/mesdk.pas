@@ -1,18 +1,17 @@
 MeSDK - MeScript Engine
-  The Fastest script engine in the world
 
 根据MeAOP的MeProc 作为执行基础，构想能逐个运行 MeProc的机制(MeProc过程流控制)作为 MeScript.
 
-准备将MeScript作为单独为MeKB实现的脚本引擎，也就是说，所有的数据来自数据库！！
-为了执行MeKB的动作而实现。废弃内存变量！
 构建一系列的MeProc, IF 语句等都是MeProc. 然后在 TMeScriptBlock 的控制下逐个运行。
-在理解了JS的实现机制：动态函数式语言后决定采用类似的方式实现，先弄一个原型，不考虑优化速度。
+在理解了JS的实现机制——动态函数式语言后，决定先弄一个原型，不考虑优化速度。
 
 MeScript Prototype V1:
+实现目标
   1. Function, Variable, Object
   2. AutoBinding, ManualBinding, LaterBinding
   3. Operator(can be defined via user)
-  是否需要考虑内存调度问题：将近期没有运行的函数从内存卸载，当需要的时候才加载。
+
+是否需要考虑内存调度问题：将近期没有运行的函数从内存卸载，当需要的时候才加载。
 
 uMeScript.pas
 //uTurboCustomSymbol.pas 抽象出既能在这里用的，也能在TurboScript中用的！
@@ -28,17 +27,17 @@ TMeScriptCustomBlock： 抽象代码块
   TMeScriptCustomFunction： 抽象函数
     TMeScriptInternalFunction： 引擎内部预定义函数，通过 TMeScriptFunction.RegisterFunction 方法注册到脚本函数上。
 
-堆栈：分为数据栈(FDataStack), 返回栈(FReturnStack), this 指针栈，在 TMeScriptGlobalFunction 上。
+堆栈：分为数据栈(FDataStack), 返回栈(FReturnStack), this 指针栈，放在 TMeScriptGlobalFunction 上。
 
 数据栈(FDataStack)：所有数据栈的数据都是PMeScriptValue指针，运算是通过指针运算。注意处理 nil, nil 表示 undefined 值.
 返回栈(FReturnStack)：  当进入某个代码块前需要保存当前代码块的数据（局部变量，参数【如果是函数】，当前代码块的执行地址）(InitExecution)，这些数据被压入返回栈。并在退出代码块前被释放(FinalizeExecution)。
   局部变量：仅在代码块内存在，局部变量编译后没有名字，没有后期绑定！
   函数参数：当进入某脚本函数前(InitExecution)将数据栈上的所有参数【参数1..参数n, n(参数个数)】形成一个参数对象(GenerateArgumentsObject)，退出函数前释放(FinalizeExecution)。
 
-只有值和函数。在JS中所有的变量和函数都是后期绑定的（最终我的实现是既有前期绑定，又有后期绑定）。
+只有值和函数。在JS中所有的变量和函数都是后期绑定的（最终实现是既有前期绑定，又有后期绑定）。
 系统初始有一个全局函数(TMeScriptGlobalFunction)，执行这个函数就相当于执行程序的Main入口。
 
-函数的调用如果是方法，还要处理this指针。似乎该Parser处理。
+函数的调用如果是方法，还要处理this指针。似乎该在Parser时处理。
 “.”引用如果作为后期绑定实现，可以将“.”作为一个内部函数实现。否则还是要作为关键字在编译时刻处理前期绑定的部分。
 
 TMeScriptValue.Ctor -> TMeScriptFunction
