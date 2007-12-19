@@ -164,98 +164,23 @@ CarProtoTypeObject.Ctor -> Car()
   end;
 
 最小指令集：
-  Push value
-  POP
-  New Func(2) = {var aObj= TMeScriptObject.Create; aObj.Ctor = Func; _Call Func(2);}
-  _Call Func(2) = {var args = _New Arguments; Arguments.Callee = @Self; Arguments[0] = 2;  PMeScriptFunction(Func).Execute(args);args.free}
-  Assign(const aVarId: integer; aValue: PMeScriptValue);
-  GetVarId(const aName)
-  DefineVar
-  DefineAttr
-  DefineFunc
-
-CoreMeScriptProcs = array [] of MeProc;??
-
-TMeScriptBlock = 
-
-参数传递问题：
-参数采用： 参数类型，参数的形式，编入代码流。
-一个过程在代码中的表现：
-ProcId ParamCount <ParamList>
-ParamList= {Param}
-Param = ParamType ParamValue
-
-TMeScriptBlock 解析执行代码流。
-  function RunProc(): MeParamValue;
-    装配参数
-      如果参数是一个过程，那么调用该过程，并返回结果，在赋值给参数。
-    执行并返回结果
-
-
-VM Execute flowchart:
-VMCodes:
- Load a VM Lib/Function;
-   Load the Lib header; 如果是来自数据库就没有该项。
-   Load the types;??  非后期绑定的
-   Load the Constants;?? 非后期绑定的
-   Load the Variables?? 非后期绑定的
-   Load the functions:
-     Decode the VM codes to TMeScriptFunction, and assign the params to the TMeScriptFunction.
-   run the Init function for Lib.
-
-如果全部存放在数据库中呢：
-  那就意味着所有的符号变量都是后期绑定的么？不是！依然存在普通放于内存中的变量和常量。
-
-Code - Structure
-
-the run-time script types, constants, global variables and procedures can be stored in the memory or database.
-
-RTTI 类型info can be switch off. when rtti is on, the types info can be stored in the memory or database.
-
-Source Script Code -> Compiled Script Code(P-Code) -> Relocated Script Class
-
-
-the run-time code structure:
-
-编译后的：Module(Package/Unit/program/function)
-  Name: string;
-  Path: string; the module path: ParentLib.SubParentLib
-  IsLoaded: Boolean; //建议考虑使用AOP来完成按需加载处理。
-  ChildModules: TMeModules;
-  Variables: 分配的变量内存区域， 内存： [PShortString(变量名称) PMeType] 实际开辟的变量区域
-  Constants: 编译的时候才有，运行的时候也有，存放常量字符串区域。
-  Types(symbolTables):
-  //Procs:
-  MainProc(InitProc): 内存： PMeProcedure(地址) 集合，大部分的参数可以在装载（编译）的时候确定，对于在编译时候不能确定的，纳入后期（运行时刻）绑定或报错处理。
-  FinalProc:
-
-编译前的：Module(Package/Unit/program/function)
-  Name: string;
-  Path: string; the module path: ParentLib.SubParentLib
-  ChildModules: TMeModules;
-  Variables: PMeVariables;
-  Constants: PMeVariables;
-
-TMeVar = record
-  Name: string;
-  VarType: PMeType;
-  Value: ;
-end;
-
-后期（运行时刻）绑定：增加是否支持后期（运行时刻）绑定的编译开关
-对于编译期不能确定的变量、过程、类型，那么就是后期（运行时刻）绑定类型，直接联入该类型的标识符。eg,
-PushFindVar 'lib.var.fghh'
-增加专门处理后期（运行时刻）绑定的单词实现。
-CallFindProc 'action.ssss'
-
-过程/模块按需装载：
-子模块装载只装载名称，不分配内存，不装载程序主体。
-
-核心(Internal)函数总览
-也就是内部关键字（过程）。ID为LongWord（$1-$FFFFFFFF）,可以分为系统关键字过程,ID从1-$FFFF和用户自定义关键字过程，ID($10000-$FFFFFFFF).
-
-系统关键字过程:
-  四则运算过程：
-  逻辑运算过程：
-  字符串处理：
-  流程控制： if...else, while, for...next, repeat...until.
+    , opHalt       // ( -- )
+    , opCallBlock   // opCallBlock pBlock (  --  )
+    , opCallFunc    // opCallFunc pFunction ( Arguments -- pResultValue )
+    , opCall        // opCall ( Arguments pFuncValue -- pResultValue )
+    , opCallBind    // opCallBind <StrLen:byte>FuncNameStr ( Arguments -- pResultValue ) the runtime error raised if function is not exists at runtime
+    , opObjectBind  // opObjectBind <StrLen:byte>ObjNameStr ( -- pObject)
+    , opLoadAttrById   // opLoadAttrById ( pObject <Id:Int32> -- pValue)  if not found return nil
+    , opLoadAttr // opLoadAttr ( pObject <Len:Byte>AttrNameStr -- pValue) if not found return nil
+    , opAssign     // opAssign pVar ( pValue -- )
+    , opPush       // opPush Int32 ( -- Int32)
+    , opPushDouble // opPushDouble Double ( -- pValue)
+    , opPushString // opPushString <cnt:Longword>string ( -- pValue)
+    , opPushObject // opPushObject pObject ( -- pValue)
+    , opPushFunction // opPushFunction pFunc ( -- pValue)
+    , opPop        // opPop         (Int32 -- )
+    , opLoadArg    // opLoadArg <index> ( -- pValue)  load local argument
+    , opLoadArgFar // opLoadArgFar <stackIndex> <index> ( -- pValue)  load parent argument which argument in return stack:  FReturnStack[_RP - stackIndex].Arguments.Attributes[index]
+    , opLoadVar    // opLoadVar <index> (-- pValue)  load loal varaible
+    , opLoadVarFar // opLoadVarFar <stackIndex> <index> ( -- pValue)  load parent varaible which varaible in return stack:  FReturnStack[_RP - stackIndex].Varaibles.Items[index]
+    , opLoadBind   // opCallBind <Len:byte>NameStr ( -- pValue ) the runtime error raised if function is not exists at runtime
