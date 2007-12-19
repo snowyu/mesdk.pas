@@ -663,10 +663,12 @@ function TMeScriptBlock.FindVariable(const aName: string; var aStackIndex: Integ
 var
   vParent: PMeScriptElement;
 begin
+	//search local variables
   for Result := 0 to Length(FVariablesName) - 1 do
   begin
     if FVariablesName[Result] = aName then exit;
   end;
+  //search parent local variables
   Result := -1;
   vParent := Parent;
   while (Result = -1) and (vParent <> nil) do
@@ -734,7 +736,7 @@ begin
           end; //case
           Inc(vParamCount);
           vNextToken := NextToken();
-          Result := Assigned(vNextToken) and ((vNextToken.TokenId = ttArgSpliter) or (vNextToken.TokenId = ttArgsEnd));
+          Result := Result and Assigned(vNextToken) and ((vNextToken.TokenId = ttArgSpliter) or (vNextToken.TokenId = ttArgsEnd));
           if Result then
           begin
             if vNextToken.TokenId = ttArgSpliter then
@@ -747,9 +749,11 @@ begin
         if Result then
         begin
           Body.AddOpCode(opPush, vParamCount);
+          //reuse vParamCount as stackIndex
           i := FindVariable(vFuncName, vParamCount);
           if i >= 0 then
           begin
+          	//vParamCount is stackIndex
             if vParamCount = 0 then
               Body.AddOpCode(opLoadVar, i)
             else begin
@@ -880,11 +884,13 @@ begin
 end;
 }
 
-{
+(*
  parser:
    Function();
-   value
-}
+   value;
+   or block: {}
+   
+*)
 function TMeScriptBlock.iParser(const aTokenizer: PMeTokenizer): Boolean;
 var
   vToken, vNextToken: PMeToken;
