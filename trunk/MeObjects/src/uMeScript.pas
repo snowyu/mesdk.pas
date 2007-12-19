@@ -215,7 +215,7 @@ type
     //FVariables: array of TMeScriptValue;
     // the local variable count.
     //FVariableCount: Integer;
-    FConstants: TMeScriptDynaValues;
+    //FConstants: TMeScriptDynaValues;
     FFunctions: PMeNamedObjects;
     FBody: PMeScriptCodeMemory;
     //for compile-time only, the index means the variable index.
