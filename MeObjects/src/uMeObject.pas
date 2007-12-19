@@ -1,3 +1,4 @@
+
 {Summary MeObject - the MeSDK Core - the abstract mini class(dynamic) - PMeDynamicObject.}
 {
    @author  Riceball LEE<riceballl@hotmail.com>
@@ -38,7 +39,7 @@ example
     end;
   </code>
 
-TODO: 需要废弃Exception Class 使用自己的 MeExceptionObject??
+需要废弃Exception Class 使用自己的 MeExceptionObject??
 No, use the EMeError instead of create new Exception Class.
 All Object use the EMeError class only!
 }

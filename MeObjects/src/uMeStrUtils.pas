@@ -1,3 +1,4 @@
+
 { Summary Various character and string routines (searching, testing and transforming).}
 {
    @author  Riceball LEE<riceballl@hotmail.com>
