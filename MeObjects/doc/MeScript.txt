@@ -31,6 +31,11 @@ TMeScriptCustomBlock： 抽象代码块
   TMeScriptCustomObject: 抽象的脚本对象，内部脚本对象和纯脚本对象从该处派生
     TMeScriptObject: 纯脚本对象,实现了属性列表。
 
+值对象：
+  TMeScriptValue： 没有名字，只有类型，值，和 Ctor。
+
+函数返回值的处理：如果没有赋值操作，应该直接丢掉返回值。
+
 堆栈：分为数据栈(FDataStack), 返回栈(FReturnStack), this 指针栈，放在 TMeScriptGlobalFunction 上。
 
 数据栈(FDataStack)：所有数据栈的数据都是PMeScriptValue指针，运算是通过指针运算。注意处理 nil, nil 表示 undefined 值.
