@@ -308,7 +308,8 @@ type
 
   //Return Stack Frame
   TMeScriptPC = record
-    Mem: tsUInt; //it is the current FBody.Memory
+    Mem: tsUInt; //it is the current FBody.Memory of the execute function
+    //the current execute function.
     Func: PMeScriptBlock;
     //脚本函数参数,当进入某脚本函数将转换栈上的所有参数形成一个参数对象，退出函数前，注意释放该参数对象。
     Arguments: PMeScriptArguments;
@@ -325,7 +326,7 @@ type
     FReturnStack: array of TMeScriptPC;
     //this 栈。this 指针的处理在进入函数前，后退出函数后，如果函数是对象调用的话！
     FThisPtrStack: PMeList;
-    _Func: PMeScriptBlock;
+    //_Func: PMeScriptBlock;
     _PC: TMeScriptPC;
     //the ReturnStack Pointer. it is the index of FReturnStack
     _RP: tsInt;
@@ -333,6 +334,7 @@ type
     _SP: tsInt;
     //the DataStack Base Pointer. it is the index of FDataStack
     _BP: tsInt;
+    //the current this pointer.
     _this: PMeScriptCustomObject;
   protected
     function GetIsRunning(): Boolean;
