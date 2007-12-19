@@ -365,7 +365,7 @@ type
     //the DataStack Pointer. it is the index of FDataStack
     _SP: tsInt;
     //the DataStack Base Pointer. it is the index of FDataStack
-    _BP: tsInt;
+    //_BP: tsInt;
     //the current this pointer.
     _this: PMeScriptCustomObject;
   protected
@@ -1263,7 +1263,7 @@ begin
     FDataStack.Count := cMeScriptMaxDataStackSize;
     _SP := 0; //Integer(ParamStackTop) + ParamStackSize * SizeOf(tsInt);
     _RP := 0; //Integer(ReturnStackTop) + ReturnStackSize * SizeOf(Pointer);
-    _BP := 0;
+    //_BP := 0;
     _PC.Func   := nil;
     _PC.Mem := tsUInt(FBody.Memory);
     LastErrorCode := errNone;
