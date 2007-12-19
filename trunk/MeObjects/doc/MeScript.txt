@@ -39,6 +39,7 @@ TMeScriptCustomBlock： 抽象代码块
 系统初始有一个全局函数(TMeScriptGlobalFunction)，执行这个函数就相当于执行程序的Main入口。
 
 函数的调用如果是方法，还要处理this指针。似乎该Parser处理。
+“.”引用如果作为后期绑定实现，可以将“.”作为一个内部函数实现。否则还是要作为关键字在编译时刻处理前期绑定的部分。
 
 TMeScriptValue.Ctor -> TMeScriptFunction
 TMeScriptFunction.prototype -> TMeScriptObject
