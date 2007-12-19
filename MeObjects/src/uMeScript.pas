@@ -3,6 +3,7 @@ unit uMeScript;
 interface
 
 {$I Setting.inc}
+{$Define PUREPASCAL}
 
 uses
   {$IFDEF MSWINDOWS}
