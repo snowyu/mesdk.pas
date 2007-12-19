@@ -38,6 +38,7 @@ TMeScriptCustomBlock： 抽象代码块
 只有值和函数。在JS中所有的变量和函数都是后期绑定的（最终我的实现是既有前期绑定，又有后期绑定）。
 系统初始有一个全局函数(TMeScriptGlobalFunction)，执行这个函数就相当于执行程序的Main入口。
 
+函数的调用如果是方法，还要处理this指针。似乎该Parser处理。
 
 TMeScriptValue.Ctor -> TMeScriptFunction
 TMeScriptFunction.prototype -> TMeScriptObject
