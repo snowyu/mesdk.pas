@@ -60,10 +60,10 @@ type
     , opCallBlock   // opCallBlock pBlock (  --  )
     , opCallFunc    // opCallFunc pFunction ( Arguments -- pResultValue )
     , opCall        // opCall ( Arguments pFuncValue -- pResultValue )
-    , opCallBind    // opCallBind <Len:byte>FuncNameStr ( Arguments -- pResultValue ) the runtime error raised if function is not exists at runtime
-    , opObjectBind  // opObjectBind <Len:byte>ObjNameStr ( -- pObject)
+    , opCallBind    // opCallBind <StrLen:byte>FuncNameStr ( Arguments -- pResultValue ) the runtime error raised if function is not exists at runtime
+    , opObjectBind  // opObjectBind <StrLen:byte>ObjNameStr ( -- pObject)
     , opLoadAttrById   // opLoadAttrById ( pObject <Id:Int32> -- pValue)  if not found return nil
-    , opLoadAttr // opLoadAttr ( pObject <Len:Byte>AttrNameStr -- pValue) if not found return nil
+    , opLoadAttr // opLoadAttr ( pObject <StrLen:Byte>AttrNameStr -- pValue) if not found return nil
     , opAssign     // opAssign pVar ( pValue -- )
     , opPush       // opPush Int32 ( -- Int32)
     , opPushDouble // opPushDouble Double ( -- pValue)
@@ -75,7 +75,7 @@ type
     , opLoadArgFar // opLoadArgFar <stackIndex> <index> ( -- pValue)  load parent argument which argument in return stack:  FReturnStack[_RP - stackIndex].Arguments.Attributes[index]
     , opLoadVar    // opLoadVar <index> (-- pValue)  load loal varaible
     , opLoadVarFar // opLoadVarFar <stackIndex> <index> ( -- pValue)  load parent varaible which varaible in return stack:  FReturnStack[_RP - stackIndex].Varaibles.Items[index]
-    , opLoadBind   // opCallBind <Len:byte>NameStr ( -- pValue ) the runtime error raised if function is not exists at runtime
+    , opLoadBind   // opCallBind <StrLen:byte>NameStr ( -- pValue ) the runtime error raised if function is not exists at runtime
   );
 
   PMeScriptCodeMemory = ^TMeScriptCodeMemory;
