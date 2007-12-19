@@ -27,6 +27,10 @@ TMeScriptCustomBlock： 抽象代码块
   TMeScriptCustomFunction： 抽象函数
     TMeScriptInternalFunction： 引擎内部预定义函数，通过 TMeScriptFunction.RegisterFunction 方法注册到脚本函数上。
 
+脚本对象：
+  TMeScriptCustomObject: 抽象的脚本对象，内部脚本对象和纯脚本对象从该处派生
+    TMeScriptObject: 纯脚本对象,实现了属性列表。
+
 堆栈：分为数据栈(FDataStack), 返回栈(FReturnStack), this 指针栈，放在 TMeScriptGlobalFunction 上。
 
 数据栈(FDataStack)：所有数据栈的数据都是PMeScriptValue指针，运算是通过指针运算。注意处理 nil, nil 表示 undefined 值.
