@@ -81,7 +81,7 @@ type
           mtkString:     (VAnsiString: Pointer);
           mtkBoolean:    (VBool: Boolean);
           mtkNumber:     (VNumber: Double);
-          mtkFunction:   (VFunc: PMeScriptCustomFunction);
+          mtkFunction:   (VFunc: PMeScriptCustomFunction; VThis: PMeScriptCustomObject); //当将一个方法赋值给变量，该变量还应该保持该方法的VThis指针值。
           mtkObject:     (VObject: PMeScriptCustomObject);
       );
   end;
