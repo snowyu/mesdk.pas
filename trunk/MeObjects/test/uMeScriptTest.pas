@@ -58,6 +58,7 @@ end;
 
 procedure TTest_MeScript.Test_Compile();
 begin
+  FScript.Parser('aaa();');
   //CheckEquals(aExcept.Size, aFact.Size, aExcept.Token+ ' the Token Size is error.');
 end;
 
