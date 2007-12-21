@@ -48,8 +48,10 @@ TMeScriptCustomBlock： 抽象代码块
 
 函数的调用如果是方法，还要处理this指针。似乎该在Parser时处理。
 “.”引用如果作为后期绑定实现，可以将“.”作为一个内部函数实现。否则还是要作为关键字在编译时刻处理前期绑定的部分。
+可以这样，如果能在编译时刻找到，就作为前期绑定，否则就认为是一个后期绑定：凡是函数，标识符后必须有括号，否则就当作属性处理。
 
-当将一个方法赋值给变量，该变量还应该保持该方法的_this指针值。
+
+当将一个方法赋值给变量，该变量还应该保持该方法的_this指针值。当对象释放后，必须将this指针置为nil.
 
 TMeScriptValue.Ctor -> TMeScriptFunction
 TMeScriptFunction.prototype -> TMeScriptObject

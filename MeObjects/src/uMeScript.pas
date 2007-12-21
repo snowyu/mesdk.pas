@@ -108,6 +108,7 @@ type
   TMeScriptValue = Object
   protected
     TypeKind: TMeScriptTypeKind;
+    procedure FreeObjectNotification;
   public
     procedure Clear;
     procedure Assign(const aValue: PMeScriptValue);
@@ -578,8 +579,14 @@ begin
   case TypeKind of
     mtkString: string(Value.VAnsiString) := '';
     mtkObject: MeFreeAndNil(Value.VObject);
+    mtkFunction: if Assigned(Value.VThis) then VThis.RemoveFreeNotification(FreeObjectNotification);
   end;
   TypeKind := mtkUndefined;
+end;
+
+procedure TMeScriptValue.FreeObjectNotification;
+begin
+	if TypeKind = mtkFunction then Value.VThis := nil;
 end;
 
 { TMeScriptCustomBlock }
