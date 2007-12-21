@@ -325,6 +325,7 @@ type
     procedure AddDependent(Obj: PMeDynamicObject);
     {Summary This Notification Proc will be executed before the object is free. }
     procedure FreeNotification(Proc: TMeObjectMethod);
+    procedure RemoveFreeNotification(Proc: TMeObjectMethod);
   public
     {Summary Indicates the number of instance pointers currently dependent upon the object.}
     property RefCount: Integer read FRefCount;
@@ -1375,6 +1376,38 @@ asm
         POP      EBX
 end;
 {$ENDIF PUREPASCAL}
+
+procedure TMeInterfacedObject.RemoveFreeNotification(Proc: TMeObjectMethod);
+var
+  i: Integer;
+{$IFDEF FPC}
+  Ptr1, Ptr2: Pointer;
+{$ENDIF FPC}
+begin
+  if Assigned(FFreeNotifies) then
+    for i : 0 to FFreeNotifies.Count div 2 - 1 do
+    begin
+      {$IFDEF FPC}
+      asm
+        MOV  EAX, [Proc]
+        MOV  [Ptr1], EAX
+        MOV  EAX, [Proc+4]
+        MOV  [Ptr2], EAX
+      end ['EAX'];
+      if (FFreeNotifies.Items[i*2] = Ptr1) and (FFreeNotifies.Items[i*2] = Ptr2) then
+      begin
+      	FFreeNotifies.DeleteRange(i*2, 2);
+      	break;
+      end;
+      {$ELSE DELPHI}
+      if (FFreeNotifies.Items[i*2] = TMethod(Proc).Code) and (FFreeNotifies.Items[i*2+1] = TMethod(Proc).Data) then
+      begin
+      	FFreeNotifies.DeleteRange(i*2, 2);
+      	break;
+      end;
+      {$ENDIF}
+    end;
+end;
 
 procedure TMeInterfacedObject.FreeNotification(Proc: TMeObjectMethod);
 {$IFDEF PUREPASCAL}
