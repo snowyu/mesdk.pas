@@ -1223,6 +1223,7 @@ begin
   SetLength(FReturnStack, cMeScriptMaxReturnStackSize);
   //SetLength(FArgumentsStack, cMeScriptMaxReturnStackSize);
   FDataStack.Count := cMeScriptMaxDataStackSize;
+  FGlobalFunction := @Self;
 end;
 
 procedure TMeScriptGlobalFunction.iExecute();
