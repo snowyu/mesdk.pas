@@ -13,6 +13,22 @@ MeScript Prototype V1:
 
 是否需要考虑内存调度问题：将近期没有运行的函数从内存卸载，当需要的时候才加载。
 
+ScriptFunction
+  Prototype: PMeScriptCustomObject;
+
+ScriptObject
+  Attributes: PMeScriptAttributes
+
+ScriptAttribute:
+  Name
+  Value: TMeScriptValue;
+  Kind : TMeScriptAttributeKinds (akReadOnly, akDontEnum, akDontDelete)
+
+ScriptValue:
+  Ctor: PMeScriptCustomFunction;
+  Value: TMeScriptValueRecord
+
+
 uMeScript.pas
 
 架构：
@@ -49,9 +65,19 @@ TMeScriptCustomBlock： 抽象代码块
 函数的调用如果是方法，还要处理this指针。似乎该在Parser时处理。
 “.”引用如果作为后期绑定实现，可以将“.”作为一个内部函数实现。否则还是要作为关键字在编译时刻处理前期绑定的部分。
 可以这样，如果能在编译时刻找到，就作为前期绑定，否则就认为是一个后期绑定：凡是函数，标识符后必须有括号，否则就当作属性处理。
+"." 和 namespace 的问题。
 
+是否需要 namespace ？
+No,最简单的化为妙。
 
 当将一个方法赋值给变量，该变量还应该保持该方法的_this指针值。当对象释放后，必须将this指针置为nil.
+no, js中如果将方法赋值给变量，那么该变量为指向一个函数！
+
+
+函数Scope的搜索顺序：
+  该函数原型对象链中搜索
+  if SearchAttr and Assigned(FGlobalFunction._this) 那么搜索this中的属性是否有该函数
+  最后搜索内部定义的函数表，然后再是父函数的内部函数表。
 
 TMeScriptValue.Ctor -> TMeScriptFunction
 TMeScriptFunction.prototype -> TMeScriptObject
