@@ -81,7 +81,7 @@ type
           mtkString:     (VAnsiString: Pointer);
           mtkBoolean:    (VBool: Boolean);
           mtkNumber:     (VNumber: Double);
-          mtkFunction:   (VFunc: PMeScriptCustomFunction; VThis: PMeScriptCustomObject); //当将一个方法赋值给变量，该变量还应该保持该方法的VThis指针值。
+          mtkFunction:   (VFunc: PMeScriptCustomFunction{; VThis: PMeScriptCustomObject}); //当将一个方法赋值给变量，该变量还应该保持该方法的VThis指针值。
           mtkObject:     (VObject: PMeScriptCustomObject);
       );
   end;
@@ -108,7 +108,7 @@ type
   TMeScriptValue = Object
   protected
     TypeKind: TMeScriptTypeKind;
-    procedure FreeObjectNotification;
+    //procedure FreeObjectNotification;
   public
     procedure Clear;
     procedure Assign(const aValue: PMeScriptValue);
@@ -247,7 +247,8 @@ type
 
     //1. search Functions; 2. search Parent.Functions until Parent = nil.
     //only find function in attributes or Functions
-    function FindFunction(const aName: string; const SearchAttr: Boolean = True): PMeScriptCustomFunction;
+    //仅当在运行时刻才去搜索this属性,才对。
+    function FindFunction(const aName: string; const SearchAttr: Boolean = True): PMeScriptCustomFunction; virtual;
     function FindVariable(const aName: string; var aStackIndex: Integer): Integer;
   public
     destructor Destroy; virtual; {override}
@@ -269,10 +270,12 @@ type
     function GetArguments: PMeStrings;
 
     procedure InitExecution(const aParams: PMeScriptArguments); virtual; {override}
+    function FindFunction(const aName: string; const SearchAttr: Boolean = True): PMeScriptCustomFunction; virtual; {override}
   public
     destructor Destroy; virtual; {override}
   public
     Prototype: PMeScriptCustomObject;
+    //the defined arguments at compile-time. store the argument name.
     property Arguments: PMeStrings read GetArguments;
   end;
 
@@ -301,6 +304,7 @@ type
     procedure RegisterFunction(const aName: string; const aFunc: TMeScriptInternalFunctionType);
   public
     Prototype: PMeScriptCustomObject;
+    //the defined arguments at compile-time. store the argument name.
     property Arguments: PMeStrings read GetArguments;
   end;
 
@@ -313,7 +317,7 @@ type
 
     procedure SetValue(const Name: string; const Value: PMeScriptValue);
     //it will search the Ctor.Prototype
-    //Cloned it to attributes if it not found in attributes but found in it's Prototype.
+    //Cloned it to attributes if it not found in its attributes but found in it's Prototype object.
     function FindAttribute(const Name: string; const Cloned: Boolean): PMeScriptAttribute;virtual;
   public
     //Ctor = nil means system Object.
@@ -463,6 +467,7 @@ const
   tkMeTokenArgSpliter = ',';
   tkMeTokenMemberBegin = '[';
   tkMeTokenMemberEnd = ']';
+  tkMeTokenMemberRef = '.';
 
 const
   //赋值
@@ -476,6 +481,7 @@ const
   ttArgSpliter  = cMeCustomTokenType + 5;
   ttMemberBegin   = cMeCustomTokenType + 6; //后期绑定的属性成员，或数组定义
   ttMemberEnd     = cMeCustomTokenType + 7;
+  ttMemberRef     = cMeCustomTokenType + 8;
 
   cMeTokenErrorExpectArgsEnd = 3;
 
@@ -498,6 +504,7 @@ begin
   FSimpleTokens.Add(ttArgSpliter, tkMeTokenArgSpliter);
   FSimpleTokens.Add(ttMemberBegin, tkMeTokenMemberBegin);
   FSimpleTokens.Add(ttMemberEnd, tkMeTokenMemberEnd);
+  FSimpleTokens.Add(ttMemberRef, tkMeTokenMemberRef);
 
   FTokens.AddStandardToken(ttString, tkMeTokenString1Limiter, tkMeTokenString1Limiter, [tfEscapeChar]);
   FTokens.AddStandardToken(ttString, tkMeTokenString2Limiter, tkMeTokenString2Limiter, [tfEscapeChar]);
@@ -579,15 +586,17 @@ begin
   case TypeKind of
     mtkString: string(Value.VAnsiString) := '';
     mtkObject: MeFreeAndNil(Value.VObject);
-    mtkFunction: if Assigned(Value.VThis) then VThis.RemoveFreeNotification(FreeObjectNotification);
+    //mtkFunction: if Assigned(Value.VThis) then VThis.RemoveFreeNotification(FreeObjectNotification);
   end;
   TypeKind := mtkUndefined;
 end;
 
+{
 procedure TMeScriptValue.FreeObjectNotification;
 begin
-	if TypeKind = mtkFunction then Value.VThis := nil;
+	//if TypeKind = mtkFunction then Value.VThis := nil;
 end;
+}
 
 { TMeScriptCustomBlock }
 destructor TMeScriptCustomBlock.Destroy;
@@ -672,7 +681,7 @@ function TMeScriptBlock.FindFunction(const aName: string; const SearchAttr: Bool
 var
   vParent: PMeScriptElement;
 begin
-  if SearchAttr then
+  if SearchAttr and Assigned(FGlobalFunction._this) then
   begin
     PMeScriptValue(vParent) := FGlobalFunction._this.Values[aName];
     if Assigned(vParent) then
@@ -1067,6 +1076,20 @@ begin
   Inherited;
 end;
 
+function TMeScriptCustomFunction.FindFunction(const aName: string; const SearchAttr: Boolean): PMeScriptCustomFunction;
+begin
+  if Assigned(Prototype) then
+  begin
+    PMeScriptValue(Result) := Prototype.Values[aName];
+    if Assigned(Result) then
+    begin
+      if (PMeScriptValue(Result).TypeKind = mtkFunction) then
+        Result := PMeScriptValue(Result).Value.VFunc
+  end;
+  if not Result then
+    Result := Inherited FindFunction(aName, SearchAttr);
+end;
+
 function TMeScriptCustomFunction.GetArguments: PMeStrings;
 begin
   if not Assigned(FArguments) then
@@ -1275,6 +1298,8 @@ begin
     _PC.Func   := nil;
     _PC.Mem := tsUInt(FBody.Memory);
     LastErrorCode := errNone;
+    _this := nil;
+    //FThisPtrStack.Clear;  
   end;
 end;
 
