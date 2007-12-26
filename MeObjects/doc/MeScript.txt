@@ -74,10 +74,11 @@ No,最简单的化为妙。
 no, js中如果将方法赋值给变量，那么该变量为指向一个函数！
 
 
-函数Scope的搜索顺序：
+Scope的搜索顺序：
+
   该函数原型对象链中搜索
-  if SearchAttr and Assigned(FGlobalFunction._this) 那么搜索this中的属性是否有该函数
-  最后搜索内部定义的函数表，然后再是父函数的内部函数表。
+  if SearchAttr and Assigned(FGlobalFunction._this) 那么搜索this中的属性是否有
+  [如果是函数则]最后搜索内部定义的函数表，然后再是父函数的内部函数表。
 
 TMeScriptValue.Ctor -> TMeScriptFunction
 TMeScriptFunction.prototype -> TMeScriptObject
@@ -222,3 +223,18 @@ CarProtoTypeObject.Ctor -> Car()
     , opLoadVar    // opLoadVar <index> (-- pValue)  load loal varaible
     , opLoadVarFar // opLoadVarFar <stackIndex> <index> ( -- pValue)  load parent varaible which varaible in return stack:  FReturnStack[_RP - stackIndex].Varaibles.Items[index]
     , opLoadBind   // opCallBind <Len:byte>NameStr ( -- pValue ) the runtime error raised if function is not exists at runtime
+    , opDeclareVar//  opDeclareVar:  decalre a local variable.
+
+
+_________________________________________________
+
+TRemoteObject: 属性和方法都是远程
+TRemoteObject  抽象的目的是为了保证远程属性的处理。需要做一些约定，比如所有以"R"打头的出版属性并且必须有设置属性的方法。
+或者抽象的出版方法为远程方法，属性的写方法为抽象方法的为远程方法。如果这样就没有必要对远程对象从指定类上派生。
+
+TRemoteExectueFeature: 注入后的类的某些约定的抽象方法获得远程执行的能力。
+  .Add(aClass, aTransport);
+TRemoteObjectFeature = Class(TRemoteExectueFeature)
+
+属性方法注入的支持：简单属性，数组属性[]。
+缺少对接口注入的支持。

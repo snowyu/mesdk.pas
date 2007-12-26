@@ -50,6 +50,10 @@ type
     procedure Test_ConsumeToken;
     procedure Test_ReadToken;
   end;
+  TTest_MeTokenErrors = class(TTestCase)
+  protected
+    FErrors: PMeTokenErrors;
+  end;
 
 implementation
 

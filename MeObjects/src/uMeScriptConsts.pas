@@ -107,6 +107,7 @@ type
     , opLoadVar    // opLoadVar <index> (-- pValue)  load loal varaible
     , opLoadVarFar // opLoadVarFar <stackIndex> <index> ( -- pValue)  load parent varaible which varaible in return stack:  FReturnStack[_RP - stackIndex].Varaibles.Items[index]
     , opLoadBind   // opCallBind <StrLen:byte>NameStr ( -- pValue ) the runtime error raised if function is not exists at runtime
+    , opDeclareVar // opDeclareVar:  decalre a local variable at runtime.
   );
 
   PMeScriptCodeMemory = ^TMeScriptCodeMemory;

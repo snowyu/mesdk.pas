@@ -264,7 +264,7 @@ type
     function GetItem(const Index: Integer): PMeTokenErrorInfo;
   public
     destructor Destroy; virtual;{override}
-    procedure Add(const aToken: TMeToken; const aErrorCode: Integer; const aErrorFmt: ShortString='');
+    procedure Add(const aToken: PMeToken; const aErrorCode: Integer; const aErrorFmt: ShortString='');
     procedure Clear;
   public
     property Items[const Index: Integer]: PMeTokenErrorInfo read GetItem; default;
@@ -572,13 +572,13 @@ begin
   inherited;
 end;
 
-procedure TMeTokenErrors.Add(const aToken: TMeToken; const aErrorCode: Integer; const aErrorFmt: ShortString);
+procedure TMeTokenErrors.Add(const aToken: PMeToken; const aErrorCode: Integer; const aErrorFmt: ShortString);
 var
   vItem: PMeTokenErrorInfo;
 begin
   New(vItem);
   inherited Add(vItem);
-  vItem.Assign(@aToken);
+  vItem.Assign(aToken);
   vItem.ErrorCode := aErrorCode;
   vItem.ErrorFmt := aErrorFmt;
   if Assigned(FOnError) then FOnError(@Self, vItem);

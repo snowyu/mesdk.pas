@@ -55,6 +55,7 @@ const
   cSymbolErrorFunctionNotFound      = 310;
   cSymbolErrorNameNotFound          = 311;
   cSymbolErrorAttributeNotFound     = 312;
+  cMSNewVarFunctionName = '_VAR';
 
 type
   PMeScriptValue          = ^ TMeScriptValue;
@@ -226,6 +227,8 @@ type
     //function GetVariables: PTurboSymbols;
     function GetFunctions: PMeNamedObjects;
     procedure DoTokenError(const Sender: PMeTokenErrors; const aError: PMeTokenErrorInfo);
+    function IndexOfLocalVariable(const aName: string): Integer;
+    function IsLocalVariableExists(const aName: string): Boolean;
 
     procedure InitExecution(const aParams: PMeScriptArguments); virtual; {override}
     procedure iExecute();virtual; {override}
@@ -233,21 +236,25 @@ type
 
     //以下是Parser.
     {}
-    function iParser(const aTokenizer: PMeTokenizer): Boolean; virtual;
+    function iParser(const aTokenizer: PMeTokenizer): Boolean;
+    //Parser other tokens in derived class
+    function iParserToken(const aTokenizer: PMeTokenizer): Boolean; virtual;
     //eg, aFunc(a,b);
     function iParserCallFunctionRef(const aTokenizer: PMeTokenizer): Boolean;
     //it's a localVar or attribute or constant
-    function iParserValueRef(const aTokenizer: PMeTokenizer): Boolean;
+    function iParserValueRef(const aTokenizer: PMeTokenizer): Boolean; virtual;
     //eg, var var1, var2;
     function iParserDeclareVar(const aTokenizer: PMeTokenizer): Boolean;
     //eg, function aFunc(a,b) {};
-    function iParserDeclareFunc(const aTokenizer: PMeTokenizer): Boolean;
+    function iParserDeclareFunc(const aTokenizer: PMeTokenizer): Boolean;virtual;
     //function iParserNewBlock(const aTokenizer: PMeTokenizer): Boolean;
 
 
+    //declare local variable.
+    function DeclareVar(const aName, aType: string): Boolean;
     //1. search Functions; 2. search Parent.Functions until Parent = nil.
     //only find function in attributes or Functions
-    //仅当在运行时刻才去搜索this属性,才对。
+    //仅当在运行时刻才去搜索this属性,才对：当GlobalFunction._This不能空。
     function FindFunction(const aName: string; const SearchAttr: Boolean = True): PMeScriptCustomFunction; virtual;
     function FindVariable(const aName: string; var aStackIndex: Integer): Integer;
   public
@@ -298,6 +305,10 @@ type
     function GetArguments: PMeStrings;
 
     procedure InitExecution(const aParams: PMeScriptArguments); virtual; {override}
+    function iParserValueRef(const aTokenizer: PMeTokenizer): Boolean; virtual; {override}
+    function iParserDeclareFunc(const aTokenizer: PMeTokenizer): Boolean;virtual; {override}
+
+    function FindArgument(const aName: string; var aStackIndex: Integer): Integer;
   public
     destructor Destroy; virtual; {override}
     { Summary Register Internal Function}
@@ -461,6 +472,8 @@ const
   tkMeTokenBlankChars : TMeCharset = [' '];
   tkMeTokenAssignment = '=';
   tkMeTokenVar  = 'var';
+  tkMeTokenVarSpliter = ',';
+  tkMeTokenVarTypeSpliter = ':';
   tkMeTokenFunc = 'function';
   tkMeTokenArgsBegin = '(';
   tkMeTokenArgsEnd = ')';
@@ -482,6 +495,8 @@ const
   ttMemberBegin   = cMeCustomTokenType + 6; //后期绑定的属性成员，或数组定义
   ttMemberEnd     = cMeCustomTokenType + 7;
   ttMemberRef     = cMeCustomTokenType + 8;
+  ttVarSpliter    = cMeCustomTokenType + 9;
+  ttVarTypeSpliter  = cMeCustomTokenType + 10;
 
   cMeTokenErrorExpectArgsEnd = 3;
 
@@ -505,6 +520,8 @@ begin
   FSimpleTokens.Add(ttMemberBegin, tkMeTokenMemberBegin);
   FSimpleTokens.Add(ttMemberEnd, tkMeTokenMemberEnd);
   FSimpleTokens.Add(ttMemberRef, tkMeTokenMemberRef);
+  FSimpleTokens.Add(ttVarSpliter, tkMeTokenVarSpliter);
+  FSimpleTokens.Add(ttVarTypeSpliter, tkMeTokenVarTypeSpliter);
 
   FTokens.AddStandardToken(ttString, tkMeTokenString1Limiter, tkMeTokenString1Limiter, [tfEscapeChar]);
   FTokens.AddStandardToken(ttString, tkMeTokenString2Limiter, tkMeTokenString2Limiter, [tfEscapeChar]);
@@ -790,13 +807,14 @@ begin
               vToken := ReadToken();
           end
           else
-            Errors.Add(vToken^, cMeTokenErrorMissedToken, tkMeTokenArgsEnd);
+            Errors.Add(vToken, cMeTokenErrorMissedToken, tkMeTokenArgsEnd);
         end; //while
 
         if Result then
         begin
           Body.AddOpCode(opPush, vParamCount);
           //reuse vParamCount as stackIndex
+          vParamCount := 0;
           i := FindVariable(vFuncName, vParamCount);
           if i >= 0 then
           begin
@@ -824,20 +842,52 @@ begin
             else 
             begin
               Result := False;
-              Errors.Add(vToken^, cMeTokenErrorMissedToken, 'function '+vFuncName);
+              Errors.Add(vToken, cMeTokenErrorMissedToken, 'function '+vFuncName);
             end;
           end;
         end;
     end
     else begin
-      Errors.Add(vToken^, cMeTokenErrorMissedToken, tkMeTokenArgsBegin);
+      Errors.Add(vToken, cMeTokenErrorMissedToken, tkMeTokenArgsBegin);
       Result := False;
     end; //if
   end; //with
 end;
 
 function TMeScriptBlock.iParserDeclareVar(const aTokenizer: PMeTokenizer): Boolean;
+var
+  vToken, vNextToken: PMeToken;
+  vName, vType: string;
 begin
+  with aTokenizer^ do
+  begin
+    vToken := ReadToken;
+    Result := Assigned(vToken) and vToken.TokenId = Ord(ttToken);
+    if Result then
+      Repeat
+        vName := vToken.Token;
+        vType := '';
+        vToken := ReadToken;
+        if Assigned(vToken) and (vToken.TokenId = Ord(ttVarTypeSpliter)) then
+        begin
+          vToken := ReadToken;
+          Result := Assigned(vToken) and (vToken.TokenId = Ord(ttToken));
+          if not Result then 
+          begin
+            Errors.Add(vToken, cMeTokenErrorMissedToken, vName +  'var type name missed ');
+            Exit; 
+          end;
+          vType := vToken.Token;
+        end
+  
+        if Result then
+        begin
+          Result := DeclareVar(vName, vType);
+        end;
+      until not Result  or (not Assigned(vToken)) or (vToken.TokenId <> Ord(ttVarSpliter))
+    else
+      Errors.Add(vToken, cMeTokenErrorMissedToken, 'var name missed ');
+  end;
 end;
 
 {
@@ -869,12 +919,15 @@ begin
     end
     else begin
       //1、查属性对象
-      vP := FGlobalFunction._this.Values[vName];
-      Result := Assigned(vP);
-      if Result then
+      if Assigned(FGlobalFunction._this) then
       begin
-        Body.AddOpCode(opPush, Integer(vP));
-        exit;
+        vP := FGlobalFunction._this.Values[vName];
+        Result := Assigned(vP);
+        if Result then
+        begin
+          Body.AddOpCode(opPush, Integer(vP));
+          exit;
+        end;
       end;
       //2、查局部变量
       I := FindVariable(vName, Integer(vP));
@@ -908,6 +961,12 @@ end;
 
 function TMeScriptBlock.iParserDeclareFunc(const aTokenizer: PMeTokenizer): Boolean;
 begin
+  Result := True;
+end;
+
+function TMeScriptBlock.iParserToken(const aTokenizer: PMeTokenizer): Boolean;
+begin
+  Result := True;
 end;
 
 {function TMeScriptBlock.iParserNewBlock(const aTokenizer: PMeTokenizer): Boolean;
@@ -925,7 +984,7 @@ begin
       while vToken
     end
     else begin
-      Errors.Add(CurrentToken, cMeTokenErrorMissedToken, tkMeTokenBlockBegin);
+      Errors.Add(@CurrentToken, cMeTokenErrorMissedToken, tkMeTokenBlockBegin);
     end;
   end;
 end;
@@ -995,8 +1054,8 @@ begin
             Result := iParserDeclareFunc(aTokenizer);
           end;
         else begin
-          Errors.Add(vToken^, cMeTokenErrorUnknownToken, vToken^.Token);
-          Result := False;
+          Result := iParserToken(aTokenizer);
+          if not Result then Errors.Add(vToken, cMeTokenErrorUnknownToken, vToken^.Token);
         end;
       end; //case
       if not Result then exit;
@@ -1009,7 +1068,7 @@ begin
   begin
     Result := Assigned(vToken) and (vToken.TokenId = Ord(ttBlockEnd) );
     if not Result then with aTokenizer^ do
-      Errors.Add(CurrentToken, cMeTokenErrorMissedToken, tkMeTokenBlockEnd);
+      Errors.Add(@CurrentToken, cMeTokenErrorMissedToken, tkMeTokenBlockEnd);
   end;
 end;
 
@@ -1060,6 +1119,34 @@ begin
     New(Variables, Create);
     //SP := FGlobalFunction._SP;
   end;
+end;
+
+function TMeScriptBlock.DeclareVar(const aName, aType: string): Boolean;
+Var
+  vFunc: PMeNamedObject;
+begin
+  Result := not IsLocalVariableExists(aName);
+  if Result then
+  begin
+    FBody.AddOpCode(opDeclareVar);
+    SetLength(FVariablesName, FVariablesName.Length+1);
+    FVariablesName[FVariablesName.Length-1] := aName;
+  end;
+  
+end;
+
+function TMeScriptBlock.IndexOfLocalVariable(const aName: string): Integer;
+begin
+  for Result := 0 to FVariablesName.Count -1 do
+  begin
+    if FVariablesName[Result] = aName then exit;
+  end;
+  Result := -1;
+end;
+
+function TMeScriptBlock.IsLocalVariableExists(const aName: string): Boolean;
+begin
+    Result := IndexOfLocalVariable(aName) >= 0;
 end;
 
 function TMeScriptBlock.GetFunctions: PMeNamedObjects;
@@ -1129,12 +1216,112 @@ begin
   Result := FArguments;
 end;
 
+function TMeScriptFunction.FindArgument(const aName: string; var aStackIndex: Integer): Integer;
+var
+  vParent: PMeScriptElement;
+begin
+	//search local variables
+  for Result := 0 to Arguments.Count - 1 do
+  begin
+    if FArguments[Result] = aName then exit;
+  end;
+  //search parent local variables
+  Result := -1;
+  vParent := Parent;
+  while (Result = -1) and (vParent <> nil) do
+  begin
+    if vParent.InheritsFrom(TypeOf(TMeScriptFunction)) then with TMeScriptFunction(vParent^) do
+    begin
+      Inc(aStackIndex);
+      for Result := 0 to Arguments.Count - 1 do
+      begin
+        if FArguments[Result] = aName then exit;
+      end;
+      Result := -1;
+    end;
+    vParent := vParent.Parent;
+  end; //while
+end;
+
+function TMeScriptFunction.iParserValueRef(const aTokenizer: PMeTokenizer): Boolean;
+var
+  vStackIndex: Integer;
+begin
+  vStackIndex := 0;
+  Integer(Result) := FindArgument(CurrentToken.Token, vStackIndex);
+  if Integer(Result) >= 0 then
+  begin
+    if vStackIndex = 0 then
+      Body.AddOpCode(opLoadArg, Integer(Result))
+    else begin
+      Body.AddOpCode(opLoadArgFar, vStackIndex);
+      Body.AddInt(Integer(Result));
+    end;
+  end
+  else
+    Result := Inherited iParserValueRef(aTokenizer);
+end;
+
 procedure TMeScriptFunction.InitExecution(const aParams: PMeScriptArguments);
 begin
   Inherited InitExecution(aParams);
   if not Assigned(aParams) then //the internal calling
   begin
     FGlobalFunction._PC.Arguments := GenerateArgumentsObject(FGlobalFunction);
+  end;
+end;
+
+function TMeScriptFunction.iParserDeclareFunc(const aTokenizer: PMeTokenizer): Boolean;
+var
+  vToken, vNextToken: PMeToken;
+  vName, vType: string;
+begin
+  with aTokenizer^ do
+  begin
+    vToken := ReadToken;
+    Result := Assigned(vToken) and vToken.TokenId = Ord(ttToken);
+    if not Result then
+    begin
+      Errors.Add(vToken, cMeTokenErrorMissedToken, 'function name missed ');
+      Exit;
+    end;
+    vName := vToken.Token;
+    vToken := ReadToken;
+    Result := Assigned(vToken) and vToken.TokenId = Ord(ttArgsBegin);
+    if not Result then
+    begin
+      Errors.Add(vToken, cMeTokenErrorMissedToken, vName + ' function ArgsBegin missed ');
+      Exit;
+    end;
+
+    vToken := ReadToken;
+    while Result and Assigned(vToken) and (vToken.TokenId <> Ord(ttArgsEnd)) do
+    begin
+      Result := Assigned(vToken) and vToken.TokenId = Ord(ttToken);
+      if not Result then
+      begin
+        Errors.Add(vToken, cMeTokenErrorMissedToken, vName + ' function arguments missed ');
+        Exit;
+      end;
+      Arguments.Add(vToken.Token);
+      if Assigned(vToken) and (vToken.TokenId = Ord(ttVarTypeSpliter)) then
+      begin
+        vToken := ReadToken;
+        Result := Assigned(vToken) and (vToken.TokenId = Ord(ttToken));
+        if not Result then 
+        begin
+          Errors.Add(vToken, cMeTokenErrorMissedToken, vName +  'var type name missed ');
+          Exit; 
+        end;
+        vType := vToken.Token;
+      end
+
+      if Result then
+      begin
+        Result := DeclareVar(vName, vType);
+      end;
+      vToken := ReadToken;
+    end; //while
   end;
 end;
 
