@@ -635,7 +635,7 @@ var
 begin
   {$IFDEF MeRTTI_SUPPORT}
   vC := MeTypeOf(aObj^);
-  CheckEquals(aClassName, vC.ClassName^, 'the ClassName is error.');
+  CheckEquals(aClassName, vC.ClassName, 'the ClassName is error.');
   {$ENDIF}
 end;
 

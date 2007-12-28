@@ -51,9 +51,11 @@ uses
 type
   TCallingConvention = (ccUnknown=-1, ccRegister, ccCdecl, ccPascal, ccStdCall, ccSafeCall, ccFastCall, ccForth);
 
+  PPPTypeEx = ^PPTypeEx;
   PPTypeEx = ^PTypeEx;
   PTypeEx = ^TTypeEx;
   PSetType = ^TSetType;
+  PCustomOrdinalType = ^TCustomOrdinalType;
   POrdinalType = ^TOrdinalType;
   PEnumerationType = ^TEnumerationType;
   PInterfaceType = ^TInterfaceType;
@@ -88,9 +90,9 @@ type
   protected
     //FCompType: PPTypeEx;
   protected
-    function GetCompType: TTypeEx;
+    function GetCompType: PTypeEx;
   public
-    Property CompType: TTypeEx read GetCompType;
+    Property CompType: PTypeEx read GetCompType;
   end;
 
   {Ordinal: tkInteger, tkChar, tkEnumeration, tkWChar}
@@ -166,7 +168,7 @@ type
     MethodCount: Word;   // #methods 
     HasMethodRTTI: Word; // $FFFF if no method RTTI, 
     // #methods again if has RTTI 
-    Methods: packed array[0..High(Word)-1] of TIntfMethodEntry;
+    Methods: packed array[0..$1FFF-1] of TIntfMethodEntry;
   end;
   (*
         IntfParent : PPTypeInfo; { ancestor }
@@ -182,19 +184,28 @@ type
   *)
   TInterfaceType = Object(TTypeEx)
   protected
+    function GetIntfEntry: PIntfEntry;
+
+    function GetIntfParent: PTypeEx;
+    function GetIntfFlags: TIntfFlagsBase;
+    function GetGuid: TGUID;
+    function GetIntfUnit: ShortStringBase;
+    function GetMethodCount: Word;
+    function GetMethodHasRTTI: Boolean;
   public
-    Property ParentInterface: PPTypeInfo read GetIntfFlags;
+    Property ParentInterface: PTypeEx read GetIntfParent;
     Property Flags: TIntfFlagsBase read GetIntfFlags;
     Property Guid: TGUID read GetGuid;
     Property UnitName: ShortStringBase read GetIntfUnit;
     Property MethodCount: Word read GetMethodCount;
+    Property HasRTTI: Boolean read GetMethodHasRTTI;
   end;
 
 implementation
 
 {## helper function ###}
 //read packed ShortString.
-function ReadString(var P: Pointer): String;
+function ReadPackedShortString(var P: Pointer): String;
 var
   B: Byte;
 begin
@@ -230,13 +241,14 @@ end;
 
 function TCustomOrdinalType.GetOrdType: TOrdType;
 begin
-  Result := TOrdType(TypeData^);
+  Result := TOrdType(Pointer(TypeData)^);
 end;
 
-function TSetType.GetCompType: TTypeEx;
+function TSetType.GetCompType: PTypeEx;
 begin
   //Result := FCompType^^;
-  Result := PPTypeEx(Integer(TypeData)+SizeOf(TOrdType))^^;
+  Result := PPPTypeEx(Integer(TypeData)+SizeOf(TOrdType))^^;
+  //Result := PPTypeEx(Result)^;
 end;
 
 function TOrdinalType.GetMinValue: Longint;
@@ -309,6 +321,46 @@ end;
 function TProcedureType.GetParamCount: Byte;
 begin
   Result := TypeData.ParamCount;
+end;
+
+{ TInterfaceType }
+function TInterfaceType.GetIntfParent: PTypeEx;
+begin
+  Result := PPPTypeEx(Integer(TypeData))^^;
+end;
+
+function TInterfaceType.GetIntfFlags: TIntfFlagsBase;
+Type
+  PIntfFlagsBase = ^ TIntfFlagsBase;
+begin
+  Result := PIntfFlagsBase(Integer(TypeData) + SizeOf(Pointer))^;
+end;
+
+function TInterfaceType.GetGuid: TGUID;
+begin
+  Result := PGuid(Integer(TypeData) + SizeOf(Pointer)+ SizeOf(TIntfFlagsBase))^;
+end;
+
+function TInterfaceType.GetIntfUnit: ShortStringBase;
+begin
+  Result := PShortString(Integer(TypeData) + SizeOf(Pointer)+ SizeOf(TIntfFlagsBase) + SizeOf(TGUID))^;
+end;
+
+function TInterfaceType.GetIntfEntry: PIntfEntry;
+var
+  vP: PChar;
+begin
+  vP := PChar(Integer(TypeData) + SizeOf(Pointer)+ SizeOf(TIntfFlagsBase) + SizeOf(TGUID));
+  Result := PIntfEntry(Integer(vP) + SizeOf(Byte) + Ord(vP[0]));
+end;
+
+function TInterfaceType.GetMethodCount: Word;
+begin
+  Result := GetIntfEntry.MethodCount;
+end;
+
+function TInterfaceType.GetMethodHasRTTI: Boolean;
+begin
 end;
 
 initialization

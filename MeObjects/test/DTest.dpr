@@ -72,6 +72,7 @@ uses
   {$IFNDEF FPC}
   , uFastCompareTextExTest
   , uMeTokenizerTest
+  , uTypInfoExTest
   {$ENDIF}
   ;
 

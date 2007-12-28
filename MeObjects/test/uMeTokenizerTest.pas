@@ -508,7 +508,7 @@ end;
 Initialization
 
   AppPath := ExtractFilePath(ParamStr(0));
-  RegisterTests('MeTypes suites',
+  RegisterTests('MeScripts suites',
                 [
                  TTest_MeTokenizer.Suite
                  //, TTest_MeTokenizer.Suite
