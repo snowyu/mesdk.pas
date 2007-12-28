@@ -1,0 +1,660 @@
+= Yield and Coroutine =
+
+在Delphi上实现代码协同执行机制
+目的：从循环控制逻辑中抽象出行为逻辑。
+
+Yield 的作用是保持当前状态（局部变量的值），然后返回行为逻辑控制，当下一次执行能接着状态执行。
+用于枚举中：
+The Russian Delphi programmer [URL=http://santonov.blogspot.com/ Sergey Antonov] (or Антонов Сергей - aka. 0xffff) is a real hacker in the positive sense. He approached me with some intriguing assembly code that implements the equivalent of the C# yield statement!
+
+Type
+  TYieldObject = class;
+  TYieldProc = procedure (YieldObject: TYieldObject);
+
+  TYieldObject = class
+  protected
+    IsYield:boolean;
+    NextItemEntryPoint:pointer;
+    BESP:pointer;
+    REAX,REBX,RECX,REDX,RESI,REDI,REBP:pointer;
+    StackFrameSize:DWORD;
+    StackFrame: array[1..128] of DWORD;
+    procedure SaveYieldedValue(const Value); virtual; abstract;
+  public
+    constructor Create(YieldProc: TYieldProc);
+    function MoveNext:boolean; //D2007 enumerable required
+    procedure Yield(const Value);
+  end;
+
+constructor TYieldObject.Create(YieldProc:TYieldProc);
+asm
+  mov eax.TYieldObject.NextItemEntryPoint,ecx;
+  mov eax.TYieldObject.REAX,EAX;
+end;
+
+function TYieldObject.MoveNext: boolean;
+asm
+  { Save the value of following registers.
+    We must preserve EBP, EBX, EDI, ESI, EAX for some circumstances.
+    Because there is no guarantee that the state of registers will 
+    be the same after an iteration }
+  push ebp;
+  push ebx;
+  push edi;
+  push esi;
+  push eax;
+
+  mov eax.TYieldObject.IsYield,0
+  push offset @@exit
+  xor edx,edx;
+  cmp eax.TYieldObject.BESP,edx;
+  jz @AfterEBPAdjust;
+
+  { Here is the correction of EBP. Some need of optimization still exists. }
+  mov edx,esp;
+  sub edx,eax.TYieldObject.BESP;
+  add [eax.TYieldObject.REBP],edx
+
+  @AfterEBPAdjust:
+  mov eax.TYieldObject.BESP,esp;
+
+  { Is there any local frame? }
+  cmp eax.TYieldObject.StackFrameSize,0
+  jz @JumpIn;
+
+  { Restore the local stack frame }
+  mov ecx,eax.TYieldObject.StackFrameSize;
+  sub esp,ecx;
+  mov edi,esp;
+  lea esi,eax.TYieldObject.StackFrame;
+
+  { Some need of optimization still exists. Like movsd}
+  rep movsb;
+  @JumpIn:
+
+  { Restore the content of processor registers }
+  mov ebx,eax.TYieldObject.REBX;
+  mov ecx,eax.TYieldObject.RECX;
+  mov edx,eax.TYieldObject.REDX;
+  mov esi,eax.TYieldObject.RESI;
+  mov edi,eax.TYieldObject.REDI;
+  mov ebp,eax.TYieldObject.REBP;
+  push [eax.TYieldObject.NextItemEntryPoint];
+  mov eax,eax.TYieldObject.REAX;
+
+  { Here is the jump to next iteration }
+  ret;
+
+  { And we return here after next iteration in all cases, except exception of course. }
+  @@exit:;
+
+  { Restore the preserved EBP, EBX, EDI, ESI, EAX registers }
+  pop eax;
+  pop esi;
+  pop edi;
+  pop ebx;
+  pop ebp;
+  { This Flag indicates the occurrence or no occurrence of Yield  }
+  mov al,eax.TYieldObject.IsYield;
+end;
+
+procedure TYieldObject.Yield(const Value);
+asm
+  { Preserve EBP, EAX,EBX,ECX,EDX,ESI,EDI }
+  mov eax.TYieldObject.REBP,ebp;
+  mov eax.TYieldObject.REAX,eax;
+  mov eax.TYieldObject.REBX,ebx;
+  mov eax.TYieldObject.RECX,ecx;
+  mov eax.TYieldObject.REDX,edx;   // This is the Ref to const param
+  mov eax.TYieldObject.RESI,ESI;
+  mov eax.TYieldObject.REDI,EDI;
+  pop ecx;
+  mov eax.TYieldObject.NextItemEntryPoint,ecx;
+
+  //We must do it first for valid const reference
+  push eax;
+  mov ecx,[eax];
+  CALL  DWORD PTR [ecx+VMTOFFSET TYieldObject.SaveYieldedValue];
+  pop eax;
+  
+  { Calculate the current local stack frame size }
+  mov ecx,eax.TYieldObject.BESP;
+  sub ecx,esp;
+  mov eax.TYieldObject.StackFrameSize,ecx;
+  jz @AfterSaveStack;
+
+  { Preserve the local stack frame }
+  lea esi,[esp];
+  lea edi,[eax.TYieldObject.StackFrame];
+  
+  { Some need of optimization still exists. Like movsd }
+  rep movsb;
+  mov esp,eax.TYieldObject.BESP;
+  @AfterSaveStack:
+
+  {Set flag of Yield occurance }
+  mov eax.TYieldObject.IsYield,1;
+end;
+
+
+And how do you use it?
+type
+  TYieldInteger = class(TYieldObject)
+  protected
+    Value:integer;
+    function GetCurrent:integer;
+    procedure SaveYieldedValue(const Value); override;
+  public
+    property Current:integer read GetCurrent; //D2007 enumerable required
+  end;
+
+{ TYieldInteger }
+
+function TYieldInteger.GetCurrent: integer;
+begin
+  Result:=Value;
+end;
+
+procedure TYieldInteger.SaveYieldedValue(const Value);
+begin
+  Self.Value:=integer(Value);
+end;
+
+So now there is full support for integer.
+
+type
+  TYieldString = class(TYieldObject)
+  protected
+    Value:string;
+    function GetCurrent:string;
+    procedure SaveYieldedValue(const Value); override;
+  public
+    property Current:string read GetCurrent;
+  end;
+
+{ TYieldString }
+
+function TYieldString.GetCurrent: string;
+begin
+  Result:=Value;
+end;
+
+procedure TYieldString.SaveYieldedValue(const Value);
+begin
+  Self.Value := string(Value);
+end;
+
+
+And now there is full support for string. 
+
+Sample of using a string Enumerator
+
+//枚举器
+procedure StringYieldProc(YieldObj: TYieldObject);
+var  
+  YieldValue: string;
+  i: integer;
+begin
+  YieldValue:='None';
+  YieldObj.Yield(YieldValue); //返回行为逻辑控制
+  for i := 1 to 10 do
+  begin
+    YieldValue := YieldValue + IntToStr(i);
+    YieldObj.Yield(YieldValue); //返回行为逻辑控制
+  end;
+end;
+
+function TForm1.GetEnumerator: TYieldString;
+begin
+  Result:=TYieldString.Create(StringYieldProc);
+end;
+
+procedure TForm1.Button1Click(Sender: TObject);
+var 
+  a:string;
+begin
+  for a in self do 
+    Memo1.Lines.Add(a);
+  {It means
+    with GetEnumerator do
+    try
+      while MoveNext do //转到控制逻辑
+      begin
+        a := Current;
+        Memo1.Lines.Add(a);
+      end;
+    finally
+      Free;
+    end;
+  }
+end;
+
+D2007 To use the for-in loop construct on a class, the class must implement a prescribed collection pattern. A type that implements the collection pattern must have the following attributes:
+ * The class must contain a public instance method called GetEnumerator(). The GetEnumerator() method must return a class, interface, or record type. 
+ * The class, interface, or record returned by GetEnumerator() must contain a public instance method called MoveNext(). The MoveNext() method must return a Boolean. 
+ * The class, interface, or record returned by GetEnumerator() must contain a public instance, read-only property called Current. The type of the Current property must be the type contained in the collection. 
+If the enumerator type returned by GetEnumerator() implements the IDisposable interface, the compiler will call the Dispose method of the type when the loop terminates. 
+
+
+MoveNext 执行流程
+当第一次执行MoveNext的时候，FNextItemEntryPoint 指向YieldProc的入口
+保存寄存器到堆栈
+设置 FIsField 0
+压入 @@exit 地址
+保存ESP 到 字段BESP
+没有 localStackFrame 跳到 JumpIn
+ebx...ebp全部清零（因为还没有数据）
+压入 FNextItemEntryPoint 入口地址
+使用 Ret 执行 FNextItemEntryPoint
+
+当第一次执行MoveNext的时候，FNextItemEntryPoint 指向YieldProc的入口，因此这里执行 StringYieldProc:
+当执行到 Yield()的时候
+保存 ebx...ebp到相应字段
+弹出 @@exit的地址，并保存到 FNextItemEntryPoint
+执行 SaveYieldedValue
+Calculate the current local stack frame size
+Preserve the local stack frame
+设置 FIsYield 1
+
+And what about my improvements 
+
+As for improvements I am still thinking about unwinding the local SEH (Structured Exception Handling) frames on yielding and restore it with any needed correction after return.
+
+Just before improving implementation for dynamic SEH unwinding support
+
+All times we declare local variables of finalized types the Delphi compiler inserts hidden try finally block that forces local variables of finalized types to be finalized under any circumstances.
+
+Look at the next sample.
+
+Delphi code
+
+procedure TForm1.Button1Click(Sender: TObject);
+var a:string;
+begin
+a:='abcdef';
+end;
+
+is mapped to appropriate x86 assembler code.
+Something like this
+
+push ebp
+mov ebp,esp
+push $00
+xor eax,eax
+
+{
+This is the hidden try
+}
+push ebp
+push $XXXXXXXX
+push dword ptr fs:[eax]
+mov fs:[eax],esp
+
+
+Unit1.pas. XX: a:='abcdef';
+lea eax,[ebp-$04]
+mov edx,$XXXXXXXX
+call @LStrLAsg
+Unit1.pas.XX: end;
+xor eax,eax
+pop edx
+pop ecx
+pop ecx
+mov fs:[eax],edx
+push $XXXXXXXX
+{
+Local variable Finalization code
+}
+lea eax,[ebp-$04]
+call @LStrClr
+
+ret
+
+{
+And this is the hidden finally block
+}
+jmp @HandleFinally
+jmp $XXXXXXXX
+
+{Normal procedure Exit }
+pop ecx
+pop ebp
+ret
+
+Little explanation about SEH.
+
+FS is protected mode selector that indexes descriptor of segment in descriptor tables (descriptors map logical address space to linear) .
+Segment that is indexed by FS has special meaning for Windows Operation System.
+This segment contains structure known as Thread Environment Block, TEB. But TEB structure includes at start of it a Win32 Thread Information Block (TIB). Win32 Thread Information Block (TIB) is a data structure in Win32 on x86 that stores info about the currently running thread.
+First field of TIB (i.e. fs:[0]) is current Structured Exception Handling frame.
+This field is used by system to provide your code the ability to react on raised exception.
+Because your procedures and functions may consist of not only hidden try/finally blocks, but yours try/finally try/except blocks, I have to implement some special SEH unwinding code and if there is any displacement I need to correct this dynamically.
+
+And because Yield has a very specific behaviour I have to dynamically attach/detach/correct local SEH frames.
+
+Read about this in my next article.
+________________________________________________________________
+浅谈 C# 中的代码协同 (Coroutine) 执行支持
+http://www.blogcn.com/User8/flier_lu/index.html?id=3409568
+
+C# 2.0 是在不修改 CLR 的前提下由编译器，通过有限状态机来实现 iterator block 中 yield 关键字的。实际上，这一机制的最终目的是提供一个代码协同(Coroutine)执行的支持机制。
+
+using System.Collections.Generic;
+
+public class Tokens : IEnumerable<string>
+{
+  public IEnumerator<string> GetEnumerator()
+  {
+    for(int i = 0; i<elements.Length; i++)
+      yield elements[i];
+  }
+  ...
+}
+
+foreach (string item in new Tokens())
+{
+  Console.WriteLine(item);
+}
+
+
+在这段代码执行过程中，foreach 的循环体和 GetEnumerator 函数体实际上是在同一个线程中交替执行的。这是一种介于线程和顺序执行之间的协同执行模式，之所以称之为协同（Coroutine），是因为同时执行的多个代码块之间的调度是由逻辑隐式协同完成的。
+
+就协同执行而言，从功能上可以分为行为、控制两部分，控制又可进一步细分为控制逻辑和控制状态。行为对应着如何处理目标对象，如上述代码中：行为就是将目标对象打印到控制台；控制则是如何遍历这个 elements 数组，可进一步细分为控制逻辑（顺序遍历）和控制状态（当前遍历到哪个元素）。下面将按照这个逻辑介绍不同语言中如何实现和模拟这些逻辑。
+
+[URL=http://pensieve.thinkingms.com/default.aspx Spark Gray] 在其 blog 上有一个系列文章介绍了协同执行的一些概念。
+  * [URL=http://pensieve.thinkingms.com/PermaLink,guid,dd0e61ef-6fb1-4156-9d16-81c20a6aa871.aspx Iterators in Ruby (Part - 1)]
+  * [URL=http://pensieve.thinkingms.com/PermaLink,guid,02da61dd-1e35-4a36-b46b-aa3a605b2ad6.aspx Warming up to using Iterators (Part 2)]
+
+文章第 1, 2 部分以 Ruby 语言（语法类似 Python）介绍了 Iterator 机制是如何简化遍历操作的代码。实际上中心思想就是将行为与控制分离，由语言层面的支持来降低控制代码的薄记工作。 
+
+def textfiles(dir)
+  Dir.chdir(dir)
+
+  Dir["*"].each do |entry|
+    yield dir+"\"+entry if /^.*.txt$/ =~ entry
+
+    if FileTest.directory?(entry)
+      textfiles(entry){|file| yield dir+"\"+file}
+    end
+  end
+  Dir.chdir("..")
+end
+
+textfiles(“c:\”){|file|
+  puts file
+}
+例如上面这段 Ruby 的递归目录处理代码中，就采用了与 C# 2.0 中完全类似的语法实现协同执行支持。
+
+
+而 C# 1.0 中就干脆没有自带支持，必须通过《C# 2.0 中Iterators的改进与实现原理浅析》一文中所举例子那样笨拙的方式完成。
+以下内容为程序代码:
+
+public class Tokens : IEnumerable
+ {
+    public string[] elements;
+
+    Tokens(string source, char[] delimiters)
+    {
+       // Parse the string into tokens:
+       elements = source.Split(delimiters);
+    }
+
+    public IEnumerator GetEnumerator()
+    {
+       return new TokenEnumerator(this);
+    }
+
+    // Inner class implements IEnumerator interface:
+    private class TokenEnumerator : IEnumerator
+    {
+       private int position = -1;
+       private Tokens t;
+
+       public TokenEnumerator(Tokens t)
+       {
+          this.t = t;
+       }
+
+       // Declare the MoveNext method required by IEnumerator:
+       public bool MoveNext()
+       {
+          if (position < t.elements.Length - 1)
+          {
+             position++;
+             return true;
+          }
+          else
+          {
+             return false;
+          }
+       }
+
+       // Declare the Reset method required by IEnumerator:
+       public void Reset()
+       {
+          position = -1;
+       }
+
+       // Declare the Current property required by IEnumerator:
+       public object Current
+       {
+          get // get_Current函数
+          {
+             return t.elements[position];
+          }
+       }
+    }
+    ...
+ }
+
+这种笨拙的 IEnumerable 接口实现方法，实际上是将 STL 中提供控制状态的 iterator 完全自行实现，而且控制逻辑还限定于编写  IEnumerable 接口实现时的定义。就算可以通过策略 (Strategy) 模式提供一定程度的定制，但其代码逻辑过于分散，要理解一个简单调用必须查看四五处分散的代码。
+
+好在牛人总是不缺的，呵呵。
+
+Ajai Shankar 在 MSDN 上一篇非常出色的文章，[URL=http://msdn.microsoft.com/msdnmag/issues/03/09/coroutinesinnet/ COROUTINES Implementing Coroutines for .NET by Wrapping the Unmanaged Fiber API]，里面通过 Win32 API 的纤程 (Fiber) 支持和 CLR 几个底层 API 的支持，完整的实现了一套可用的协同执行支持机制。
+
+Spark Gray 的第 4 篇文章中就详细讨论了这种实现方式的利弊：
+
+[URL=http://pensieve.thinkingms.com/PermaLink,guid,e5126078-543f-49bf-a83a-325c11ec7682.aspx  SICP, Fiber api and ITERATORS !(Part 4)]
+
+纤程 Fiber 是 Win32 子系统为了移植 Unix 下伪线程环境下的程序方便，而提供的一套轻量级并行执行机制，由程序代码自行控制调度流程。
+其使用方法很简单，在某个线程中调用 ConvertThreadToFiber(Ex) 初始化纤程支持，然后调用 CreateFiber(Ex)  建立多个不同纤程，对新建的纤程和转换时当前线程缺省纤程，都可以通过 SwitchToFiber 显式进行调度。
+
+<code>
+static int array[3] = { 0, 1, 2 };
+
+static int cur = 0;
+
+VOID CALLBACK FibERProc(PVOID lpParameter)
+{
+  for(int i=0; i<sizeof(array)/sizeof(array[0]); i++)
+  {
+    cur = array[i];
+
+    SwitchToFiber(lpParameter);
+  }
+}
+
+LPVOID fiberMain = ConvertThreadToFiber(NULL);
+
+LPVOID fiberFor = CreateFiber(0, FiberProc, fiberMain);
+
+while(cur >= 0)
+{
+  std::cout << cur << std::endl;
+
+  SwitchToFiber(fiberFor);
+}
+
+DeleteFiber(fiberFor);
+</code>
+
+上述伪代码是纤程使用的一个大概流程，可以看出实际上纤程跟上面 Ruby 和 C# 2.0 中的协同执行所需功能是非常符合的。而在实现上，纤程实际上是通过在同一线程堆栈中构造出不同的区域(ConvertThreadToFiber/CreateFiber)，在 SwitchToFiber 函数中切换到指定区域，以此区域(纤程)的代码和寄存器等环境执行，有点类似于 C 代码库中 longjmp 的概念。Netscape 提供的状态线程库 [URL=http://state-threads.sourceforge.net/ State Threads library] 就是通过 longjmp 等机制模拟的类似功能。
+
+而在 .net 1.0/1.1 中要使用纤程，则还需要考虑对每个纤程的 Managed 环境构造，以及切换调度时的状态管理等等。有兴趣的朋友可以仔细阅读上述两篇精彩文章。
+
+class CorIter : Fiber {
+    protected override void Run() {
+        object[] array = new object[] {1, 2, 3, 4};
+        for(int ndx = 0; true; ++ndx)
+            Yield(arr[ndx]);
+    }
+}
+
+Coroutine next = new CorIter();
+Object o = next();
+
+可以看到这个代码已经非常类似 C# 2.0 中的语法了，只是要受到一些细节上的限制。
+
+而 C# 2.0 中，大概是为了保障移植性，使用了将控制逻辑编译成状态机的方式实现，并由状态机自动管理控制状态。其原理我在[URL=http://www.blogcn.com/User8/flier_lu/index.html?id=1511638《C# 2.0 中Iterators的改进与实现原理浅析》]一文中已经大概分析过了，有兴趣的朋友可以进一步阅读 Spark Gray 的第 5 篇文章中的详细分析。
+
+[URL=http://pensieve.thinkingms.com/PermaLink,guid,fd10bfa8-1aeb-4353-84c8-cd80e418424f.aspx Implementation of Iterators in C# 2.0 (Part 5)]
+
+以及 Matt Pietrek 的关于 Iterator 状态机的分析文章
+
+[URL=http://blogs.msdn.com/matt_pietrek/archive/2004/07/26/197242.aspx Fun with Iterators and state machines]
+
+而为了将行为与控制更紧密地绑定到一起，C# 2.0 也提供了类似 C++ 中 boost::lambda 机制的匿名方法支持。简要的分析可以参考我以前的一篇文章[URL=http://www.blogcn.com/User8/flier_lu/index.html?id=1397624 《CLR 中匿名函数的实现原理浅析》]，或者Spark Gray 的第 6 篇文章。
+
+[URL=http://pensieve.thinkingms.com/PermaLink,guid,9fe42970-09e3-44e2-a4d0-32d63139351a.aspx Implementation of Closures (Anonymous Methods) in C# 2.0 (Part 6)]
+
+
+
+_________________________________________
+Lua的多任务机制——协程(coroutine)
+
+并发是现实世界的本质特征，而聪明的计算机科学家用来模拟并发的技术手段便是多任务机制。大致上有这么两种多任务技术，一种是抢占式多任务 (preemptive multitasking)，它让操作系统来决定何时执行哪个任务。另外一种就是协作式多任务(cooperative multitasking)，它把决定权交给任务，让它们在自己认为合适的时候自愿放弃执行。这两种多任务方式各有优缺点，前者固有的同步问题使得程序经常有不可预知的行为，而后者则要求任务具备相当的自律精神。
+
+协程(coroutine)技术是一种程序控制机制，早在上世纪60年代就已提出，用它可以很方便地实现协作式多任务。在主流的程序语言(如C++、Java、Pascal等)里我们很少能看到协程的身影，但是现在不少动态脚本语言(Python、Perl)却都提供了协程或与之相似的机制，其中最突出的便是Lua。
+　　
+Lua语言实现的协程是一种非对称式(asymmetric)协程，或称半对称式(semi-asymmetric)协程，又或干脆就叫半协程(semi-coroutine)。这种协程机制之所以被称为非对称的，是因为它提供了两种传递程序控制权的操作：一种是(重)调用协程(通过coroutine.resume)；另一种是挂起协程并将程序控制权返回给协程的调用者(通过coroutine.yield)。一个非对称协程可以看做是从属于它的调用者的，二者的关系非常类似于例程 (routine)与其调用者之间的关系。既然有非对称式协程，当然也就有对称式(symmetric)协程了，它的特点是只有一种传递程序控制权的操作，即将控制权直接传递给指定的协程。曾经有这么一种说法，对称式和非对称式协程机制的能力并不等价，但事实上很容易根据前者来实现后者。接下来我们就用代码来证明这个事实。
+　　
+　　--对称式协程库coro.lua
+　　
+　　coro = {}
+　　--coro.main用来标识程序的主函数
+　　coro.main = function() end
+　　-- coro.current变量用来标识拥有控制权的协程，
+　　-- 也即正在运行的当前协程
+　　coro.current = coro.main
+　　
+　　-- 创建一个新的协程
+　　function coro.create(f)
+　　　 return coroutine.wrap(function(val)
+　　　　　　　　　　　　　　　　return nil,f(val)
+　　　　　　　　　　　　　　 end)
+　　end
+　　
+　　-- 把控制权及指定的数据val传给协程k
+　　function coro.transfer(k,val)
+　　　 if coro.current ~= coro.main then
+　　　　　return coroutine.yield(k,val)
+　　　 else
+　　　　　-- 控制权分派循环
+　　　　　while k do
+　　　　　　 coro.current = k
+　　　　　　 if k == coro.main then
+　　　　　　　　return val
+　　　　　　 end
+　　　　　　 k,val = k(val)
+　　　　　end
+　　　　　error("coroutine ended without transfering control...")
+　　　 end
+　　end
+　　
+　　如果暂时还弄不懂上面的程序，没关系，看看如何使用这个库后再回头分析。下面是使用示例：
+　　
+　　require("coro.lua")
+　　
+　　function foo1(n)
+　　　 print("1: foo1 received value "..n)
+　　　 n = coro.transfer(foo2,n + 10)
+　　　 print("2: foo1 received value "..n)
+　　　 n = coro.transfer(coro.main,n + 10)
+　　　 print("3: foo1 received value "..n)
+　　　 coro.transfer(coro.main,n + 10)
+　　end
+　　
+　　function foo2(n)
+　　　 print("1: foo2 received value "..n)
+　　　 n = coro.transfer(coro.main,n + 10)
+　　　 print("2: foo2 received value "..n)
+　　　 coro.transfer(foo1,n + 10)
+　　end
+　　
+　　function main()
+　　　 foo1 = coro.create(foo1)
+　　　 foo2 = coro.create(foo2)
+　　　 local n = coro.transfer(foo1,0)
+　　　 print("1: main received value "..n)
+　　　 n = coro.transfer(foo2,n + 10)
+　　　 print("2: main received value "..n)
+　　　 n = coro.transfer(foo1,n + 10)
+　　　 print("3: main received value "..n)
+　　end
+　　
+　　--把main设为主函数(协程)
+　　coro.main = main
+　　--将coro.main设为当前协程
+　　coro.current = coro.main
+　　--开始执行主函数(协程)
+　　coro.main()
+　　
+　　
+上面的示例定义了一个名为main的主函数，整个程序由它而始，也因它而终。为什么需要一个这样的主函数呢？上面说了，程序控制权可以在对称式协程之间自由地直接传递，它们之间无所谓谁从属于谁的问题，都处于同一个层级，但是应用程序必须有一个开始点，所以我们定义一个主函数，让它点燃程序运行的导火线。虽说各个协程都是平等的，但做为程序运行原动力的主函数仍然享有特殊的地位(这个世上哪有绝对的平等！)，为此我们的库专门用了一个 coro.main变量来保存主函数，并且在它执行之前要将它设为当前协程(虽然上面的main实际只是一个普通函数而非一个真正的协程，但这并无太大的关系，以后主函数也被称为主协程)。示例运行的结果是：
+　　
+　　1: foo1 received value 0
+　　1: foo2 received value 10
+　　1: main received value 20
+　　2: foo2 received value 30
+　　2: foo1 received value 40
+　　2: main received value 50
+　　3: foo1 received value 60
+　　3: main received value 70
+　　
+协程的执行序列是：main->foo1->foo2->main->foo2->foo1->main->foo1->main。
+　　
+coro.transfer(k,val)函数中k是将要接收程序控制权的协程，而val是传递给k的数据。如果当前协程不是主协程， tansfer(k,val)就简单地利用coroutine.yield(k,val)将当前协程挂起并传回两项数据，即程序控制权的下一站和传递给它的数据；否则进入一个控制权分派(dispatch)循环，该循环(重)启动(resume)k协程，等待它执行到挂起(suspend)，并根据此时协程传回的数据来决定下一个要(重)启动的协程。从应用示例来看，协程与协程之间似乎是用transfer直接传递控制权的，但实际上这个传递还是通过了主协程。每一个在主协程里被调用(比较coro.current和coro.main是否相同即可判断出)的transfer都相当于一个协程管理器，它不断地(重)启动一个协程，将控制权交出去，然后等那个协程挂起时又将控制权收回，然后再(重)启动下一个协程...，这个动作不会停止，除非< 1>将(重)启动的协程是主协程；<2>某个协程没有提供控制权的下一个目的地。很显然，每一轮分派循环开始时都由主协程把握控制权，在循环过程中如果控制权的下一站又是主协程的话就意味着这个当初把控制权交出去的主协程transfer操作应该结束了，所以函数直接返回val从而结束这轮循环。对于情况<2>，因为coro.create(f)创建的协程的体函数(body function)实际是function(val) return nil,f(val) end，所以当函数f的最后一条指令不是transfer时，这个协程终将执行完毕并把nil和函数f的返回值一起返回。如果k是这样的协程， transfer执行完k,val = k(val)语句后k值就成了nil，这被视为一个错误，因为程序此时没法确定下一个应该(重)启动的协程到底是谁。所以在对称式模型下，每一个协程(当然主协程出外)最后都必须显式地将控制权传递给其它的协程。根据以上分析，应用示例的控制权的分派应为：
+　　
+　　第一轮分派: main->foo1->main->foo2->main->main(结束)
+　　第二轮分派: main->foo2->main->foo1->main->main(结束)
+　　第三轮分派: main->foo1->main->main(结束)
+　　
+由于可以直接指定控制权传递的目标，对称式协程机制拥有极大的自由，但得到这种自由的代价却是牺牲程序结构。如果程序稍微复杂一点，那么即使是非常有经验的程序员也很难对程序流程有全面而清晰的把握。这非常类似goto语句，它能让程序跳转到任何想去的地方，但人们却很难理解充斥着goto的程序。非对称式协程具有良好的层次化结构关系，(重)启动这些协程与调用一个函数非常类似：被(重)启动的协程得到控制权开始执行，然后挂起(或结束)并将控制权返回给协程调用者，这与计算机先哲们倡导的结构化编程风格完全一致。
+　　
+综上所述，Lua提供的非对称式协程不但具有与对称式协程一样强大的能力，而且还能避免程序员滥用机制写出结构混乱的程序。
+
+
+_________________________________________
+Coroutines in C# and Delphi: Part 1
+
+I've been thinking about some of the cool things I could do with coroutines, especially with regards to unit tests. So over the weekend, I wrote a coroutine library in C#.
+
+If you haven't dealt with coroutines ("generators" for the Python crowd), they're interesting beasts. You create a coroutine and call it, much like you would call any other routine; and it runs for a while, and then sends a return value back to its caller. But it doesn't actually return; instead, it just "yields" the value back to the caller. The difference is that after a yield, the coroutine's state — local variables, etc. — still exists, and later, you can tell the coroutine to resume where it left off, and run a while longer, until it yields again (or, in the end, returns for real).
+
+If you've read about C# 2.0 iterators, you've got the basic idea. But coroutines are much more powerful. In particular, I believe that a C# iterator is a single routine, and if you have any yield statements, those have to occur inside that single routine. (Correct me if I'm wrong — I don't actually have Whidbey installed, and haven't tested this. But based on what I've read about them, I believe this is correct.) But if you're using a coroutine, that yield can come anywhere: when you yield a coroutine, it's not just the local variables that are saved for later, it's also the call stack.
+
+Which means, for example, that coroutines can use recursion to their heart's content. If I had something like this:
+
+public class TreeWalker : Coroutine {
+    private TreeNode _tree;
+    public TreeWalker(TreeNode tree) { _tree = tree; }
+    protected override Execute() {
+        Walk(_tree);
+    }
+    private void Walk(TreeNode tree) {
+        if (tree != null) {
+            Walk(tree.Left);
+            Yield(tree);
+            Walk(tree.Right);
+        }
+    }
+}
+
+Here I'm doing a recursive in-order traversal of my binary tree... but the call site doesn't need to deal with the recursion — or even care that there's recursion going on. The call site would just look something like this:
+
+foreach (TreeNode node in new TreeWalker(tree)) { ... }
+
+If you've read Raymond Chen's series of articles on using fibers to simplify enumerations, this should all sound very familiar; he was basically using fibers to implement coroutines. I did the same thing, but avoiding fibers (more on this later, but read the dire warnings at the end of Raymond's third article).
+
+I'll post the code a little later, once I've got a few more features added (like the ability to deal with exceptions inside the coroutine). I'll also be doing a Delphi version (probably both Win32 and .NET).　　
