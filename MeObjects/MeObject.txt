@@ -4,8 +4,8 @@ HomePage: http://dev.cqhot.cn/mesdk/
 Email: riceballl@hotmail.com
 Author: Riceball LEE
 
-MeObjects Library for Delphi is an light object extension to make object type small and powerful. It makes the object type
-supports the ClassType, InheritsFrom and ClassName like the Class Type.
+MeObjects Library for Delphi is a light object extension to make object type small and powerful. It makes the object type
+supports the ClassType, InheritsFrom and ClassName like the Class Type, but it's mini and faster than class type.
 It is freeware and open source.
 
 == License ==
@@ -20,6 +20,15 @@ appreciated
 == MeObjects ==
 
 All MeObjects should be derived from TMeDynamicObject.
+
+TMeDynamicObject Features:
+  * ClassType:  the address of virtual methods table of object
+  * InheritsFrom : Determines the relationship of two object types
+  * IsObject: replace 'is' operator, test whether is the same object.
+  * ClassParent: Return the VMT Address of parent
+  * InstanceSize: the size of the object instance.
+  * ClassName: PChar (optional enable MeRTTI_SUPPORT compiler directive in MeSetting.inc)
+  * Free(aFreeMemRequired: Boolean = True):  Free the Object. Disposes the memory allocated to an object if aFreeMemRequired.
 
 How to derived a new object from TMeDynamicObject?
 
