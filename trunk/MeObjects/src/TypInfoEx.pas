@@ -166,7 +166,7 @@ type
   PIntfEntry = ^TIntfEntry;
   TIntfEntry = packed record
     MethodCount: Word;   // #methods 
-    HasMethodRTTI: Word; // $FFFF if no method RTTI, 
+    MethodRTTICount: Word; // $FFFF if no method RTTI, 
     // #methods again if has RTTI 
     Methods: packed array[0..$1FFF-1] of TIntfMethodEntry;
   end;
@@ -177,7 +177,7 @@ type
         IntfUnit : ShortStringBase;
         IntfEntry: TIntfEntry;
           MethodCount: Word;   // #methods 
-          HasMethodRTTI: Word; // $FFFF if no method RTTI, 
+          MethodRTTICount: Word; // $FFFF if no method RTTI, 
           // #methods again if has RTTI 
           Methods: packed array[0..High(Word)-1] of TIntfMethodEntry;
 
@@ -201,9 +201,45 @@ type
     Property HasRTTI: Boolean read GetMethodHasRTTI;
   end;
 
+//writen by hallvards
+function GetImplementorOfInterface(const I: IInterface): TObject; 
+
 implementation
 
 {## helper function ###}
+function GetImplementorOfInterface(const I: IInterface): TObject; 
+const 
+  AddByte = $04244483;  
+  AddLong = $04244481;  
+type 
+  PAdjustSelfThunk = ^TAdjustSelfThunk; 
+  TAdjustSelfThunk = packed record 
+    case AddInstruction: longint of 
+      AddByte : (AdjustmentByte: shortint); 
+      AddLong : (AdjustmentLong: longint); 
+  end; 
+  PInterfaceMT = ^TInterfaceMT; 
+  TInterfaceMT = packed record 
+    QueryInterfaceThunk: PAdjustSelfThunk; 
+  end; 
+  TInterfaceRef = ^PInterfaceMT; 
+var 
+  QueryInterfaceThunk: PAdjustSelfThunk; 
+begin 
+  Result := Pointer(I); 
+  if Assigned(Result) then 
+    try 
+      QueryInterfaceThunk := TInterfaceRef(I)^. QueryInterfaceThunk; 
+      case QueryInterfaceThunk.AddInstruction of 
+        AddByte: Inc(PChar(Result), QueryInterfaceThunk.AdjustmentByte); 
+        AddLong: Inc(PChar(Result), QueryInterfaceThunk.AdjustmentLong); 
+        else     Result := nil; 
+      end; 
+    except 
+      Result := nil; 
+    end; 
+end; 
+
 //read packed ShortString.
 function ReadPackedShortString(var P: Pointer): String;
 var
