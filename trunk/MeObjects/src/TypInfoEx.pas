@@ -32,6 +32,7 @@
  * All rights reserved.
  *
  * Contributor(s):
+ *  hallvards
  *
  *)
 
