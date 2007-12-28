@@ -1385,7 +1385,7 @@ var
 {$ENDIF FPC}
 begin
   if Assigned(FFreeNotifies) then
-    for i : 0 to FFreeNotifies.Count div 2 - 1 do
+    for i := 0 to FFreeNotifies.Count div 2 - 1 do
     begin
       {$IFDEF FPC}
       asm
