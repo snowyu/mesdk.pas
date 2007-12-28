@@ -760,7 +760,7 @@ NextTk:
                   aToken.Size := Integer(vPChar)- Integer(aToken.Pos);
                   aToken.TokenId := TokenId;
                   aToken.TokenType := FTokens.Items[i];
-                  FErrors.Add(aToken, cMeTokenErrorMissedToken, TokenEnd);
+                  FErrors.Add(@aToken, cMeTokenErrorMissedToken, TokenEnd);
                   exit;
                 end;
               end;
