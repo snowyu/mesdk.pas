@@ -26,7 +26,7 @@
 
  Usage:
 //Ã¶¾ÙÆ÷
-procedure StringYieldProc(YieldObj: TYieldObject);
+procedure StringYieldProc(const YieldObj: TYieldObject);
 var  
   YieldValue: string;
   i: integer;
@@ -91,7 +91,7 @@ type
   PYieldInteger = ^TYieldInteger;
   {$ENDIF}
 
-  TMeYieldProc = procedure (YieldObject: {$IFDEF YieldClass_Supports}TMeYieldObject{$ELSE} PMeYieldObject{$endif});
+  TMeYieldProc = procedure (const YieldObject: {$IFDEF YieldClass_Supports}TMeYieldObject{$ELSE} PMeYieldObject{$endif});
 
   TMeYieldObject = {$IFDEF YieldClass_Supports}class{$ELSE}object(TMeDynamicObject){$ENDIF}
   protected
@@ -103,7 +103,7 @@ type
     FStackFrame: array[1..128] of DWORD;
     procedure SaveYieldedValue(const aValue); virtual; abstract;
   public
-    constructor Create(YieldProc: TMeYieldProc);
+    constructor Create(const YieldProc: TMeYieldProc);
     function MoveNext:boolean; //D2007 enumerable required
     procedure Yield(const Value);
   end;
@@ -135,7 +135,7 @@ type
 implementation
 
 { TMeYieldObject }
-constructor TMeYieldObject.Create(YieldProc:TMeYieldProc);
+constructor TMeYieldObject.Create(const YieldProc:TMeYieldProc);
 asm
   {$IFNDEF YieldClass_Supports}
   CALL TMeDynamicObject.Init

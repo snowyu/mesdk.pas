@@ -71,8 +71,12 @@ procedure Consumer();
 
 begin
   with GetEnumerator do
+  try
     While MoveNext do
       writeln(Current);
+  finally
+    Free;
+  end;
 end;
 </code>
 
@@ -102,7 +106,7 @@ end;
 
 在Delphi2005(D9)以上版本上可以用For..In循环，这样来写（不过为了兼容性，还是使用上述的代码放心）：
 <code>
-Type
+type
   TMyContainer = class
   public
     function GetEnumerator: TYieldInteger;
@@ -134,6 +138,7 @@ end;
 
 == 在Delphi上实现 Yield ==
 本实现是由俄罗斯的牛人 [http://santonov.blogspot.com/ Sergey Antonov] (or Антонов Сергей - aka. 0xffff) 具体实施的。
+该方法是通过保护当前堆栈现场Frame以及寄存器的方式实现，注意在控制逻辑中不能递归。如果要以状态机的方式实现，就只能考虑预编译处理了！
 本人只是将其稍作修改并移植到了MeObject上。你可以在 http://code.google.com/p/meaop/source 中的MeObjects/src/uMeYield.pas中找到。
 不过如果你想使用delphi class类型，你需要打开MeSetting.inc中的 YieldClass_Supports 编译开关。
 
@@ -265,3 +270,212 @@ begin
 end.
 
 </code>
+
+== 错误使用 ==
+
+以下为一些错误使用Delphi Yield的方式：
+
+=== 交替控制 ===
+
+企图在两个YieldProc中交替控制Yield，实际上这将在堆栈上形成递归，这有可能会造成堆栈溢出或死锁。
+
+<code>
+var
+  i: integer;
+  w,b: integer;
+procedure BlackYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeYieldObject{$ELSE} PMeYieldObject{$endif});forward;
+
+procedure WhiteYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeYieldObject{$ELSE} PMeYieldObject{$endif});
+begin
+  while true do
+  begin
+    writeln('white move: ', w);
+    inc(w);
+    YieldObj.Yield(w);
+    BlackYieldProc(YieldObj);  
+    //if w > 10001 then exit;
+  end;
+end;
+
+procedure BlackYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeYieldObject{$ELSE} PMeYieldObject{$endif});
+begin
+    //if b > 10 then exit;
+    writeln('black move: ', b);
+    inc(b);
+    YieldObj.Yield(b);
+    WhiteYieldProc(YieldObj); //<--禁止在过程之间中交替执行.!否则可能会堆栈溢出。
+end;
+
+  w := 0; b:= 0; i := 0;
+  with GetWhiteEnumerator{$IFNDEF YieldClass_Supports}^{$endif} do
+    try
+      while MoveNext do
+      begin
+        inc(i);
+        //if i > 10 then break;
+        //Writeln(Current);
+      end;
+    finally
+      Free;
+    end;
+</code>
+
+=== Pipeline 模式的滥用 ===
+
+首先提醒递归的存在，注意堆栈溢出，另外这种写法绝对能把你眼球搞晕，不建议使用。请看代码：
+<code>
+//pipeline pattern
+type
+  PYieldIntegerRange = ^ TYieldIntegerRange;
+  TYieldIntegerRange = class(TYieldInteger)
+  public
+    Min, Max: Integer;
+    constructor Create(const aMin, aMax: Integer);
+  end;
+
+  PYieldIntegerMul = ^ TYieldIntegerMul;
+  TYieldIntegerMul = class(TYieldInteger)
+  public
+    Factor: Integer;
+    Input: TYieldInteger;
+    constructor Create(const aFact: Integer; const aInput: TYieldInteger);
+  end;
+
+  PYieldIntegerMod = ^ TYieldIntegerMod;
+  TYieldIntegerMod = class(TYieldInteger)
+  public
+    Factor: Integer;
+    Input: TYieldInteger;
+    constructor Create(const aFact: Integer; const aInput: TYieldInteger);
+  end;
+
+  PYieldIntegerJoin = ^ TYieldIntegerJoin;
+  TYieldIntegerJoin = class(TYieldInteger)
+  public
+    Input1, Input2: TYieldInteger;
+    constructor Create(const aInput1, aInput2: TYieldInteger);
+  end;
+
+procedure RangeYieldProc(const YieldObj: TMeYieldObject);
+var
+  i: integer;
+begin
+  with TYieldIntegerRange(YieldObj) do
+  begin
+    for i := Min to Max do Yield(i);
+  end;
+end;
+
+procedure MulYieldProc(const YieldObj: TMeYieldObject);
+var
+  i: integer;
+begin
+  with TYieldIntegerMul(YieldObj) do
+  begin
+    if Assigned(Input) then
+    while Input.MoveNext do
+    begin
+      i := Input.Current*Factor;
+      YieldObj.Yield(i);
+    end;
+  end;
+end;
+
+procedure ModYieldProc(const YieldObj: TMeYieldObject);
+var
+  i: integer;
+begin
+  with TYieldIntegerMod(YieldObj) do
+  begin
+    if Assigned(Input) then
+    while Input.MoveNext do
+    begin
+      i := Input.Current;
+      if i mod Factor = 0 then
+      begin
+        YieldObj.Yield(i);
+      end;
+    end;
+  end;
+end;
+
+procedure JoinYieldProc(const YieldObj: TMeYieldObject);
+var
+  i: integer;
+begin
+  with TYieldIntegerJoin(YieldObj) do
+  begin
+    if Assigned(Input1) then while Input1.MoveNext do
+    begin
+      i := Input1.Current;
+      YieldObj.Yield(i);
+    end;
+
+    if Assigned(Input2) then while Input2.MoveNext do
+    begin
+      i := Input2.Current;
+      YieldObj.Yield(i);
+    end;
+  end;
+end;
+
+constructor TYieldIntegerRange.Create(const aMin, aMax: Integer);
+begin
+  Min := aMin; Max := aMax;
+  inherited Create(RangeYieldProc);
+end;
+
+constructor TYieldIntegerMul.Create(const aFact: Integer; const aInput: TYieldInteger);
+begin
+  Factor:= aFact; Input := aInput;
+  inherited Create(MulYieldProc);
+end;
+
+constructor TYieldIntegerMod.Create(const aFact: Integer; const aInput: TYieldInteger);
+begin
+  Factor:= aFact; Input := aInput;
+  inherited Create(ModYieldProc);
+end;
+
+constructor TYieldIntegerJoin.Create(const aInput1, aInput2: TYieldInteger);
+begin
+  Input1:= aInput1; Input2 := aInput2;
+  inherited Create(JoinYieldProc);
+end;
+
+var
+  RangeI,Range1I, MulI, JoinI, ModI: TYieldInteger;
+
+RangeI := TYieldIntegerRange.Create(-4,-2);
+Range1I := TYieldIntegerRange.Create(1,10);
+MulI := TYieldIntegerMul.Create(2, Range1I);
+ModI := TYieldIntegerMod.Create(3, MulI);
+JoinI := TYieldIntegerJoin.Create(RangeI, ModI);
+
+while JoinI.MoveNext do
+  Writeln(JoinI.Current);
+
+MulI.free;
+RangeI.free;
+JoinI.free;
+ModI.free;
+Range1I.free;
+</code>
+
+程序输出：
+<code>
+ -4
+-3
+-2
+6
+12
+18
+</code>
+
+输出值中-4,-3 和 -2 很好理解。后面的值 6,12, 18是怎么输出的？请看下表：
+<code>
+IntegerRange  : 1 2 3 4 5  6  7  8  9  10
+IntegerMul(2) : 2 4 6 8 10 12 14 16 18 20
+IntegerMod(3) :     6      12       18
+</code>
+
