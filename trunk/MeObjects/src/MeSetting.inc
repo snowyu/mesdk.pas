@@ -16,7 +16,7 @@
 {$DEFINE STATIC_METHOD_SCRAMBLING_CODE_SUPPORT}
 {.$DEFINE MeDynamicMemory_HoldMem_SUPPORT}
 
-{$DEFINE YieldClass_Supports} //use the delphi class type instead.
+{.$DEFINE YieldClass_Supports} //use the delphi class type instead.
 
 {Include Common setting File}
 {$I Setting.inc}

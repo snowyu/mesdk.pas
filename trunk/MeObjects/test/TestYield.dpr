@@ -17,17 +17,18 @@ uses
 
 {.$Define YieldClass_Supports} //use the delphi class type instead.
 
+//控制逻辑：枚举器
 procedure StringYieldProc(YieldObj: {$IFDEF YieldClass_Supports}TMeYieldObject{$ELSE} PMeYieldObject{$endif});
 var  
   YieldValue: string;
   i: integer;
 begin
   YieldValue:='None';
-  YieldObj.Yield(YieldValue);
+  YieldObj.Yield(YieldValue);//返回行为逻辑
   for i := 1 to 10 do
   begin
     YieldValue := YieldValue + IntToStr(i);
-    YieldObj.Yield(YieldValue);
+    YieldObj.Yield(YieldValue); //返回行为逻辑
   end;
 end;
 
