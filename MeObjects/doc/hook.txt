@@ -1,4 +1,4 @@
-我使用的是 Extended Code Overwriting 方式，不过也许该考虑绝对跳转，如果要在系统API范围内做hook。
+我使用的是 Extended Code Overwriting 方式以及变体，不过也许该考虑绝对跳转，如果要在系统API范围内做hook。
 系统范围的API hook可以在uMeHookAPI.pas中实现： IAT(Import Address Table) hook, EAT(export address table) hook.
 
 = System Wide API Hooking =

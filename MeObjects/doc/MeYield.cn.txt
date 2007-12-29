@@ -137,6 +137,27 @@ end;
 本人只是将其稍作修改并移植到了MeObject上。你可以在 http://code.google.com/p/meaop/source 中的MeObjects/src/uMeYield.pas中找到。
 不过如果你想使用delphi class类型，你需要打开MeSetting.inc中的 YieldClass_Supports 编译开关。
 
+=== 关键执行流程分析 ===
+MoveNext 执行流程
+当第一次执行MoveNext的时候，FNextItemEntryPoint 指向YieldProc的入口
+保存寄存器到堆栈
+设置 FIsField 0
+压入 @@exit 地址
+保存ESP 到 字段BESP
+没有 localStackFrame 跳到 JumpIn
+ebx...ebp全部清零（因为还没有数据）
+压入 FNextItemEntryPoint 入口地址
+使用 Ret 执行 FNextItemEntryPoint
+
+当第一次执行MoveNext的时候，FNextItemEntryPoint 指向YieldProc的入口，因此这里执行 StringYieldProc:
+在StringYieldProc中，当执行到 Yield()的时候
+保存 ebx...ebp到相应字段
+弹出 @@exit的地址，并保存到 FNextItemEntryPoint
+执行 SaveYieldedValue
+Calculate the current local stack frame size
+Preserve the local stack frame
+设置 FIsYield 1
+
 == 在MeObject上的使用 ==
 首先确保关闭MeSetting.inc中的 YieldClass_Supports 编译开关。在写法上略有差别：
 <code>
@@ -174,17 +195,19 @@ end;
 == 使用 YieldClass_Supports 编译开关的写法 ==
 <code>
 {$I MeSetting.inc}
+
+//控制逻辑：枚举器
 procedure StringYieldProc(YieldObj: {$IFDEF YieldClass_Supports}TMeYieldObject{$ELSE} PMeYieldObject{$endif});
 var  
   YieldValue: string;
   i: integer;
 begin
   YieldValue:='None';
-  YieldObj.Yield(YieldValue);
+  YieldObj.Yield(YieldValue);//返回行为逻辑
   for i := 1 to 10 do
   begin
     YieldValue := YieldValue + IntToStr(i);
-    YieldObj.Yield(YieldValue);
+    YieldObj.Yield(YieldValue); //返回行为逻辑
   end;
 end;
 
