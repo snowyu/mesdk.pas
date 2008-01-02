@@ -41,7 +41,7 @@ uses
   ;
 
 const
-  cStackSize = 1024 * 8;
+  cStackSize = 1024 * 4;
 
 type
   {$IFDEF YieldClass_Supports}
@@ -167,7 +167,6 @@ asm
   { Preserve EBP, EAX,EBX,ECX,EDX,ESI,EDI }
   MOV EAX.TMeCoroutine.FEBP,EBP;
   MOV EAX.TMeCoroutine.FESP,ESP;
-  //mov eax.TMeCoroutine.FEAX,EAX;
 
   PUSH EAX.TMeCoroutine.FEBX;
   PUSH EAX.TMeCoroutine.FECX;
@@ -190,19 +189,21 @@ asm
   MOV  ESP, EAX.TMeCoroutine.FStackPointer
   MOV  EBP, EAX.TMeCoroutine.FStackFrame
   MOV  EAX.TMeCoroutine.FStatus, coRunning
-  //PUSH offset @@DeadExit
   CMP  EAX.TMeCoroutine.FInited, 0
   JNZ  @@DoNextIP
+
+  //PUSH EAX.TMeCoroutine.FEBP
+  MOV  EBP, EAX.TMeCoroutine.FESP
   PUSH EAX
   PUSH offset @@DeadExit
   MOV  EAX.TMeCoroutine.FInited, 1
-@@DoNextIP:
+
+@@DoNextIP: //TODO: add exception process here
   PUSH [EAX.TMeCoroutine.FNextIP]
   MOV  EAX, EAX.TMeCoroutine.FEAX
   RET
-  //CALL [FNextIP]
 
-@@DeadExit:
+@@DeadExit: //the coroutine finished 
   POP EAX
   MOV EBP, EAX.TMeCoroutine.FEBP;
   MOV EBX, EAX.TMeCoroutine.FEBX;
@@ -249,7 +250,6 @@ asm
 
 
   { Preserve EBP, EAX,EBX,ECX,EDX,ESI,EDI }
-  //PUSH EAX.TMeCoroutine.FEAX;
   PUSH EAX.TMeCoroutine.FEBX;
   PUSH EAX.TMeCoroutine.FECX;
   PUSH EAX.TMeCoroutine.FEDX;
@@ -261,7 +261,7 @@ asm
   MOV EAX.TMeCoroutine.FEDX,EDX;   // This is the Ref to const param
   MOV EAX.TMeCoroutine.FESI,ESI;
   MOV EAX.TMeCoroutine.FEDI,EDI;
-  MOV EAX.TMeYieldObject.FEAX,EAX;
+  MOV EAX.TMeCoroutine.FEAX,EAX;
 
   POP  EDI;
   POP  ESI;
@@ -280,9 +280,11 @@ asm
 }
   MOV  ESP, EAX.TMeCoroutine.FESP;
   MOV  EBP, EAX.TMeCoroutine.FEBP;
+  RET
 
 @@ErrorExit:
   MOV  EAX.TMeCoroutine.FLastErrorCode, Ord(cecNotRunning)
+
 end;
 
 function TMeYieldObject.MoveNext:boolean;
