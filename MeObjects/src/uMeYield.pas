@@ -26,7 +26,7 @@
 
  Usage:
 //枚举器
-procedure StringYieldProc(const YieldObj: TYieldObject);
+procedure StringCoroutineProc(const YieldObj: TaCoroutine);
 var  
   YieldValue: string;
   i: integer;
@@ -42,7 +42,7 @@ end;
 
 function TForm1.GetEnumerator: TYieldString;
 begin
-  Result:=TYieldString.Create(StringYieldProc);
+  Result:=TYieldString.Create(StringCoroutineProc);
 end;
 
 procedure TForm1.Button1Click(Sender: TObject);
@@ -54,7 +54,7 @@ begin
   {It means
     with GetEnumerator do
     try
-      while MoveNext do //转到控制逻辑
+      while Resume do //转到控制逻辑
       begin
         s := Current;
         Memo1.Lines.Add(s);
@@ -84,28 +84,37 @@ uses
 
 type
   {$IFDEF YieldClass_Supports}
-  TMeYieldObject = Class;
+  TMeCoroutine = Class;
   {$ELSE}
+  PMeCoroutine = ^TMeCoroutine;
+
   PMeYieldObject = ^TMeYieldObject;
   PYieldString = ^TYieldString;
   PYieldInteger = ^TYieldInteger;
   {$ENDIF}
 
-  TMeYieldProc = procedure (const YieldObject: {$IFDEF YieldClass_Supports}TMeYieldObject{$ELSE} PMeYieldObject{$endif});
+  TMeCoroutineProc = procedure (const aCoroutine: {$IFDEF YieldClass_Supports}TMeCoroutine{$ELSE} PMeCoroutine{$endif});
+  TMeCoroutineMethod = procedure () of object;
+  TMeCoroutineStatus = (coSuspended, coRunning, coDead);
 
-  TMeYieldObject = {$IFDEF YieldClass_Supports}class{$ELSE}object(TMeDynamicObject){$ENDIF}
+  TMeCoroutine = {$IFDEF YieldClass_Supports}class{$ELSE}object(TMeDynamicObject){$ENDIF}
   protected
     FIsYield:boolean;
-    FNextItemEntryPoint:pointer;
+    FNextIP:TMeCoroutineProc;
     BESP:pointer;
     FEAX,FEBX,FECX,FEDX,FESI,FEDI,FEBP:pointer;
     FStackFrameSize:DWORD;
     FStackFrame: array[1..128] of DWORD;
     procedure SaveYieldedValue(const aValue); virtual; abstract;
   public
-    constructor Create(const YieldProc: TMeYieldProc);
-    function MoveNext:boolean; //D2007 enumerable required
+    constructor Create(const CoroutineProc: TMeCoroutineProc);
+    function Resume:boolean; //D2007 enumerable required
     procedure Yield(const Value);
+  end;
+
+  TMeYieldObject = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeCoroutine)
+  public
+    function MoveNext:boolean;
   end;
 
   TYieldString = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeYieldObject)
@@ -134,17 +143,17 @@ type
 
 implementation
 
-{ TMeYieldObject }
-constructor TMeYieldObject.Create(const YieldProc:TMeYieldProc);
+{ TMeCoroutine }
+constructor TMeCoroutine.Create(const CoroutineProc:TMeCoroutineProc);
 asm
   {$IFNDEF YieldClass_Supports}
   CALL TMeDynamicObject.Init
   {$ENDIF}
-  mov eax.TMeYieldObject.FNextItemEntryPoint,ecx;
-  mov eax.TMeYieldObject.FEAX,EAX;
+  mov eax.TMeCoroutine.FNextIP,ecx;
+  mov eax.TMeCoroutine.FEAX,EAX;
 end;
 
-function TMeYieldObject.MoveNext: boolean;
+function TMeCoroutine.Resume: boolean;
 asm
   { Save the value of following registers.
     We must preserve EBP, EBX, EDI, ESI, EAX for some circumstances.
@@ -156,43 +165,43 @@ asm
   push esi;
   push eax;
 
-  mov eax.TMeYieldObject.FIsYield,0
+  mov eax.TMeCoroutine.FIsYield,0
   push offset @@exit
   xor edx,edx;
-  cmp eax.TMeYieldObject.BESP,edx;
+  cmp eax.TMeCoroutine.BESP,edx;
   jz @AfterEBPAdjust;
 
   { Here is the correction of EBP. Some need of optimization still exists. }
   mov edx,esp;
-  sub edx,eax.TMeYieldObject.BESP;
-  add [eax.TMeYieldObject.FEBP],edx
+  sub edx,eax.TMeCoroutine.BESP;
+  add [eax.TMeCoroutine.FEBP],edx
 
   @AfterEBPAdjust:
-  mov eax.TMeYieldObject.BESP,esp;
+  mov eax.TMeCoroutine.BESP,esp;
 
   { Is there any local frame? }
-  cmp eax.TMeYieldObject.FStackFrameSize,0
+  cmp eax.TMeCoroutine.FStackFrameSize,0
   jz @JumpIn;
 
   { Restore the local stack frame }
-  mov ecx,eax.TMeYieldObject.FStackFrameSize;
+  mov ecx,eax.TMeCoroutine.FStackFrameSize;
   sub esp,ecx;
   mov edi,esp;
-  lea esi,eax.TMeYieldObject.FStackFrame;
+  lea esi,eax.TMeCoroutine.FStackFrame;
 
   { Some need of optimization still exists. Like movsd}
   rep movsb;
   @JumpIn:
 
   { Restore the content of processor registers }
-  mov ebx,eax.TMeYieldObject.FEBX;
-  mov ecx,eax.TMeYieldObject.FECX;
-  mov edx,eax.TMeYieldObject.FEDX;
-  mov esi,eax.TMeYieldObject.FESI;
-  mov edi,eax.TMeYieldObject.FEDI;
-  mov ebp,eax.TMeYieldObject.FEBP;
-  push [eax.TMeYieldObject.FNextItemEntryPoint];
-  mov eax,eax.TMeYieldObject.FEAX;
+  mov ebx,eax.TMeCoroutine.FEBX;
+  mov ecx,eax.TMeCoroutine.FECX;
+  mov edx,eax.TMeCoroutine.FEDX;
+  mov esi,eax.TMeCoroutine.FESI;
+  mov edi,eax.TMeCoroutine.FEDI;
+  mov ebp,eax.TMeCoroutine.FEBP;
+  push [eax.TMeCoroutine.FNextIP];
+  mov eax,eax.TMeCoroutine.FEAX;
 
   { Here is the jump to next iteration }
   ret;
@@ -207,45 +216,51 @@ asm
   pop ebx;
   pop ebp;
   { This Flag indicates the occurrence or no occurrence of Yield  }
-  mov al,eax.TMeYieldObject.FIsYield;
+  mov al,eax.TMeCoroutine.FIsYield;
 end;
 
-procedure TMeYieldObject.Yield(const Value);
+procedure TMeCoroutine.Yield(const Value);
 asm
   { Preserve EBP, EAX,EBX,ECX,EDX,ESI,EDI }
-  mov eax.TMeYieldObject.FEBP,ebp;
-  mov eax.TMeYieldObject.FEAX,eax;
-  mov eax.TMeYieldObject.FEBX,ebx;
-  mov eax.TMeYieldObject.FECX,ecx;
-  mov eax.TMeYieldObject.FEDX,edx;   // This is the Ref to const param
-  mov eax.TMeYieldObject.FESI,ESI;
-  mov eax.TMeYieldObject.FEDI,EDI;
+  mov eax.TMeCoroutine.FEBP,ebp;
+  mov eax.TMeCoroutine.FEAX,eax;
+  mov eax.TMeCoroutine.FEBX,ebx;
+  mov eax.TMeCoroutine.FECX,ecx;
+  mov eax.TMeCoroutine.FEDX,edx;   // This is the Ref to const param
+  mov eax.TMeCoroutine.FESI,ESI;
+  mov eax.TMeCoroutine.FEDI,EDI;
   pop ecx;
-  mov eax.TMeYieldObject.FNextItemEntryPoint,ecx;
+  mov eax.TMeCoroutine.FNextIP,ecx;
 
   //We must do it first for valid const reference
   push eax;
   mov ecx,[eax];
-  CALL  DWORD PTR [ecx+VMTOFFSET TMeYieldObject.SaveYieldedValue];
+  CALL  DWORD PTR [ecx+VMTOFFSET TMeCoroutine.SaveYieldedValue];
   pop eax;
   
   { Calculate the current local stack frame size }
-  mov ecx,eax.TMeYieldObject.BESP;
+  mov ecx,eax.TMeCoroutine.BESP;
   sub ecx,esp;
-  mov eax.TMeYieldObject.FStackFrameSize,ecx;
+  mov eax.TMeCoroutine.FStackFrameSize,ecx;
   jz @AfterSaveStack;
 
   { Preserve the local stack frame }
   lea esi,[esp];
-  lea edi,[eax.TMeYieldObject.FStackFrame];
+  lea edi,[eax.TMeCoroutine.FStackFrame];
   
   { Some need of optimization still exists. Like movsd }
   rep movsb;
-  mov esp,eax.TMeYieldObject.BESP;
+  mov esp,eax.TMeCoroutine.BESP;
   @AfterSaveStack:
 
   {Set flag of Yield occurance }
-  mov eax.TMeYieldObject.FIsYield,1;
+  mov eax.TMeCoroutine.FIsYield,1;
+end;
+
+{ TMeYieldObject }
+function TMeYieldObject.MoveNext:boolean;
+begin
+  Result := Resume();
 end;
 
 { TYieldString }

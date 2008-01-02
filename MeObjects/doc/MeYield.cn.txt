@@ -157,7 +157,7 @@ ebx...ebp全部清零（因为还没有数据）
 当第一次执行MoveNext的时候，FNextItemEntryPoint 指向YieldProc的入口，因此这里执行 StringYieldProc:
 在StringYieldProc中，当执行到 Yield()的时候
 保存 ebx...ebp到相应字段
-弹出 @@exit的地址，并保存到 FNextItemEntryPoint
+弹出调用者的地址，并保存到 FNextItemEntryPoint
 执行 SaveYieldedValue
 Calculate the current local stack frame size
 Preserve the local stack frame

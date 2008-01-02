@@ -18,7 +18,7 @@ uses
 {.$Define YieldClass_Supports} //use the delphi class type instead.
 
 //¿ØÖÆÂß¼­£ºÃ¶¾ÙÆ÷
-procedure StringYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeYieldObject{$ELSE} PMeYieldObject{$endif});
+procedure StringYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutine{$ELSE} PMeCoroutine{$endif});
 var  
   YieldValue: string;
   i: integer;
@@ -37,9 +37,9 @@ end;
 var
   i: integer;
   w,b: integer;
-procedure BlackYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeYieldObject{$ELSE} PMeYieldObject{$endif});forward;
+procedure BlackYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutine{$ELSE} PMeCoroutine{$endif});forward;
 
-procedure WhiteYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeYieldObject{$ELSE} PMeYieldObject{$endif});
+procedure WhiteYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutine{$ELSE} PMeCoroutine{$endif});
 begin
   while true do
   begin
@@ -51,7 +51,7 @@ begin
   end;
 end;
 
-procedure BlackYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeYieldObject{$ELSE} PMeYieldObject{$endif});
+procedure BlackYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutine{$ELSE} PMeCoroutine{$endif});
 begin
     //if b > 10 then exit;
     writeln('black move: ', b);
@@ -99,7 +99,7 @@ type
     constructor Create(const aInput1, aInput2: {$IFDEF YieldClass_Supports}TYieldInteger{$ELSE} PYieldInteger{$endif});
   end;
 
-procedure RangeYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeYieldObject{$ELSE} PMeYieldObject{$endif});
+procedure RangeYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutine{$ELSE} PMeCoroutine{$endif});
 var
   i: integer;
 begin
@@ -109,7 +109,7 @@ begin
   end;
 end;
 
-procedure MulYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeYieldObject{$ELSE} PMeYieldObject{$endif});
+procedure MulYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutine{$ELSE} PMeCoroutine{$endif});
 var
   i: integer;
 begin
@@ -124,7 +124,7 @@ begin
   end;
 end;
 
-procedure ModYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeYieldObject{$ELSE} PMeYieldObject{$endif});
+procedure ModYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutine{$ELSE} PMeCoroutine{$endif});
 var
   i: integer;
 begin
@@ -142,7 +142,7 @@ begin
   end;
 end;
 
-procedure JoinYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeYieldObject{$ELSE} PMeYieldObject{$endif});
+procedure JoinYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutine{$ELSE} PMeCoroutine{$endif});
 var
   i: integer;
 begin
