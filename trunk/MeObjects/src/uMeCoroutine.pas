@@ -84,9 +84,9 @@ type
     FStackTop: Pointer;
     FSTackFrame: Pointer;
     procedure SaveYieldedValue(const aValue); virtual; abstract;
-    {$IFNDEF YieldClass_Supports}
-    procedure Init(); virtual; {override;}
-    {$ENDIF}
+    
+    procedure Init(); {$IFNDEF YieldClass_Supports}virtual; {override;}{$ENDIF}
+    
   public
     constructor Create(const CoroutineProc: TMeCoroutineProc);
     destructor Destroy; {$IFDEF YieldClass_Supports}override;{$ELSE}virtual;{$ENDIF}
@@ -131,25 +131,26 @@ constructor TMeCoroutine.Create(const CoroutineProc: TMeCoroutineProc);
 begin
   inherited Create;
   {$IFDEF YieldClass_Supports}
-  FStack := AllocMem(cStackSize*SizeOf(Pointer));
-  FStackTop := Pointer(Integer(FStack) + (cStackSize)*SizeOf(Pointer));
-  FStackPointer := FStackTop;
-  FSTackFrame := FStackTop;
-  FEAX := Self;
+  Init();
   {$ENDIF}
   FNextIP := CoroutineProc;
 end;
 
-{$IFNDEF YieldClass_Supports}
- procedure TMeCoroutine.Init();
-{$ENDIF}
+procedure TMeCoroutine.Init();
+var
+  p: Pointer;
 begin
+{$IFNDEF YieldClass_Supports}
   inherited;
+{$ENDIF}
   FStack := AllocMem(cStackSize*SizeOf(Pointer));
   FStackTop := Pointer(Integer(FStack) + (cStackSize)*SizeOf(Pointer));
   FStackPointer := FStackTop;
-  FSTackFrame := FStackTop;
-  FEAX := @Self;
+  p := FStackTop;
+  Dec(Cardinal(FStackPointer), SizeOf(Pointer));
+  PPointer(FStackPointer)^ := p;
+  FSTackFrame := FStackPointer;
+  FEAX := {$IFNDEF YieldClass_Supports}@{$ENDIF}Self;
 end;
 
 destructor TMeCoroutine.Destroy();
