@@ -103,7 +103,7 @@ procedure RangeYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutin
 var
   i: integer;
 begin
-  with {$IFDEF YieldClass_Supports}TYieldIntegerRange {$ELSE}PYieldIntegerRange{$ENDIF}(YieldObj)^ do
+  with {$IFDEF YieldClass_Supports}TYieldIntegerRange {$ELSE}PYieldIntegerRange{$ENDIF}(YieldObj){$IFNDEF YieldClass_Supports}^{$endif} do
   begin
     for i := Min to Max do Yield(i);
   end;
@@ -113,7 +113,7 @@ procedure MulYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutine{
 var
   i: integer;
 begin
-  with {$IFDEF YieldClass_Supports}TYieldIntegerMul {$ELSE}PYieldIntegerMul{$ENDIF}(YieldObj)^ do
+  with {$IFDEF YieldClass_Supports}TYieldIntegerMul {$ELSE}PYieldIntegerMul{$ENDIF}(YieldObj){$IFNDEF YieldClass_Supports}^{$endif} do
   begin
     if Assigned(Input) then
     while Input.MoveNext do
@@ -128,7 +128,7 @@ procedure ModYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutine{
 var
   i: integer;
 begin
-  with {$IFDEF YieldClass_Supports}TYieldIntegerMod {$ELSE}PYieldIntegerMod{$ENDIF}(YieldObj)^ do
+  with {$IFDEF YieldClass_Supports}TYieldIntegerMod {$ELSE}PYieldIntegerMod{$ENDIF}(YieldObj){$IFNDEF YieldClass_Supports}^{$endif} do
   begin
     if Assigned(Input) then
     while Input.MoveNext do
@@ -146,7 +146,7 @@ procedure JoinYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutine
 var
   i: integer;
 begin
-  with {$IFDEF YieldClass_Supports}TYieldIntegerJoin {$ELSE}PYieldIntegerJoin{$ENDIF}(YieldObj)^ do
+  with {$IFDEF YieldClass_Supports}TYieldIntegerJoin {$ELSE}PYieldIntegerJoin{$ENDIF}(YieldObj){$IFNDEF YieldClass_Supports}^{$endif} do
   begin
     if Assigned(Input1) then while Input1.MoveNext do
     begin
@@ -214,7 +214,7 @@ var
 {$ENDIF}
 {$ENDIF}
 var
-  RangeI,Range1I, MulI, JoinI, ModI: PYieldInteger;
+  RangeI,Range1I, MulI, JoinI, ModI: {$IFDEF YieldClass_Supports}TYieldInteger{$ELSE} PYieldInteger{$endif};
 
 begin
     {$IFDEF SUPPORTS_FOR_IN}
@@ -261,11 +261,11 @@ begin
 
 
     //Wrong Usage *)
-RangeI := New(PYieldIntegerRange, Create(-4,-2));
-Range1I := New(PYieldIntegerRange, Create(1,10));
-MulI := New(PYieldIntegerMul, Create(2, Range1I));
-ModI := New(PYieldIntegerMod, Create(3, MulI));
-JoinI := New(PYieldIntegerJoin, Create(RangeI, ModI));
+RangeI := {$IFDEF YieldClass_Supports}TYieldIntegerRange.Create(-4,-2){$ELSE}New(PYieldIntegerRange, Create(-4,-2)){$ENDIF};
+Range1I := {$IFDEF YieldClass_Supports}TYieldIntegerRange.Create(1,10){$ELSE}New(PYieldIntegerRange, Create(1,10)){$ENDIF};
+MulI := {$IFDEF YieldClass_Supports}TYieldIntegerMul.Create(2, Range1I){$ELSE}New(PYieldIntegerMul, Create(2, Range1I)){$ENDIF};
+ModI := {$IFDEF YieldClass_Supports}TYieldIntegerMod.Create(3, MulI){$ELSE}New(PYieldIntegerMod, Create(3, MulI)){$ENDIF};
+JoinI := {$IFDEF YieldClass_Supports}TYieldIntegerJoin.Create(RangeI, ModI){$ELSE}New(PYieldIntegerJoin, Create(RangeI, ModI)){$ENDIF};
 while JoinI.MoveNext do
   Writeln(JoinI.Current);
 MulI.free;
