@@ -152,7 +152,9 @@ procedure TMeHandleStream.SetSize(const NewSize: Int64);
 begin
   Seek(NewSize, soBeginning);
 {$IFDEF MSWINDOWS}
+  {$WARN SYMBOL_PLATFORM OFF}
   Win32Check(SetEndOfFile(FHandle));
+  {$WARN SYMBOL_PLATFORM ON}
 {$ELSE}
   if ftruncate(FHandle, Position) = -1 then
     raise EMeError(sStreamSetSize);

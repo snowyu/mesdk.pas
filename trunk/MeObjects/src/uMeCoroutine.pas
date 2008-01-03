@@ -97,7 +97,7 @@ type
 
   TMeYieldObject = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeCoroutine)
   public
-    function MoveNext:boolean;
+    function MoveNext:boolean;  //D2007 enumerable required
   end;
 
   TYieldInteger = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeYieldObject)
@@ -193,10 +193,10 @@ asm
   CMP  EAX.TMeCoroutine.FInited, 0
   JNZ  @@DoNextIP
 
-  //PUSH EAX.TMeCoroutine.FEBP
-  MOV  EBP, EAX.TMeCoroutine.FESP
+  PUSH EAX.TMeCoroutine.FEBP //it seems no uses
   PUSH EAX
-  PUSH offset @@DeadExit
+  MOV  EBP, ESP //it seems no uses
+  PUSH offset @@DeadExit //change to return my entry after finished the coroutine.
   MOV  EAX.TMeCoroutine.FInited, 1
 
 @@DoNextIP: //TODO: add exception process here
@@ -206,14 +206,16 @@ asm
 
 @@DeadExit: //the coroutine finished 
   POP EAX
-  MOV EBP, EAX.TMeCoroutine.FEBP;
+  POP EBP
+  //MOV ESP, EBP
+  //MOV EBP, EDX
   MOV EBX, EAX.TMeCoroutine.FEBX;
   MOV ECX, EAX.TMeCoroutine.FECX;
   MOV EDX, EAX.TMeCoroutine.FEDX;
   MOV ESI, EAX.TMeCoroutine.FESI;
   MOV EDI, EAX.TMeCoroutine.FEDI;
   MOV ESP, EAX.TMeCoroutine.FESP;
-  //mov EAX, eax.TMeCoroutine.FEAX;
+  //MOV EBP, EAX.TMeCoroutine.FEBP;
 
   MOV EAX.TMeCoroutine.FStatus,coDead
   MOV EAX.TMeCoroutine.FLastErrorCode, Ord(cecNone)

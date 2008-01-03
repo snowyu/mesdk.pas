@@ -21,12 +21,12 @@
  *
  * Contributor(s):
  *  Sergey Antonov
- *  Riceball LEE (port to MeObject)
+ *  Riceball LEE (port to MeObject and little optimal)
  *
 
  Usage:
 //Ã¶¾ÙÆ÷
-procedure StringCoroutineProc(const YieldObj: TaCoroutine);
+procedure StringCoRoutineProc(const YieldObj: TaCoRoutine);
 var  
   YieldValue: string;
   i: integer;
@@ -42,7 +42,7 @@ end;
 
 function TForm1.GetEnumerator: TYieldString;
 begin
-  Result:=TYieldString.Create(StringCoroutineProc);
+  Result:=TYieldString.Create(StringCoRoutineProc);
 end;
 
 procedure TForm1.Button1Click(Sender: TObject);
@@ -84,37 +84,42 @@ uses
 
 type
   {$IFDEF YieldClass_Supports}
-  TMeCoroutine = Class;
+  TMeCoRoutine = Class;
   {$ELSE}
-  PMeCoroutine = ^TMeCoroutine;
+  PMeCoRoutine = ^TMeCoRoutine;
 
   PMeYieldObject = ^TMeYieldObject;
   PYieldString = ^TYieldString;
   PYieldInteger = ^TYieldInteger;
   {$ENDIF}
 
-  TMeCoroutineProc = procedure (const aCoroutine: {$IFDEF YieldClass_Supports}TMeCoroutine{$ELSE} PMeCoroutine{$endif});
-  TMeCoroutineMethod = procedure () of object;
-  TMeCoroutineStatus = (coSuspended, coRunning, coDead);
+  TMeCoRoutineProc = procedure (const aCoRoutine: {$IFDEF YieldClass_Supports}TMeCoRoutine{$ELSE} PMeCoRoutine{$endif});
+  TMeCoRoutineMethod = procedure () of object;
+  TMeCoRoutineStatus = (coSuspended, coRunning, coDead);
 
-  TMeCoroutine = {$IFDEF YieldClass_Supports}class{$ELSE}object(TMeDynamicObject){$ENDIF}
+  TMeCoRoutine = {$IFDEF YieldClass_Supports}class{$ELSE}object(TMeDynamicObject){$ENDIF}
   protected
-    FIsYield:boolean;
-    FNextIP:TMeCoroutineProc;
-    BESP:pointer;
+    FIsYield: Boolean;
+    FStatus: TMeCoRoutineStatus;
+    FNextIP:TMeCoRoutineProc;
+    FProc: TMeCoRoutineProc;
     FEAX,FEBX,FECX,FEDX,FESI,FEDI,FEBP:pointer;
+    FESP:pointer;
     FStackFrameSize:DWORD;
     FStackFrame: array[1..128] of DWORD;
     procedure SaveYieldedValue(const aValue); virtual; abstract;
   public
-    constructor Create(const CoroutineProc: TMeCoroutineProc);
-    function Resume:boolean; //D2007 enumerable required
+    constructor Create(const CoRoutineProc: TMeCoRoutineProc);
+    function Resume:boolean;
+    function Reset:boolean;
     procedure Yield(const Value);
+
+    property Status: TMeCoRoutineStatus read FStatus;
   end;
 
-  TMeYieldObject = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeCoroutine)
+  TMeYieldObject = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeCoRoutine)
   public
-    function MoveNext:boolean;
+    function MoveNext:boolean; //D2007 enumerable required
   end;
 
   TYieldString = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeYieldObject)
@@ -127,7 +132,7 @@ type
     destructor Destroy; virtual; {override}
     {$ENDIF}
 
-    property Current:string read GetCurrent;
+    property Current:string read GetCurrent; //D2007 enumerable required
   end;
 
   TYieldInteger = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeYieldObject)
@@ -138,23 +143,51 @@ type
   public
 
     //return the Current value
-    property Current:Integer read GetCurrent;
+    property Current:Integer read GetCurrent; //D2007 enumerable required
   end;
 
 implementation
 
-{ TMeCoroutine }
-constructor TMeCoroutine.Create(const CoroutineProc:TMeCoroutineProc);
+{ TMeCoRoutine }
+constructor TMeCoRoutine.Create(const CoRoutineProc:TMeCoRoutineProc);
 asm
   {$IFNDEF YieldClass_Supports}
   CALL TMeDynamicObject.Init
   {$ENDIF}
-  mov eax.TMeCoroutine.FNextIP,ecx;
-  mov eax.TMeCoroutine.FEAX,EAX;
+  mov eax.TMeCoRoutine.FNextIP,ecx;
+  mov eax.TMeCoRoutine.FProc, ecx;
+  mov eax.TMeCoRoutine.FEAX,EAX;
 end;
 
-function TMeCoroutine.Resume: boolean;
+function TMeCoRoutine.Reset:boolean;
+begin
+  Result := (FStatus = coDead) and Assigned(FProc);
+  if Result then
+  begin
+    FNextIP := FProc;
+    FStatus := coSuspended;
+    FEAX:= {$IFNDEF YieldClass_Supports}@{$ENDIF}Self;
+    FEBX:= nil;
+    FECX:= nil;
+    FEDX:= nil;
+    FESI:= nil;
+    FEDI:= nil;
+    FEBP:= nil;
+    FESP:= nil;
+    FStackFrameSize := 0;
+  end;
+end;
+
+function TMeCoRoutine.Resume: boolean;
 asm
+  MOV EAX.TMeCoRoutine.FIsYield, 0
+
+  CMP  EAX.TMeCoRoutine.FStatus, coSuspended
+  JNE  @@CheckExit
+
+
+@@DoResume:
+  MOV EAX.TMeCoRoutine.FStatus, coRunning
   { Save the value of following registers.
     We must preserve EBP, EBX, EDI, ESI, EAX for some circumstances.
     Because there is no guarantee that the state of registers will 
@@ -165,46 +198,45 @@ asm
   push esi;
   push eax;
 
-  mov eax.TMeCoroutine.FIsYield,0
   push offset @@exit
   xor edx,edx;
-  cmp eax.TMeCoroutine.BESP,edx;
+  cmp eax.TMeCoRoutine.FESP,edx;
   jz @AfterEBPAdjust;
 
   { Here is the correction of EBP. Some need of optimization still exists. }
   mov edx,esp;
-  sub edx,eax.TMeCoroutine.BESP;
-  add [eax.TMeCoroutine.FEBP],edx
+  sub edx,eax.TMeCoRoutine.FESP;
+  add [eax.TMeCoRoutine.FEBP],edx
 
   @AfterEBPAdjust:
-  mov eax.TMeCoroutine.BESP,esp;
+  mov eax.TMeCoRoutine.FESP,esp;
 
   { Is there any local frame? }
-  cmp eax.TMeCoroutine.FStackFrameSize,0
+  cmp eax.TMeCoRoutine.FStackFrameSize,0
   jz @JumpIn;
 
   { Restore the local stack frame }
-  mov ecx,eax.TMeCoroutine.FStackFrameSize;
+  mov ecx,eax.TMeCoRoutine.FStackFrameSize;
   sub esp,ecx;
   mov edi,esp;
-  lea esi,eax.TMeCoroutine.FStackFrame;
+  lea esi,eax.TMeCoRoutine.FStackFrame;
 
-  { Some need of optimization still exists. Like movsd}
-  rep movsb;
+  shr ecx, 2
+  rep movsd;
   @JumpIn:
 
   { Restore the content of processor registers }
-  mov ebx,eax.TMeCoroutine.FEBX;
-  mov ecx,eax.TMeCoroutine.FECX;
-  mov edx,eax.TMeCoroutine.FEDX;
-  mov esi,eax.TMeCoroutine.FESI;
-  mov edi,eax.TMeCoroutine.FEDI;
-  mov ebp,eax.TMeCoroutine.FEBP;
-  push [eax.TMeCoroutine.FNextIP];
-  mov eax,eax.TMeCoroutine.FEAX;
+  mov ebx,eax.TMeCoRoutine.FEBX;
+  mov ecx,eax.TMeCoRoutine.FECX;
+  mov edx,eax.TMeCoRoutine.FEDX;
+  mov esi,eax.TMeCoRoutine.FESI;
+  mov edi,eax.TMeCoRoutine.FEDI;
+  mov ebp,eax.TMeCoRoutine.FEBP;
+  push [eax.TMeCoRoutine.FNextIP];
+  mov eax,eax.TMeCoRoutine.FEAX;
 
   { Here is the jump to next iteration }
-  ret;
+  RET;
 
   { And we return here after next iteration in all cases, except exception of course. }
   @@exit:;
@@ -215,46 +247,55 @@ asm
   pop edi;
   pop ebx;
   pop ebp;
-  { This Flag indicates the occurrence or no occurrence of Yield  }
-  mov al,eax.TMeCoroutine.FIsYield;
+
+
+@@CheckExit:
+  CMP  EAX.TMeCoRoutine.FIsYield, 0
+  JNE  @@skip
+  MOV  EAX.TMeCoRoutine.FStatus, coDead
+  MOV  EAX.TMeCoRoutine.FNextIP, 0
+
+@@skip:
+  MOV  AL, EAX.TMeCoRoutine.FIsYield
 end;
 
-procedure TMeCoroutine.Yield(const Value);
+procedure TMeCoRoutine.Yield(const Value);
 asm
   { Preserve EBP, EAX,EBX,ECX,EDX,ESI,EDI }
-  mov eax.TMeCoroutine.FEBP,ebp;
-  mov eax.TMeCoroutine.FEAX,eax;
-  mov eax.TMeCoroutine.FEBX,ebx;
-  mov eax.TMeCoroutine.FECX,ecx;
-  mov eax.TMeCoroutine.FEDX,edx;   // This is the Ref to const param
-  mov eax.TMeCoroutine.FESI,ESI;
-  mov eax.TMeCoroutine.FEDI,EDI;
+  mov eax.TMeCoRoutine.FEBP,ebp;
+  mov eax.TMeCoRoutine.FEAX,eax;
+  mov eax.TMeCoRoutine.FEBX,ebx;
+  mov eax.TMeCoRoutine.FECX,ecx;
+  mov eax.TMeCoRoutine.FEDX,edx;   // This is the Ref to const param
+  mov eax.TMeCoRoutine.FESI,ESI;
+  mov eax.TMeCoRoutine.FEDI,EDI;
   pop ecx;
-  mov eax.TMeCoroutine.FNextIP,ecx;
+  mov eax.TMeCoRoutine.FNextIP,ecx; //store the next execution address
 
   //We must do it first for valid const reference
   push eax;
   mov ecx,[eax];
-  CALL  DWORD PTR [ecx+VMTOFFSET TMeCoroutine.SaveYieldedValue];
+  CALL  DWORD PTR [ecx+VMTOFFSET TMeCoRoutine.SaveYieldedValue];
   pop eax;
   
   { Calculate the current local stack frame size }
-  mov ecx,eax.TMeCoroutine.BESP;
+  mov ecx,eax.TMeCoRoutine.FESP;
   sub ecx,esp;
-  mov eax.TMeCoroutine.FStackFrameSize,ecx;
+  mov eax.TMeCoRoutine.FStackFrameSize,ecx;
   jz @AfterSaveStack;
 
   { Preserve the local stack frame }
   lea esi,[esp];
-  lea edi,[eax.TMeCoroutine.FStackFrame];
+  lea edi,[eax.TMeCoRoutine.FStackFrame];
   
-  { Some need of optimization still exists. Like movsd }
-  rep movsb;
-  mov esp,eax.TMeCoroutine.BESP;
+  shr ecx, 2
+  rep movsd;
+  mov esp,eax.TMeCoRoutine.FESP;
   @AfterSaveStack:
 
   {Set flag of Yield occurance }
-  mov eax.TMeCoroutine.FIsYield,1;
+  MOV EAX.TMeCoRoutine.FIsYield,1;
+  mov EAX.TMeCoRoutine.FStatus, coSuspended;
 end;
 
 { TMeYieldObject }
