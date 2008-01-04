@@ -17,6 +17,9 @@ uses
 
 {.$Define YieldClass_Supports} //use the delphi class type instead.
 
+var
+  vContinuationRec: TMeContinuationRec;
+
 //¿ØÖÆÂß¼­£ºÃ¶¾ÙÆ÷
 procedure StringYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutine{$ELSE} PMeCoroutine{$endif});
 var  
@@ -37,6 +40,7 @@ end;
 var
   i: integer;
   w,b: integer;
+
 procedure BlackYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutine{$ELSE} PMeCoroutine{$endif});forward;
 
 procedure WhiteYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutine{$ELSE} PMeCoroutine{$endif});
@@ -45,10 +49,14 @@ begin
   begin
     writeln('white move: ', w);
     inc(w);
+    writeln('white move1: ', w);
     YieldObj.Yield(w);
     BlackYieldProc(YieldObj);  
-    //if w > 10001 then exit;
+    if w >= 10 then break;
   end;
+  YieldObj.MarkContinuation(vContinuationRec);
+  inc(w);
+  writeln('white move-end: ', w);
 end;
 
 procedure BlackYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutine{$ELSE} PMeCoroutine{$endif});
@@ -249,12 +257,15 @@ begin
   w := 0; b:= 0; i := 0;
   with GetWhiteEnumerator{$IFNDEF YieldClass_Supports}^{$endif} do
     try
+      Reset;
       while MoveNext do
       begin
         inc(i);
         if i > 21 then break;
         //Writeln(Current);
       end;
+      Writeln('---CallCC---');
+      CallCC(vContinuationRec);
     finally
       Free;
     end;
