@@ -177,7 +177,6 @@ type
     FStackFrameSize:DWORD;
     FStackFrame: array[1..128] of DWORD;
     procedure SaveYieldedValue(const aValue); virtual;
-    //procedure iCallCC;
   public
     constructor Create(const CoRoutineProc: TMeCoRoutineProc);
     function Resume:boolean;
@@ -342,81 +341,6 @@ asm
 @@skip:
   MOV  AL, EAX.TMeCoRoutine.FIsYield
 end;
-
-(*
-procedure TMeCoRoutine.iCallCC;
-asm
-  MOV EAX.TMeCoRoutine.FIsYield, 0
-
-  CMP  EAX.TMeCoRoutine.FStatus, coSuspended
-  JNE  @@CheckExit
-
-
-@@DoResume:
-  MOV EAX.TMeCoRoutine.FStatus, coRunning
-  { Save the value of following registers.
-    We must preserve EBP, EBX, EDI, ESI, EAX for some circumstances.
-    Because there is no guarantee that the state of registers will 
-    be the same after an iteration }
-  push ebp;
-  push ebx;
-  push edi;
-  push esi;
-  push eax;
-
-  push offset @@exit
-
-  @AfterEBPAdjust:
-  mov eax.TMeCoRoutine.FRegisters.FESP,esp;
-
-  { Is there any local frame? }
-  cmp eax.TMeCoRoutine.FStackFrameSize,0
-  jz @JumpIn;
-
-  { Restore the local stack frame }
-  mov ecx,eax.TMeCoRoutine.FStackFrameSize;
-  sub esp,ecx;
-  mov edi,esp;
-  lea esi,eax.TMeCoRoutine.FStackFrame;
-
-  shr ecx, 2
-  rep movsd;
-  @JumpIn:
-
-  { Restore the content of processor registers }
-  mov ebx,eax.TMeCoRoutine.FRegisters.FEBX;
-  mov ecx,eax.TMeCoRoutine.FRegisters.FECX;
-  mov edx,eax.TMeCoRoutine.FRegisters.FEDX;
-  mov esi,eax.TMeCoRoutine.FRegisters.FESI;
-  mov edi,eax.TMeCoRoutine.FRegisters.FEDI;
-  //mov ebp,eax.TMeCoRoutine.FRegisters.FEBP;
-  push [eax.TMeCoRoutine.FNextIP];
-  mov eax,eax.TMeCoRoutine.FRegisters.FEAX;
-
-  { Here is the jump to next iteration }
-  RET;
-
-  { And we return here after next iteration in all cases, except exception of course. }
-  @@exit:;
-
-  { Restore the preserved EBP, EBX, EDI, ESI, EAX registers }
-  pop eax;
-  pop esi;
-  pop edi;
-  pop ebx;
-  pop ebp;
-
-
-@@CheckExit:
-  CMP  EAX.TMeCoRoutine.FIsYield, 0
-  JNE  @@skip
-  MOV  EAX.TMeCoRoutine.FStatus, coDead
-  MOV  EAX.TMeCoRoutine.FNextIP, 0
-
-@@skip:
-  MOV  AL, EAX.TMeCoRoutine.FIsYield
-end;
-*)
 
 function TMeCoRoutine.RestoreContinuation(const aContinuationRec: TMeContinuationRec): Boolean;
 var
