@@ -182,12 +182,13 @@ type
     function Resume:boolean;
     function Reset:boolean;
     procedure Yield(const Value);
-    procedure MarkContinuation(var aContinuationRec: TMeContinuationRec);
-    //Call with Current  Continuation
     {WARNING: MUST NOT USE the local string etc dynamic local variable after Mark postion!!
       Do not Mark the Continuation in the loop.
     }
+    procedure MarkContinuation(var aContinuationRec: TMeContinuationRec);
+    //Call with Current  Continuation
     function CallCC(const aContinuationRec: TMeContinuationRec): Boolean;
+    function RestoreContinuation(const aContinuationRec: TMeContinuationRec): Boolean;
 
     property Status: TMeCoRoutineStatus read FStatus;
   end;
@@ -416,7 +417,7 @@ asm
 end;
 *)
 
-function TMeCoRoutine.CallCC(const aContinuationRec: TMeContinuationRec): boolean;
+function TMeCoRoutine.RestoreContinuation(const aContinuationRec: TMeContinuationRec): Boolean;
 var
   p: Pointer;
 begin
@@ -430,8 +431,14 @@ begin
     FStatus := coSuspended;
     FStackFrameSize := aContinuationRec.StackFrameSize;
     Move(aContinuationRec.StackFrame, FStackFrame, FStackFrameSize);
-    Result := Resume;
   end;
+end;
+
+function TMeCoRoutine.CallCC(const aContinuationRec: TMeContinuationRec): boolean;
+begin
+  Result := RestoreContinuation(aContinuationRec);
+  if Result then
+    Result := Resume;
 end;
 
 procedure TMeCoRoutine.MarkContinuation(var aContinuationRec: TMeContinuationRec);
