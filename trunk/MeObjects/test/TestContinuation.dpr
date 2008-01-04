@@ -63,8 +63,7 @@ begin
       end;
 
       Writeln('---CallCC Again---', Integer(vContinuationRec.StackFrameSize));
-      CallCC(vContinuationRec);
-      Writeln('resume:', Current);
+      if RestoreContinuation(vContinuationRec) then
       while MoveNext do
       begin
         Writeln('resume:', Current);
