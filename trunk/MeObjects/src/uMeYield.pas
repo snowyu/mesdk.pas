@@ -25,9 +25,12 @@
  *
  * History
  *   Riceball LEE
+ *     ! maybe use the SEH instead..
  *     + little optimal
  *     + TMeCoRoutine
  *     + TMeCoRoutine.Continuation supports
+ *        Note: Continuations are the functional expression of the GOTO statement
+ *              Re-invocable continuations must be simple enough and no local memory allocation in it..
 
  Usage:
 
@@ -68,6 +71,13 @@ begin
       Writeln('---CallCC---', Integer(vContinuationRec.StackFrameSize));
       CallCC(vContinuationRec);
       Writeln('resume:', Current);
+      while MoveNext do
+      begin
+        Writeln('resume:', Current);
+      end;
+
+      Writeln('---CallCC Again---', Integer(vContinuationRec.StackFrameSize));
+      if RestoreContinuation(vContinuationRec) then
       while MoveNext do
       begin
         Writeln('resume:', Current);
