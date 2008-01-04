@@ -373,6 +373,7 @@ type
     {返回栈}
     FReturnStack: array of TMeScriptPC;
     //this 栈。this 指针的处理在进入函数前，后退出函数后，如果函数是对象调用的话！
+    //processed in the CALL instruction.
     FThisPtrStack: PMeList;
     //_Func: PMeScriptBlock;
     _PC: TMeScriptPC;
