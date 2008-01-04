@@ -26,7 +26,8 @@
  * History
  *   Riceball LEE
  *     + little optimal
- *     + Continuation supports
+ *     + TMeCoRoutine
+ *     + TMeCoRoutine.Continuation supports
 
  Usage:
 
