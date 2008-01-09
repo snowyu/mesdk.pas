@@ -479,3 +479,9 @@ IntegerMul(2) : 2 4 6 8 10 12 14 16 18 20
 IntegerMod(3) :     6      12       18
 </code>
 
+Continuation
+
+a continuation represents the rest of the computation given a point in the computation. Another word for "rest of the computation" is control state, meaning the data structures and code needed to complete a computation. Most languages implement the data structure as a variant of the stack and the code as just a pointer to the current instructions. There are also programming languages that represent the control data as a heap-allocated object. Continuations are the functional expression of the GOTO statement.
+Continuations are used in models of computation including denotational semantics, the Actor model, process calculi, and the lambda calculus. 
+
+A programming language can support re-invocable continuations if a continuation may be invoked repeatedly (even after it has already returned).
