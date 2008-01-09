@@ -25,7 +25,6 @@
  *
  * History
  *   Riceball LEE
- *     ! maybe use the SEH instead..
  *     + little optimal
  *     + TMeCoRoutine
  *     + TMeCoRoutine.Continuation supports
@@ -172,6 +171,8 @@ type
     Registers: TPreservedRegisters;
     StackFrameSize:DWORD;
     StackFrame: array[1..128] of DWORD;
+    InnerSEHCount:DWORD;
+    InnerSEHOffsets:array[0..$F] of DWORD;
     NextIP:Pointer;
   end;
 
@@ -186,6 +187,9 @@ type
     //FESP:pointer;
     FStackFrameSize:DWORD;
     FStackFrame: array[1..128] of DWORD;
+    InnerSEHCount:DWORD;
+    InnerSEHOffsets:array[0..$F] of DWORD;
+
     procedure SaveYieldedValue(const aValue); virtual;
   public
     constructor Create(const CoRoutineProc: TMeCoRoutineProc);
@@ -292,31 +296,65 @@ asm
   push eax;
 
   push offset @@exit
-  xor edx,edx;
-  cmp eax.TMeCoRoutine.FRegisters.FESP,edx;
-  jz @AfterEBPAdjust;
+  XOR EDX,EDX;
+  {Is it the first call?}
+  MOV ECX, EAX.TMeCoRoutine.FRegisters.FESP
+  CMP ECX,EDX
+  JNZ @NotFirstCall
+  MOV EAX.TMeCoRoutine.FRegisters.FESP,ESP;
+  JMP @JustBeforeTheJump;
 
-  { Here is the correction of EBP. Some need of optimization still exists. }
-  mov edx,esp;
-  sub edx,eax.TMeCoRoutine.FRegisters.FESP;
+@NotFirstCall:
+  CMP EAX.TMeCoRoutine.FStackFrameSize,EDX
+  JZ @RestoreRegisters;
+  {Is need any correction?}
+
+  MOV EDX,ESP;
+  SUB EDX,ECX;
+  JZ @RestoreStackFrame;
+  {Correct ebp}
   add [eax.TMeCoRoutine.FRegisters.FEBP],edx
+  {Is any SEH frames}
+  mov ecx,eax.TMeCoRoutine.InnerSEHCount;
+  jecxz @ChangeFESP;
+  {correct SEH frames}
+  mov ebx,eax.TMeCoRoutine.FRegisters.FEBP;
+  lea esi,eax.TMeCoRoutine.FStackFrame;
+  add esi,eax.TMeCoRoutine.FStackFrameSize;
+  dec ecx;
+  mov edi,esi;
+  sub edi,DWORD PTR eax.TMeCoRoutine.InnerSEHOffsets+4*ecx;
+  mov [edi+$08],ebx;
+@SEHCorrection:
+  dec ecx;
+  jl @ChangeFESP
+  mov edi,esi;
+  sub edi,DWORD PTR eax.TMeCoRoutine.InnerSEHOffsets+4*ecx;
+  mov [edi+$08],ebx;
+  add [edi],edx;
+  jmp @SEHCorrection;
+  {Change BESP}
+@ChangeFESP:
+  MOV EAX.TMeCoRoutine.FRegisters.FESP,ESP;
 
-  @AfterEBPAdjust:
-  mov eax.TMeCoRoutine.FRegisters.FESP,esp;
-
-  { Is there any local frame? }
-  cmp eax.TMeCoRoutine.FStackFrameSize,0
-  jz @JumpIn;
-
+@RestoreStackFrame:
   { Restore the local stack frame }
   mov ecx,eax.TMeCoRoutine.FStackFrameSize;
   sub esp,ecx;
   mov edi,esp;
   lea esi,eax.TMeCoRoutine.FStackFrame;
-
   shr ecx, 2
   rep movsd;
-  @JumpIn:
+  {Connect Inner SEH frame. Are any inner SEH?}
+  mov ecx,eax.TMeCoRoutine.InnerSEHCount;
+  jecxz @RestoreRegisters;
+  { Connect Inner SEH frame }
+  xor ecx,ecx;
+  mov edi,eax.TMeCoRoutine.FRegisters.FESP;
+  sub edi,DWORD PTR eax.TMeCoRoutine.InnerSEHOffsets+4*ecx;
+  mov fs:[ecx],edi;
+
+@RestoreRegisters:
 
   { Restore the content of processor registers }
   mov ebx,eax.TMeCoRoutine.FRegisters.FEBX;
@@ -325,6 +363,8 @@ asm
   mov esi,eax.TMeCoRoutine.FRegisters.FESI;
   mov edi,eax.TMeCoRoutine.FRegisters.FEDI;
   mov ebp,eax.TMeCoRoutine.FRegisters.FEBP;
+
+@JustBeforeTheJump:
   push [eax.TMeCoRoutine.FNextIP];
   mov eax,eax.TMeCoRoutine.FRegisters.FEAX;
 
@@ -332,7 +372,7 @@ asm
   RET;
 
   { And we return here after next iteration in all cases, except exception of course. }
-  @@exit:;
+@@exit:
 
   { Restore the preserved EBP, EBX, EDI, ESI, EAX registers }
   pop eax;
@@ -366,6 +406,8 @@ begin
     FStatus := coSuspended;
     FStackFrameSize := aContinuationRec.StackFrameSize;
     Move(aContinuationRec.StackFrame, FStackFrame, FStackFrameSize);
+    InnerSEHCount := aContinuationRec.InnerSEHCount;
+    Move(aContinuationRec.InnerSEHOffsets, InnerSEHOffsets, SizeOf(InnerSEHOffsets));
   end;
 end;
 
@@ -393,7 +435,8 @@ asm
   MOV ECX, [ESP]
   MOV EDX.TMeContinuationRec.NextIP, ECX; //store the next execution address
 
-  
+ 
+
   { Calculate the current local stack frame size }
   mov ecx,eax.TMeCoRoutine.FRegisters.FESP;
   sub ecx,esp;
@@ -447,6 +490,29 @@ asm
   CALL  DWORD PTR [ecx+VMTOFFSET TMeCoRoutine.SaveYieldedValue];
   pop eax;
   
+  { Unwind SEH }
+  xor ebx,ebx;
+  mov ecx,fs:[ebx];
+  @SEHUnwind:
+  jecxz @JustAfterSEHUnwind;
+  cmp ecx,eax.TMeCoRoutine.FRegisters.FESP;
+  jnl @JustAfterSEHUnwind
+  mov esi,eax.TMeCoRoutine.FRegisters.FESP;
+  sub esi,ecx;
+  mov DWORD PTR eax.TMeCoRoutine.InnerSEHOffsets+4*ebx,esi;
+  inc ebx;
+  mov ecx,[ecx];
+  jmp @SEHUnwind;
+  @JustAfterSEHUnwind:
+  mov eax.TMeCoRoutine.InnerSEHCount,ebx;
+  {
+  Connect Outer SEH frame.
+  If no local SEH frames next two commands are redundant
+  }
+  xor ebx,ebx;
+  mov fs:[ebx],ecx;
+  
+  {Save local stack frame}
   { Calculate the current local stack frame size }
   mov ecx,eax.TMeCoRoutine.FRegisters.FESP;
   sub ecx,esp;

@@ -265,7 +265,7 @@ begin
         //Writeln(Current);
       end;
       Writeln('---CallCC---');
-      CallCC(vContinuationRec);
+      //CallCC(vContinuationRec);
     finally
       Free;
     end;
