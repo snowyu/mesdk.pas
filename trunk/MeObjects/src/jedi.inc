@@ -357,8 +357,8 @@
   HAS_UNIT_VARIANTS             Unit Variants exists (D6+/BCB6+)
   HAS_UNIT_STRUTILS             Unit StrUtils exists (D6+/BCB6+)
   XPLATFORM_RTL                 The RTL supports crossplatform function names (e.g. RaiseLastOSError) (D6+/BCB6+/FPC)
-  SUPPORTS_IFDIRECTIVE          Compiler supports $IF Directive. (D6/KYLIX) (Riceball)
-  SUPPORTS_REINTRODUCE          Compiler supports reintroduce (D6/KYLIX) (Riceball)
+  SUPPORTS_IFDIRECTIVE          Compiler supports $IF Directive. (D6+/KYLIX) (Riceball)
+  SUPPORTS_REINTRODUCE          Compiler supports reintroduce (D6+/KYLIX/FPC) (Riceball)
 
 
 - Compiler Settings
@@ -769,6 +769,7 @@
     {$DEFINE SUPPORTS_OUTPARAMS}
     {$DEFINE SUPPORTS_WIDECHAR}
     {$DEFINE SUPPORTS_WIDESTRING}
+    {$DEFINE SUPPORTS_REINTRODUCE}
     {$IFDEF HASINTF}
       {$DEFINE SUPPORTS_INTERFACE}
     {$ENDIF}
