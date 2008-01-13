@@ -73,6 +73,7 @@ uses
   , uFastCompareTextExTest
   , uMeTokenizerTest
   , uTypInfoExTest
+  , uMeYieldTest
   {$ENDIF}
   ;
 

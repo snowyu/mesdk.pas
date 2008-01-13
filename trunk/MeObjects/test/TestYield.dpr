@@ -28,6 +28,16 @@ var
 begin
   YieldValue:='None';
   YieldObj.Yield(YieldValue);//·µ»ØÐÐÎªÂß¼­
+  try
+    //writeln(3/0);
+    raise Exception.Create('hello E');
+  except
+    On E:Exception do 
+    begin
+      writeln('Exception:', E.Message);
+      //raise;
+    end;
+  end;
   for i := 1 to 10 do
   begin
     YieldValue := YieldValue + IntToStr(i);
@@ -55,6 +65,11 @@ begin
     if w >= 10 then break;
   end;
   YieldObj.MarkContinuation(vContinuationRec);
+  try
+    Raise Exception.Create('haha');
+  except
+    writeln('Haha Exception');
+  end;
   inc(w);
   writeln('white move-end: ', w);
 end;
@@ -265,7 +280,8 @@ begin
         //Writeln(Current);
       end;
       Writeln('---CallCC---');
-      //CallCC(vContinuationRec);
+      CallCC(vContinuationRec);
+      CallCC(vContinuationRec);
     finally
       Free;
     end;

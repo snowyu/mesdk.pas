@@ -26,8 +26,8 @@
  * History
  *   Riceball LEE
  *     + little optimal
- *     + TMeCoRoutine
- *     + TMeCoRoutine.Continuation supports
+ *     + TMeCustomCoRoutine
+ *     + TMeCustomCoRoutine.Continuation supports
  *        Note: Continuations are the functional expression of the GOTO statement
  *              Re-invocable continuations must be simple enough and no local memory allocation in it, No Unwind SEH supports..
 
@@ -39,7 +39,7 @@ Continuation Usage[this just a demo, but it's ugly coding]:
 var
   vContinuationRec: TMeContinuationRec;
 
-procedure YieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutine{$ELSE} PMeCoroutine{$endif});
+procedure YieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCustomCoRoutine{$ELSE} PMeCoroutine{$endif});
 var
   i: integer;
 begin
@@ -136,7 +136,7 @@ interface
 
 {$I MeSetting.inc}
 {.$Define YieldClass_Supports} //use the delphi class type instead.
-{$Define MarkContinuation_Supports} //No Unwind SEH
+{_$Define MarkContinuation_Supports}
 
 uses
   {$IFNDEF YieldClass_Supports}
@@ -149,18 +149,18 @@ uses
 
 type
   {$IFDEF YieldClass_Supports}
-  TMeCoRoutine = Class;
+  TMeCustomCoRoutine = Class;
   {$ELSE}
-  PMeCoRoutine = ^TMeCoRoutine;
+  PMeCoRoutine = ^TMeCustomCoRoutine;
 
-  PMeYieldObject = ^TMeYieldObject;
+  PMeYieldObject = ^TMeCoRoutineEnumerator;
   PYieldString = ^TYieldString;
   PYieldInteger = ^TYieldInteger;
   {$ENDIF}
 
-  TMeCoRoutineProc = procedure (const aCoRoutine: {$IFDEF YieldClass_Supports}TMeCoRoutine{$ELSE} PMeCoRoutine{$endif});
+  TMeCoRoutineProc = procedure (const aCoRoutine: {$IFDEF YieldClass_Supports}TMeCustomCoRoutine{$ELSE} PMeCoRoutine{$endif});
   TMeCoRoutineMethod = procedure () of object;
-  TMeCoRoutineStatus = (coSuspended, coRunning, coDead);
+  TMeCoRoutineState = (coSuspended, coRunning, coDead);
 
   TPreservedRegisters = packed record
     FEAX,FEBX,FECX,FEDX,FESI,FEDI,FEBP:pointer;
@@ -168,22 +168,22 @@ type
   end;
   //the control state of the rest of the computation, meaning the data structures and code needed to complete a computation. 
   //当前函数执行的位置现场
-  //实现这个难点在于在函数中可能有动态分配内容，如字符串，当退出该函数后自然被清除，这时候从函数的中间进入就会出问题！
+  //不能用于在函数中可能有动态分配内容，如字符串，当退出该函数后自然被清除，这时候从函数的中间进入就会出问题！
   TMeContinuationRec = packed record
     Registers: TPreservedRegisters;
     StackFrameSize:DWORD;
     StackFrame: array[1..128] of DWORD;
     NextIP:Pointer;
-    {$IFNDEF MarkContinuation_Supports}
+    {_$IFNDEF MarkContinuation_Supports}
     InnerSEHCount:DWORD;
     InnerSEHOffsets:array[0..$F] of DWORD;
-    {$ENDIF}
+    {_$ENDIF}
   end;
 
-  TMeCoRoutine = {$IFDEF YieldClass_Supports}class{$ELSE}object(TMeDynamicObject){$ENDIF}
+  TMeCustomCoRoutine = {$IFDEF YieldClass_Supports}class{$ELSE}object(TMeDynamicObject){$ENDIF}
   protected
-    FIsYield: Boolean;
-    FStatus: TMeCoRoutineStatus;
+    FIsYield: Boolean; //when call yield break.
+    FState: TMeCoRoutineState;
     FNextIP:Pointer;
     FProc: TMeCoRoutineProc;
     FRegisters: TPreservedRegisters;
@@ -192,10 +192,10 @@ type
     FStackFrameSize:DWORD;
     FStackFrame: array[1..128] of DWORD;
 
-    {$IFNDEF MarkContinuation_Supports}
+    {_$IFNDEF MarkContinuation_Supports}
     InnerSEHCount:DWORD;
     InnerSEHOffsets:array[0..$F] of DWORD;
-    {$ENDIF}
+    {_$ENDIF}
 
     procedure SetNextValue(const aValue); virtual;
 
@@ -204,7 +204,7 @@ type
     function Resume:boolean;
     function Reset:boolean;
     procedure Yield(const Value);
-    {$IFDEF MarkContinuation_Supports}
+    {_$IFDEF MarkContinuation_Supports}
     {WARNING: MUST NOT USE the local string etc dynamic local variable after Mark postion!!
       Do not Mark the Continuation in the loop. no unwind SEH supports
     }
@@ -212,17 +212,23 @@ type
     //Call with Current  Continuation
     function CallCC(const aContinuationRec: TMeContinuationRec): Boolean;
     function RestoreContinuation(const aContinuationRec: TMeContinuationRec): Boolean;
-    {$ENDIF}
+    {_$ENDIF}
 
-    property Status: TMeCoRoutineStatus read FStatus;
+    property State: TMeCoRoutineState read FState;
   end;
 
-  TMeYieldObject = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeCoRoutine)
+  { the abstract enumerator running in a CoRoutine
+    In order to obtain a concrete enumerator, you must override the SetNextValue 
+    methods, and define a Current property. The Execute method can call Yield many 
+    times with any value as a parameter. The SetNextValue must store this value, 
+    and the Current property should read it.
+  }
+  TMeCoRoutineEnumerator = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeCustomCoRoutine)
   public
     function MoveNext:boolean; //D2007 enumerable required
   end;
 
-  TYieldString = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeYieldObject)
+  TYieldString = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeCoRoutineEnumerator)
   protected
     FValue:String;
     function GetCurrent:string;
@@ -235,7 +241,7 @@ type
     property Current:string read GetCurrent; //D2007 enumerable required
   end;
 
-  TYieldInteger = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeYieldObject)
+  TYieldInteger = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeCoRoutineEnumerator)
   protected
     FValue: Integer;
     function GetCurrent: Integer;
@@ -248,24 +254,24 @@ type
 
 implementation
 
-{ TMeCoRoutine }
-constructor TMeCoRoutine.Create(const CoRoutineProc:TMeCoRoutineProc);
+{ TMeCustomCoRoutine }
+constructor TMeCustomCoRoutine.Create(const CoRoutineProc:TMeCoRoutineProc);
 asm
   {$IFNDEF YieldClass_Supports}
   CALL TMeDynamicObject.Init
   {$ENDIF}
-  mov eax.TMeCoRoutine.FNextIP,ecx;
-  mov eax.TMeCoRoutine.FProc, ecx;
-  mov eax.TMeCoRoutine.FRegisters.FEAX,EAX;
+  mov eax.TMeCustomCoRoutine.FNextIP,ecx;
+  mov eax.TMeCustomCoRoutine.FProc, ecx;
+  mov eax.TMeCustomCoRoutine.FRegisters.FEAX,EAX;
 end;
 
-function TMeCoRoutine.Reset:boolean;
+function TMeCustomCoRoutine.Reset:boolean;
 begin
-  Result := (FStatus = coDead) and Assigned(FProc);
+  Result := (FState = coDead) and Assigned(FProc);
   if Result then
   begin
     FNextIP := @FProc;
-    FStatus := coSuspended;
+    FState := coSuspended;
     with FRegisters do
     begin
       FEAX:= {$IFNDEF YieldClass_Supports}@{$ENDIF}Self;
@@ -281,20 +287,20 @@ begin
   end;
 end;
 
-procedure TMeCoRoutine.SetNextValue(const aValue);
+procedure TMeCustomCoRoutine.SetNextValue(const aValue);
 begin
 end;
 
-function TMeCoRoutine.Resume: boolean;
+function TMeCustomCoRoutine.Resume: boolean;
 asm
-  MOV EAX.TMeCoRoutine.FIsYield, 0
+  MOV EAX.TMeCustomCoRoutine.FIsYield, 0
 
-  CMP  EAX.TMeCoRoutine.FStatus, coSuspended
+  CMP  EAX.TMeCustomCoRoutine.FState, coSuspended
   JNE  @@CheckExit
 
 
 @@DoResume:
-  MOV EAX.TMeCoRoutine.FStatus, coRunning
+  MOV EAX.TMeCustomCoRoutine.FState, coRunning
   { Save the value of following registers.
     We must preserve EBP, EBX, EDI, ESI, EAX for some circumstances.
     Because there is no guarantee that the state of registers will 
@@ -308,15 +314,15 @@ asm
   push offset @@exit
   XOR EDX,EDX;
   {Is it the first call?}
-  MOV ECX, EAX.TMeCoRoutine.FRegisters.FESP
+  MOV ECX, EAX.TMeCustomCoRoutine.FRegisters.FESP
   CMP ECX,EDX
   JNZ @NotFirstCall
 
-  MOV EAX.TMeCoRoutine.FRegisters.FESP,ESP;
+  MOV EAX.TMeCustomCoRoutine.FRegisters.FESP,ESP;
   //JMP @JustBeforeTheJump;
 
 @NotFirstCall:
-  CMP EAX.TMeCoRoutine.FStackFrameSize,EDX
+  CMP EAX.TMeCustomCoRoutine.FStackFrameSize,EDX
   JZ @RestoreRegisters;
   {Is need any correction?}
 
@@ -324,67 +330,67 @@ asm
   SUB EDX,ECX;
   JZ @RestoreStackFrame;
   {Correct ebp}
-  add [eax.TMeCoRoutine.FRegisters.FEBP],edx
+  add [eax.TMeCustomCoRoutine.FRegisters.FEBP],edx
 
-{$IFNDEF MarkContinuation_Supports}
+{_$IFNDEF MarkContinuation_Supports}
   {Is any SEH frames}
-  mov ecx,eax.TMeCoRoutine.InnerSEHCount;
+  mov ecx,eax.TMeCustomCoRoutine.InnerSEHCount;
   jecxz @ChangeFESP;
   {correct SEH frames}
-  mov ebx,eax.TMeCoRoutine.FRegisters.FEBP;
-  lea esi,eax.TMeCoRoutine.FStackFrame;
-  add esi,eax.TMeCoRoutine.FStackFrameSize;
+  mov ebx,eax.TMeCustomCoRoutine.FRegisters.FEBP;
+  lea esi,eax.TMeCustomCoRoutine.FStackFrame;
+  add esi,eax.TMeCustomCoRoutine.FStackFrameSize;
   dec ecx;
   mov edi,esi;
-  sub edi,DWORD PTR eax.TMeCoRoutine.InnerSEHOffsets+4*ecx;
+  sub edi,DWORD PTR eax.TMeCustomCoRoutine.InnerSEHOffsets+4*ecx;
   mov [edi+$08],ebx;
 @SEHCorrection:
   dec ecx;
   jl @ChangeFESP
   mov edi,esi;
-  sub edi,DWORD PTR eax.TMeCoRoutine.InnerSEHOffsets+4*ecx;
+  sub edi,DWORD PTR eax.TMeCustomCoRoutine.InnerSEHOffsets+4*ecx;
   mov [edi+$08],ebx;
   add [edi],edx;
   jmp @SEHCorrection;
   {Change BESP}
 @ChangeFESP:
-  MOV EAX.TMeCoRoutine.FRegisters.FESP,ESP;
-{$ENDIF}
+  MOV EAX.TMeCustomCoRoutine.FRegisters.FESP,ESP;
+{_$ENDIF}
 
 @RestoreStackFrame:
   { Restore the local stack frame }
-  mov ecx,eax.TMeCoRoutine.FStackFrameSize;
+  mov ecx,eax.TMeCustomCoRoutine.FStackFrameSize;
   sub esp,ecx;
   mov edi,esp;
-  lea esi,eax.TMeCoRoutine.FStackFrame;
+  lea esi,eax.TMeCustomCoRoutine.FStackFrame;
   shr ecx, 2
   rep movsd;
 
-{$IFNDEF MarkContinuation_Supports}
+{_$IFNDEF MarkContinuation_Supports}
   {Connect Inner SEH frame. Are any inner SEH?}
-  mov ecx,eax.TMeCoRoutine.InnerSEHCount;
+  mov ecx,eax.TMeCustomCoRoutine.InnerSEHCount;
   jecxz @RestoreRegisters;
 
   { Connect Inner SEH frame }
   xor ecx,ecx;
-  mov edi,eax.TMeCoRoutine.FRegisters.FESP;
-  sub edi,DWORD PTR eax.TMeCoRoutine.InnerSEHOffsets+4*ecx;
+  mov edi,eax.TMeCustomCoRoutine.FRegisters.FESP;
+  sub edi,DWORD PTR eax.TMeCustomCoRoutine.InnerSEHOffsets+4*ecx;
   mov fs:[ecx],edi;
-{$ENDIF}
+{_$ENDIF}
 
 @RestoreRegisters:
 
   { Restore the content of processor registers }
-  mov ebx,eax.TMeCoRoutine.FRegisters.FEBX;
-  mov ecx,eax.TMeCoRoutine.FRegisters.FECX;
-  mov edx,eax.TMeCoRoutine.FRegisters.FEDX;
-  mov esi,eax.TMeCoRoutine.FRegisters.FESI;
-  mov edi,eax.TMeCoRoutine.FRegisters.FEDI;
-  mov ebp,eax.TMeCoRoutine.FRegisters.FEBP;
+  mov ebx,eax.TMeCustomCoRoutine.FRegisters.FEBX;
+  mov ecx,eax.TMeCustomCoRoutine.FRegisters.FECX;
+  mov edx,eax.TMeCustomCoRoutine.FRegisters.FEDX;
+  mov esi,eax.TMeCustomCoRoutine.FRegisters.FESI;
+  mov edi,eax.TMeCustomCoRoutine.FRegisters.FEDI;
+  mov ebp,eax.TMeCustomCoRoutine.FRegisters.FEBP;
 
 @JustBeforeTheJump:
-  push [eax.TMeCoRoutine.FNextIP];
-  mov eax,eax.TMeCoRoutine.FRegisters.FEAX;
+  push [eax.TMeCustomCoRoutine.FNextIP];
+  mov eax,eax.TMeCustomCoRoutine.FRegisters.FEAX;
 
   { Here is the jump to next iteration }
   RET;
@@ -401,28 +407,28 @@ asm
 
 
 @@CheckExit:
-  CMP  EAX.TMeCoRoutine.FIsYield, 0
+  CMP  EAX.TMeCustomCoRoutine.FIsYield, 0
   JNE  @@skip
-  MOV  EAX.TMeCoRoutine.FStatus, coDead
-  MOV  EAX.TMeCoRoutine.FNextIP, 0
+  MOV  EAX.TMeCustomCoRoutine.FState, coDead
+  MOV  EAX.TMeCustomCoRoutine.FNextIP, 0
 
 @@skip:
-  MOV  AL, EAX.TMeCoRoutine.FIsYield
+  MOV  AL, EAX.TMeCustomCoRoutine.FIsYield
 end;
 
-{$IFDEF MarkContinuation_Supports}
-function TMeCoRoutine.RestoreContinuation(const aContinuationRec: TMeContinuationRec): Boolean;
+{_$IFDEF MarkContinuation_Supports}
+function TMeCustomCoRoutine.RestoreContinuation(const aContinuationRec: TMeContinuationRec): Boolean;
 var
   p: Pointer;
 begin
-  Result := Assigned(aContinuationRec.NextIP) and ((FStatus = coDead) or (not FIsYield and (FStatus = coSuspended))) ;
+  Result := Assigned(aContinuationRec.NextIP) and ((FState = coDead) or (not FIsYield and (FState = coSuspended))) ;
   if Result then
   begin
     P := FRegisters.FESP;
     FNextIP := aContinuationRec.NextIP;
     FRegisters := aContinuationRec.Registers;
     FRegisters.FESP := nil;
-    FStatus := coSuspended;
+    FState := coSuspended;
     FStackFrameSize := aContinuationRec.StackFrameSize;
     Move(aContinuationRec.StackFrame, FStackFrame, FStackFrameSize);
     //InnerSEHCount := aContinuationRec.InnerSEHCount;
@@ -430,16 +436,16 @@ begin
   end;
 end;
 
-function TMeCoRoutine.CallCC(const aContinuationRec: TMeContinuationRec): boolean;
+function TMeCustomCoRoutine.CallCC(const aContinuationRec: TMeContinuationRec): boolean;
 begin
   Result := RestoreContinuation(aContinuationRec);
   if Result then
     Result := Resume;
 end;
 
-procedure TMeCoRoutine.MarkContinuation(var aContinuationRec: TMeContinuationRec);
+procedure TMeCustomCoRoutine.MarkContinuation(var aContinuationRec: TMeContinuationRec);
 asm
-  CMP  EAX.TMeCoRoutine.FStatus, coRunning
+  CMP  EAX.TMeCustomCoRoutine.FState, coRunning
   JNE  @@Exit
 
   { Preserve EBP, EAX,EBX,ECX,EDX,ESI,EDI }
@@ -456,7 +462,7 @@ asm
 
 
   { Calculate the current local stack frame size }
-  mov ecx,eax.TMeCoRoutine.FRegisters.FESP;
+  mov ecx,eax.TMeCustomCoRoutine.FRegisters.FESP;
   sub ecx,esp;
   //Sub ecx, 4
   DEC ECX
@@ -480,83 +486,83 @@ asm
 
   MOV ESI, EDX.TMeContinuationRec.Registers.FESI
   MOV EDI, EDX.TMeContinuationRec.Registers.FEDI
-  //mov esp,eax.TMeCoRoutine.FRegisters.FESP;
+  //mov esp,eax.TMeCustomCoRoutine.FRegisters.FESP;
   @AfterSaveStack:
 
 @@Exit:
 end;
-{$ENDIF}
+{_$ENDIF}
 
-procedure TMeCoRoutine.Yield(const Value);
+procedure TMeCustomCoRoutine.Yield(const Value);
 asm
-  CMP  EAX.TMeCoRoutine.FStatus, coRunning
+  CMP  EAX.TMeCustomCoRoutine.FState, coRunning
   JNE  @@Exit
 
   { Preserve EBP, EAX,EBX,ECX,EDX,ESI,EDI }
-  mov eax.TMeCoRoutine.FRegisters.FEBP,ebp;
-  mov eax.TMeCoRoutine.FRegisters.FEAX,eax;
-  mov eax.TMeCoRoutine.FRegisters.FEBX,ebx;
-  mov eax.TMeCoRoutine.FRegisters.FECX,ecx;
-  mov eax.TMeCoRoutine.FRegisters.FEDX,edx;   // This is the Ref to const param
-  mov eax.TMeCoRoutine.FRegisters.FESI,ESI;
-  mov eax.TMeCoRoutine.FRegisters.FEDI,EDI;
+  mov eax.TMeCustomCoRoutine.FRegisters.FEBP,ebp;
+  mov eax.TMeCustomCoRoutine.FRegisters.FEAX,eax;
+  mov eax.TMeCustomCoRoutine.FRegisters.FEBX,ebx;
+  mov eax.TMeCustomCoRoutine.FRegisters.FECX,ecx;
+  mov eax.TMeCustomCoRoutine.FRegisters.FEDX,edx;   // This is the Ref to const param
+  mov eax.TMeCustomCoRoutine.FRegisters.FESI,ESI;
+  mov eax.TMeCustomCoRoutine.FRegisters.FEDI,EDI;
   pop ecx;
-  mov eax.TMeCoRoutine.FNextIP,ecx; //store the next execution address
+  mov eax.TMeCustomCoRoutine.FNextIP,ecx; //store the next execution address
 
   //We must do it first for valid const reference
   push eax;
   mov ecx,[eax];
-  CALL  DWORD PTR [ecx+VMTOFFSET TMeCoRoutine.SetNextValue];
+  CALL  DWORD PTR [ecx+VMTOFFSET TMeCustomCoRoutine.SetNextValue];
   pop eax;
   
-{$IFNDEF MarkContinuation_Supports}
+{_$IFNDEF MarkContinuation_Supports}
   { Unwind SEH }
   xor ebx,ebx;
   mov ecx,fs:[ebx];
   @SEHUnwind:
   jecxz @JustAfterSEHUnwind;
-  cmp ecx,eax.TMeCoRoutine.FRegisters.FESP;
+  cmp ecx,eax.TMeCustomCoRoutine.FRegisters.FESP;
   jnl @JustAfterSEHUnwind
-  mov esi,eax.TMeCoRoutine.FRegisters.FESP;
+  mov esi,eax.TMeCustomCoRoutine.FRegisters.FESP;
   sub esi,ecx;
-  mov DWORD PTR eax.TMeCoRoutine.InnerSEHOffsets+4*ebx,esi;
+  mov DWORD PTR eax.TMeCustomCoRoutine.InnerSEHOffsets+4*ebx,esi;
   inc ebx;
   mov ecx,[ecx];
   jmp @SEHUnwind;
   @JustAfterSEHUnwind:
-  mov eax.TMeCoRoutine.InnerSEHCount,ebx;
+  mov eax.TMeCustomCoRoutine.InnerSEHCount,ebx;
   {
   Connect Outer SEH frame.
   If no local SEH frames next two commands are redundant
   }
   xor ebx,ebx;
   mov fs:[ebx],ecx;
-{$ENDIF}
+{_$ENDIF}
 
   {Save local stack frame}
   { Calculate the current local stack frame size }
-  mov ecx,eax.TMeCoRoutine.FRegisters.FESP;
+  mov ecx,eax.TMeCustomCoRoutine.FRegisters.FESP;
   sub ecx,esp;
-  mov eax.TMeCoRoutine.FStackFrameSize,ecx;
+  mov eax.TMeCustomCoRoutine.FStackFrameSize,ecx;
   jz @AfterSaveStack;
 
   { Preserve the local stack frame }
   lea esi,[esp];
-  lea edi,[eax.TMeCoRoutine.FStackFrame];
+  lea edi,[eax.TMeCustomCoRoutine.FStackFrame];
   
   shr ecx, 2
   rep movsd;
-  mov esp,eax.TMeCoRoutine.FRegisters.FESP;
+  mov esp,eax.TMeCustomCoRoutine.FRegisters.FESP;
   @AfterSaveStack:
 
   {Set flag of Yield occurance }
-  MOV EAX.TMeCoRoutine.FIsYield,1;
-  MOV EAX.TMeCoRoutine.FStatus, coSuspended;
+  MOV EAX.TMeCustomCoRoutine.FIsYield,1;
+  MOV EAX.TMeCustomCoRoutine.FState, coSuspended;
 @@Exit:
 end;
 
-{ TMeYieldObject }
-function TMeYieldObject.MoveNext:boolean;
+{ TMeCoRoutineEnumerator }
+function TMeCoRoutineEnumerator.MoveNext:boolean;
 begin
   Result := Resume();
 end;
