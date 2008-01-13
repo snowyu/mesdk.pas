@@ -29,9 +29,10 @@
  *     + TMeCoRoutine
  *     + TMeCoRoutine.Continuation supports
  *        Note: Continuations are the functional expression of the GOTO statement
- *              Re-invocable continuations must be simple enough and no local memory allocation in it..
+ *              Re-invocable continuations must be simple enough and no local memory allocation in it, No Unwind SEH supports..
 
  Usage:
+
 
 Continuation Usage[this just a demo, but it's ugly coding]:
 
@@ -135,6 +136,7 @@ interface
 
 {$I MeSetting.inc}
 {.$Define YieldClass_Supports} //use the delphi class type instead.
+{$Define MarkContinuation_Supports} //No Unwind SEH
 
 uses
   {$IFNDEF YieldClass_Supports}
@@ -171,9 +173,11 @@ type
     Registers: TPreservedRegisters;
     StackFrameSize:DWORD;
     StackFrame: array[1..128] of DWORD;
+    NextIP:Pointer;
+    {$IFNDEF MarkContinuation_Supports}
     InnerSEHCount:DWORD;
     InnerSEHOffsets:array[0..$F] of DWORD;
-    NextIP:Pointer;
+    {$ENDIF}
   end;
 
   TMeCoRoutine = {$IFDEF YieldClass_Supports}class{$ELSE}object(TMeDynamicObject){$ENDIF}
@@ -187,22 +191,28 @@ type
     //FESP:pointer;
     FStackFrameSize:DWORD;
     FStackFrame: array[1..128] of DWORD;
+
+    {$IFNDEF MarkContinuation_Supports}
     InnerSEHCount:DWORD;
     InnerSEHOffsets:array[0..$F] of DWORD;
+    {$ENDIF}
 
-    procedure SaveYieldedValue(const aValue); virtual;
+    procedure SetNextValue(const aValue); virtual;
+
   public
     constructor Create(const CoRoutineProc: TMeCoRoutineProc);
     function Resume:boolean;
     function Reset:boolean;
     procedure Yield(const Value);
+    {$IFDEF MarkContinuation_Supports}
     {WARNING: MUST NOT USE the local string etc dynamic local variable after Mark postion!!
-      Do not Mark the Continuation in the loop.
+      Do not Mark the Continuation in the loop. no unwind SEH supports
     }
     procedure MarkContinuation(var aContinuationRec: TMeContinuationRec);
     //Call with Current  Continuation
     function CallCC(const aContinuationRec: TMeContinuationRec): Boolean;
     function RestoreContinuation(const aContinuationRec: TMeContinuationRec): Boolean;
+    {$ENDIF}
 
     property Status: TMeCoRoutineStatus read FStatus;
   end;
@@ -216,7 +226,7 @@ type
   protected
     FValue:String;
     function GetCurrent:string;
-    procedure SaveYieldedValue(const aValue); {$IFDEF YieldClass_Supports}override{$ELSE} virtual{$endif}; 
+    procedure SetNextValue(const aValue); {$IFDEF YieldClass_Supports}override{$ELSE} virtual{$endif}; 
   public
     {$IFNDEF YieldClass_Supports}
     destructor Destroy; virtual; {override}
@@ -229,7 +239,7 @@ type
   protected
     FValue: Integer;
     function GetCurrent: Integer;
-    procedure SaveYieldedValue(const aValue); {$IFDEF YieldClass_Supports}override{$ELSE} virtual{$endif}; 
+    procedure SetNextValue(const aValue); {$IFDEF YieldClass_Supports}override{$ELSE} virtual{$endif}; 
   public
 
     //return the Current value
@@ -271,7 +281,7 @@ begin
   end;
 end;
 
-procedure TMeCoRoutine.SaveYieldedValue(const aValue);
+procedure TMeCoRoutine.SetNextValue(const aValue);
 begin
 end;
 
@@ -301,8 +311,9 @@ asm
   MOV ECX, EAX.TMeCoRoutine.FRegisters.FESP
   CMP ECX,EDX
   JNZ @NotFirstCall
+
   MOV EAX.TMeCoRoutine.FRegisters.FESP,ESP;
-  JMP @JustBeforeTheJump;
+  //JMP @JustBeforeTheJump;
 
 @NotFirstCall:
   CMP EAX.TMeCoRoutine.FStackFrameSize,EDX
@@ -314,6 +325,8 @@ asm
   JZ @RestoreStackFrame;
   {Correct ebp}
   add [eax.TMeCoRoutine.FRegisters.FEBP],edx
+
+{$IFNDEF MarkContinuation_Supports}
   {Is any SEH frames}
   mov ecx,eax.TMeCoRoutine.InnerSEHCount;
   jecxz @ChangeFESP;
@@ -336,6 +349,7 @@ asm
   {Change BESP}
 @ChangeFESP:
   MOV EAX.TMeCoRoutine.FRegisters.FESP,ESP;
+{$ENDIF}
 
 @RestoreStackFrame:
   { Restore the local stack frame }
@@ -345,14 +359,18 @@ asm
   lea esi,eax.TMeCoRoutine.FStackFrame;
   shr ecx, 2
   rep movsd;
+
+{$IFNDEF MarkContinuation_Supports}
   {Connect Inner SEH frame. Are any inner SEH?}
   mov ecx,eax.TMeCoRoutine.InnerSEHCount;
   jecxz @RestoreRegisters;
+
   { Connect Inner SEH frame }
   xor ecx,ecx;
   mov edi,eax.TMeCoRoutine.FRegisters.FESP;
   sub edi,DWORD PTR eax.TMeCoRoutine.InnerSEHOffsets+4*ecx;
   mov fs:[ecx],edi;
+{$ENDIF}
 
 @RestoreRegisters:
 
@@ -392,6 +410,7 @@ asm
   MOV  AL, EAX.TMeCoRoutine.FIsYield
 end;
 
+{$IFDEF MarkContinuation_Supports}
 function TMeCoRoutine.RestoreContinuation(const aContinuationRec: TMeContinuationRec): Boolean;
 var
   p: Pointer;
@@ -406,8 +425,8 @@ begin
     FStatus := coSuspended;
     FStackFrameSize := aContinuationRec.StackFrameSize;
     Move(aContinuationRec.StackFrame, FStackFrame, FStackFrameSize);
-    InnerSEHCount := aContinuationRec.InnerSEHCount;
-    Move(aContinuationRec.InnerSEHOffsets, InnerSEHOffsets, SizeOf(InnerSEHOffsets));
+    //InnerSEHCount := aContinuationRec.InnerSEHCount;
+    //Move(aContinuationRec.InnerSEHOffsets, InnerSEHOffsets, SizeOf(InnerSEHOffsets));
   end;
 end;
 
@@ -435,7 +454,6 @@ asm
   MOV ECX, [ESP]
   MOV EDX.TMeContinuationRec.NextIP, ECX; //store the next execution address
 
- 
 
   { Calculate the current local stack frame size }
   mov ecx,eax.TMeCoRoutine.FRegisters.FESP;
@@ -467,6 +485,7 @@ asm
 
 @@Exit:
 end;
+{$ENDIF}
 
 procedure TMeCoRoutine.Yield(const Value);
 asm
@@ -487,9 +506,10 @@ asm
   //We must do it first for valid const reference
   push eax;
   mov ecx,[eax];
-  CALL  DWORD PTR [ecx+VMTOFFSET TMeCoRoutine.SaveYieldedValue];
+  CALL  DWORD PTR [ecx+VMTOFFSET TMeCoRoutine.SetNextValue];
   pop eax;
   
+{$IFNDEF MarkContinuation_Supports}
   { Unwind SEH }
   xor ebx,ebx;
   mov ecx,fs:[ebx];
@@ -511,7 +531,8 @@ asm
   }
   xor ebx,ebx;
   mov fs:[ebx],ecx;
-  
+{$ENDIF}
+
   {Save local stack frame}
   { Calculate the current local stack frame size }
   mov ecx,eax.TMeCoRoutine.FRegisters.FESP;
@@ -554,7 +575,7 @@ begin
   Result := FValue;
 end;
 
-procedure TYieldString.SaveYieldedValue(const aValue);
+procedure TYieldString.SetNextValue(const aValue);
 begin
   Self.FValue := string(aValue);
 end;
@@ -565,7 +586,7 @@ begin
   Result := FValue;
 end;
 
-procedure TYieldInteger.SaveYieldedValue(const aValue);
+procedure TYieldInteger.SetNextValue(const aValue);
 begin
   Self.FValue := Integer(aValue);
 end;
