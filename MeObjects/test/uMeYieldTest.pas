@@ -38,10 +38,38 @@ type
     procedure Test_Yield;
   end;
 
+  TTest_YieldInteger = class(TTest_CoRoutine)
+  protected
+    function CreateObject: {$IFDEF YieldClass_Supports}TMeCoRoutine {$ELSE}PMeCoRoutine{$ENDIF};override;
+  published
+    procedure Test_Yield;
+  end;
+
 implementation
 
 const
   rsTestStringException = 'MyStringYieldException Test';
+
+//Fibonacc
+procedure IntegerYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutine{$ELSE} PMeCoroutine{$endif});
+var
+  I, X,Y, t: Integer;
+begin
+  X := 0;
+  Y := 1;
+  I := 0;
+  YieldObj.Yield(X);
+  While I < 20 do
+  begin
+    YieldObj.Yield(Y);
+    //writeln('X=',X);
+    t := X;
+    X := Y;
+    //writeln('X=',X);
+    Y := Y + t;
+    Inc(I);
+  end;
+end;
 
 procedure StringYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutine{$ELSE} PMeCoroutine{$endif});
 var  
@@ -120,11 +148,36 @@ begin
       end;
 end;
 
+{ TTest_YieldInteger }
+function TTest_YieldInteger.CreateObject: {$IFDEF YieldClass_Supports}TMeCoRoutine {$ELSE}PMeCoRoutine{$ENDIF};
+begin
+  Result := {$IFDEF YieldClass_Supports}TYieldInteger.Create(StringYieldProc) {$ELSE}New(PYieldInteger, Create(IntegerYieldProc)){$ENDIF};
+end;
+
+const
+  cFibonacc : array[0..20] of integer = (0,1,1,2,3,5,8,13,21,34,55,89,144,233,377,610,987,1597,2584,4181,6765);
+
+procedure TTest_YieldInteger.Test_Yield;
+var
+  i: integer;
+  vRaised: boolean;
+begin
+  i:= 0;
+  vRaised := false;
+    with {$IFDEF YieldClass_Supports}TYieldInteger{$ELSE}PYieldInteger{$ENDIF}(FCoRoutine){$IFNDEF YieldClass_Supports}^{$endif} do
+      while MoveNext do
+      begin
+        CheckEquals(cFibonacc[i], Current,  IntToStr(i)+ ' Fibonacc error.');
+        inc(i);
+      end;
+end;
+
 Initialization
 
   RegisterTests('MeCoRoutine suites',
                 [
                  TTest_YieldString.Suite
+                 , TTest_YieldInteger.Suite
                  //, TTest_EnumerationType.Suite
                  //, TTest_MeRegisteredTypes.Suite
                 ]);//}
