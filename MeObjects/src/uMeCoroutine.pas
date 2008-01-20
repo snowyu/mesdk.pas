@@ -24,7 +24,7 @@
  *
  * The Initial Developers of the Original Code are Riceball LEE.
  * Portions created by sjrd is Copyright (C) 2007
- * Portions created by Riceball LEE<riceballl@hotmail.com> is Copyright (C) 2007
+ * Portions created by Riceball LEE<riceballl@hotmail.com> is Copyright (C) 2007-2008
  * All rights reserved.
  *
  * limitations:
@@ -61,17 +61,17 @@ const
   MinStackSize = $10000;
 
 resourcestring
-  rsCoRouteErrInvalidOpWhileRunning =
+  rsCoRoutineErrInvalidOpWhileRunning =
     'Invalid operation while the CoRoutine is running';
-  rsCoRouteErrInvalidOpWhileNotRunning =
+  rsCoRoutineErrInvalidOpWhileNotRunning =
     'Invalid operation while the CoRoutine is not running';
-  rsCoRouteErrBadStackSize =
+  rsCoRoutineErrBadStackSize =
     'Invalid stack size (%d): must be a multiple of 64 Kb';
-  rsCoRouteErrTerminating =
+  rsCoRoutineErrTerminating =
     'The CoRoutine is terminating';
-  rsCoRouteErrTerminated =
+  rsCoRoutineErrTerminated =
     'Can''t continue: the CoRoutine is terminated';
-  rsCoRouteErrNotTerminated =
+  rsCoRoutineErrNotTerminated =
     'Can''t reset: the CoRoutine is not terminated';
 
 type
@@ -117,12 +117,12 @@ type
   TMeCoroutineProc = procedure (const aCoRoutine: {$IFDEF YieldClass_Supports}TMeCustomCoRoutine{$ELSE} PMeCustomCoRoutine{$endif});
   TMeCoroutineMethod = procedure () of object;
 
-  {*
+  {
     CoRoutine loop kind
     - clRunOnce : runs once and doesn't loop, calling Invoke when Terminated is True will raise an exception.
     - clLoop : loops immediately after end of Execute
     - clNextInvoke : waits for next Invoke before looping
-  *}
+  }
   TMeCoRoutineLoop = (clRunOnce, clNextInvoke, clLoop);
 
   {: CoRoutine state
@@ -387,7 +387,7 @@ procedure TMeRunningFrame.AllocStackSpace(const aStackSize: Cardinal);
 begin
   // Check stack size
   if (aStackSize < MinStackSize) or (aStackSize mod MinStackSize <> 0) then
-    Raise ECoRoutineError.CreateResFmt(@rsCoRouteErrBadStackSize, [aStackSize]);
+    Raise ECoRoutineError.CreateResFmt(@rsCoRoutineErrBadStackSize, [aStackSize]);
 
   StackBottom := VirtualAlloc(nil, aStackSize, MEM_RESERVE, PAGE_READWRITE);
   if not Assigned(StackBottom) then
@@ -444,7 +444,7 @@ begin
   
   {// Check stack size
   if (aStackSize < MinStackSize) or (aStackSize mod MinStackSize <> 0) then
-    Error(@rsCoRouteErrBadStackSize, aStackSize);
+    Error(@rsCoRoutineErrBadStackSize, aStackSize);
 
   // Reserve stack address space
   FStackSize := aStackSize;
@@ -479,7 +479,7 @@ destructor TMeCustomCoRoutine.Destroy;
 begin
   {$IFNDEF YieldClass_Supports}
   if coRunning in FStates then
-    Error(@rsCoRouteErrInvalidOpWhileRunning);
+    Error(@rsCoRoutineErrInvalidOpWhileRunning);
 
   //FTerminating := True;
   Include(FStates, coTerminating);
@@ -616,9 +616,9 @@ var
   TempError: TObject;
 begin
   if coRunning in FStates then
-    Error(@rsCoRouteErrInvalidOpWhileRunning);
+    Error(@rsCoRoutineErrInvalidOpWhileRunning);
   if coDead in FStates then
-    Error(@rsCoRouteErrTerminated);
+    Error(@rsCoRoutineErrTerminated);
 
   // Enter the CoRoutine
   SwitchRunningFrame;
@@ -649,9 +649,9 @@ end;
 procedure TMeCustomCoRoutine.Yield;
 begin
   if not (coRunning in FStates) then
-    Error(@rsCoRouteErrInvalidOpWhileNotRunning);
+    Error(@rsCoRoutineErrInvalidOpWhileNotRunning);
   if coTerminating in FStates then
-    raise ECoRoutineTerminating.CreateRes(@rsCoRouteErrTerminating);
+    raise ECoRoutineTerminating.CreateRes(@rsCoRoutineErrTerminating);
 
   SwitchRunningFrame;
 end;
@@ -663,9 +663,9 @@ end;
 procedure TMeCustomCoRoutine.Reset;
 begin
   if coRunning in FStates then
-    Error(@rsCoRouteErrInvalidOpWhileRunning);
+    Error(@rsCoRoutineErrInvalidOpWhileRunning);
   if not (coDead in FStates) then
-    Error(@rsCoRouteErrNotTerminated);
+    Error(@rsCoRoutineErrNotTerminated);
 
   //FTerminated := False;
   Exclude(FStates, coDead);
@@ -683,7 +683,7 @@ end;
 procedure TMeCustomCoRoutine.BeforeDestruction;
 begin
   if coRunning in FStates then
-    Error(@rsCoRouteErrInvalidOpWhileRunning);
+    Error(@rsCoRoutineErrInvalidOpWhileRunning);
 
   //FTerminating := True;
   Include(FStates, coTerminating);
