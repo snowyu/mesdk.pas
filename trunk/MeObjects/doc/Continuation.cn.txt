@@ -1,0 +1,150 @@
+Continuation 概念与协程(CoRoutine)
+
+所谓Continuation就是保存接下来要做的事情的内容(the rest of the computation)。举个简单例子，我在写文档，突然接到电话要外出，这时我存档，存档的数据就是Continuation(继续即将的写作)，然后等会儿回来，调入存档，继续写作。Continuation这个概念就协程来说就是协程保护的现场。而对于函数来说就是保存函数调用现场——Stack Frame值和寄存器，以供以后调用继续从Continuation处执行。换一个角度看，它也可以看作是非结构化Goto语句的函数表达。当我们执行Yield从协程返回的时候，需要保存的就是Continuation了。从理论研究的角度上来说Continuation即是对程序"接下来要做的事情"所进行的一种建模，从而能对之作进一步的分析。Continuation是对未来的完整描述，这对于理论分析而言是有很多方便的地方。实际上任何程序都可以通过CPS(Continuation Passing Style)类型转换为使用Continuation的形式。如：
+<code>
+function foo(x: integer);
+begin
+  Result := x + 1;
+end;
+
+//foo 函数的CPS形式:
+procedure  foo(x: integer; c: Continuation);
+begin
+  //使用continuation的函数不"返回"值,而是把值作为一个参数传递给continuation从而"继续"处理值
+  c.continueWith(x+1);
+end;
+</code>
+
+对于我们熟悉的Pascal,C++等传统高级编译语言而言，程序本身在运行期是固定不变的，我们只需要记录下执行点(excution point)的信息（例如指针位置和堆栈内容）即足以完整的描述程序未来的运行情况，一般都是使用堆栈保存函数上下文的——采用Activation record或者叫Stack frame来记录从最顶层函数到当前函数的所有函数的上下文，当函数进入时候将局部变量等作为StackFrame压入堆栈，退出函数的时候它的StackFrame就被删掉（具体压入弹出的时机视调用约定而定）。
+
+而在许多的函数式语言中（如 Scheme 和SmallTalk），它们并不采用堆栈来保存上下文，而是将这些信息保存在continuation记录中。这些continuation记录和堆栈的Frame的区别在于，它不采用后入先出的线性方式，所有continuation记录被组成一棵树（或者图），从一个函数调用另一个函数就等于给当前节点生成一个子节点，然后把系统寄存器移动到这个子节点。一个函数的退出等于从当前节点退回到父节点。这些节点的空间回收是由垃圾回收器(garbage collection)来管理。如果没有引用这个continuation记录，则它就是可以被删除的。这样的调用方式和堆栈方式相比，它可以在一个函数内的任何位置储存自己的上下文信息，然后，在以后某个适当的时刻，从其它的任何一个函数里面返回到自己现在的位置。实际上它使得一个函数可以拥有了多个不同的入口点（知道为何可以看作是Goto语句的函数表达式了吧，不过我们在软件工程中极度忌讳使用GOTO模式避免面条式代码成形。）
+
+在函数式语言中, continuation的引入是非常自然的过程, 考察如下函数调用： f(h(k(arg)))，根据函数的结合律，我们可以有复合函数 g = f(h(.)), 它自然就是函数k()的continuation，在理论上我们有可能利用泛函分析的一些技术实现对于continuation(复合函数)的化简，但实践已经证明这是极为艰难的，主要是我们的程序不可避免的要涉及到程序与数据的纠缠。不过，我们在引入continuation概念之后，程序运行的表述是非常简单的：
+<code>
+  Continuation.Proceed();
+</code>
+
+针对顺序执行的程序，我们可以建立更加精细的运行模型。
+<code>
+   while(Continuation.HasNextStep()) do
+   begin
+     Continuation.ProceedOneStep();
+   end;
+</code>
+
+只要以某种方式构造出Continuation 子句(closure)，就意味着我们能够通过单一变量来表示程序未来的运行结构。这样，我们就有可能在某个层面上实现对程序的一种更简洁的描述。
+
+
+在上一次对Delphi的CoRoutine(uMeYield.pas)实现的基础上，我实现在对Delphi语言函数的Continuation。通过为CoRoutine类添加了MarkContinuation方法保存Continuation记录以及CallCC方法调用进入保存的Continuation记录所在位置执行CoRoutine。
+
+<code>
+var
+  vContinuationRec: TContinuationRec;
+
+procedure YieldProc(const YieldObj: TMeCoroutine);
+var
+  i: integer;
+begin
+  i := 0;
+  while true do
+  begin
+    inc(i);
+    writeln('i= ', i);
+    YieldObj.Yield(i);
+    if i >= 3 then break;
+  end;
+  YieldObj.MarkContinuation(vContinuationRec);
+  inc(i);
+  writeln('i++ end: ', i);
+end;
+
+
+  with TYieldInteger.Create(YieldProc) do
+    try
+      Reset;
+      while MoveNext do
+      begin
+        inc(i);
+        Writeln('Current:', Current);
+      end;
+      Writeln('---CallCC---');
+      CallCC(vContinuationRec);
+      CallCC(vContinuationRec);
+    finally
+      Free;
+    end;
+
+</code>
+
+程序输出：
+i=1
+Current=1
+i=2
+Current=2
+i=3
+Current=3
+i++ end: 4
+'---CallCC---
+i++ end: 5
+i++ end: 6
+
+以上实现只是纯学术上的研究，如果要在实际上应用这种函数重入，一来是不符合软件工程规范（当然如果你要作为反破解的扰乱另当别论），二来是你必须很清楚它的限制条件：在需要重入的函数体，不能使用动态分配内存的局部变量（如字符串）。
+
+当然，Continuation不仅仅只是适用于程序理论分析领域，如果我们的眼界开阔一些，不拘泥于构造语言级别通用的continuation结构（这需要以抽象的方式定义并保存任意程序的完整运行状态），而是考察“对程序未来运行的整体结构进行建模”这一更宽广的命题，我们很快就能发现大量对于continuation概念的应用，如：异常处理，回退跟踪（back-tracking），AOP的拦截器，动态工作流，Web Continuation。
+
+异常处理
+应用continuation进行异常处理是很显而易见的，只要在可能抛出异常的函数外面try的地方做一个continuation 记录，那么这个函数就可以在需要的时候直接返回到try语句的地方。在出现了异常之后，当异常处理模块修复了错误后，需要返回道发生错误的地方继续执行的时候，就是continuation大显神威的时候。
+
+回退跟踪（back-tracking）
+回退跟踪（back-tracking）算法也可以应用continuation，在某些地方保存当前的continuation，然后以后回退的时候，就可以从其它的函数直接跳回。 
+
+
+AOP（Aspect Oriented Programming）拦截器
+对原来函数拦截后，我们需要在拦截器中处理函数调用前事件，然后继续执行原函数。
+<code>
+  TMethodInterceptor = class
+    procedure Invoke(const Invocation: TMethodInvocation);
+    begin
+      doSthBeforeInvoke();
+      Invocation.Proceed();
+    end;
+  end;
+</code>
+
+动态工作流
+在一些比较复杂的网络协议中，我们通过注册监听器（listener）来处理接收到的网络指令，网络指令之间往往存在一定的关联，我们可以通过针对不同的指令动态调整关联的命令监听器， 或者建立复杂而庞大的有限自动机来描述所有指令之间的关联规则。
+
+<code>
+//动态调整关联的命令监听器的方式
+TCommandListener = class
+   procedure OnEvent(aEvent: TEvent, aFutureListeners: TListeners)
+   begin
+      HandleEvent(aEvent);
+      aFutureListeners.clear();
+      aFutureListeners.add("ACommand", new ACommandListener());
+      aFutureListeners.add("BCommand", new BCommandListener());
+   end
+end;
+</code>
+而动态调整关联的命令监听器的方式可以看作是对程序未来运行结构的一种动态调整. 沿着这种方式深入下去, 我们可以建立一种完整的动态工作流机制.
+
+何谓Continuation Server
+
+传统Web开发，一般都是以客户端作为主动的，客户端发请求，然后接收响应，然后再发请求...，整个流程都是以客户端为推动源。这样的一个结果就是，一般的web框架都是把他们的控制器分成一个个的方法调用，客户端的请求就对应到这些方法调用当中。而Continuation Server 通过引入Continuation机制实现了对于page flow的完整描述。
+
+Continuation Server 把这个逻辑反了过来，让服务器作为主动方，服务器发回响应，然后等待客户端输入之后，继续执行，然后发回响应...，整个流程是服务器通过发回响应进行推动。整个过程就像是函数调用那样，服务器发送响应就是函数调用开始，而用户发送请求就是函数的返回。要实现这个效果，就需要服务器端可以在收到请求之后能返回到之前的发送响应的后一语句。这里的核心就是服务器端需要能够动态的获取运行栈，在发送响应前，先对当前的运行栈作一个快照，然后在响应到达时，重新从快照那里执行，这样就相当于实现了刚才所说的函数调用效果。使用continuation server之后服务器端就只需要一个方法调用，对应初始请求。
+<code>
+procedure OnRequest()
+begin
+  funcA();
+  input = SendPageAndWait("GetInfoFromUser.php");
+  HandleInput(input);
+end;
+
+</code>
+
+在调用SendPageAndWait的时候，web框架会保存当前函数调用的continuation，向用户返回页面GetInfoFromUser.php，等待用户提交表单之后，web框架重新激活我们所保存的continuation，继续执行我们的函数。这种做法与系统调用和线程调度等机制是非常类似的。虽然这种基于continuation的方式可以自然的解决在session中保存并清理变量的问题，但是使用通用的continuation 实现很有可能会在无意中保存了过多的临时变量，从而对系统性能造成极大的损害，另外在集群环境下，continuation状态如何复制也是需要思考如何解决的问题。
+
+那么为什么需要Continuation呢？使用Continuation理念，可以很好的解决了服务器更新客户端的问题，服务器从而不用再为每一个等待响应的客户端单独建立一个线程，借助Continuations和新IO，可以在有限的线程内支持更多用户。根据Greg Wilkins的测试，使用Continuation的Jetty Cometd服务10000个用户875个线程，只用了57M内存。
+
+
