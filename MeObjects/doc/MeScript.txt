@@ -52,6 +52,11 @@ TMeScriptCustomBlock： 抽象代码块
 
 函数返回值的处理：在碰到分隔符后，如果没有赋值操作，应该直接丢掉返回值。
 在编译时处理，还是在运行时处理？
+如果没有表达式，就没有赋值语句，只有函数：变量赋值函数。
+
+f();  ==> call f; drop
+c(f(g())); ==> call g, call f, call c, drop
+assignValue(a, f());
 
 堆栈：分为数据栈(FDataStack), 返回栈(FReturnStack), this 指针栈，放在 TMeScriptGlobalFunction 上。
 
