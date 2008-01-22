@@ -10,6 +10,7 @@ MeScript Prototype V1:
   1. Function, Variable, Object
   2. AutoBinding, ManualBinding, LaterBinding
   3. Operator(can be defined via user)
+  4. 无表达式，只是函数。
 
 是否需要考虑内存调度问题：将近期没有运行的函数从内存卸载，当需要的时候才加载。
 
@@ -223,7 +224,7 @@ CarProtoTypeObject.Ctor -> Car()
     , opLoadVar    // opLoadVar <index> (-- pValue)  load loal varaible
     , opLoadVarFar // opLoadVarFar <stackIndex> <index> ( -- pValue)  load parent varaible which varaible in return stack:  FReturnStack[_RP - stackIndex].Varaibles.Items[index]
     , opLoadBind   // opCallBind <Len:byte>NameStr ( -- pValue ) the runtime error raised if function is not exists at runtime
-    , opDeclareVar//  opDeclareVar:  decalre a local variable.
+    , opDeclareVar//  opDeclareVar:  decalre a local variable. allocate the space for variable.
 
 
 _________________________________________________
