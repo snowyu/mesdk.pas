@@ -1043,6 +1043,9 @@ begin
               vBlock.Parent := @Self;
               Functions.Add(vBlock);
               FBody.AddOpCode(opCallBlock, Integer(vBlock));
+            end
+            else begin
+              MeFreeAndNil(vBlock);
             end;
           end;
         Ord(ttBlockEnd): break;
@@ -1052,7 +1055,13 @@ begin
           end;
         ttDeclareFunc:
           begin
-            Result := iParserDeclareFunc(aTokenizer);
+            vBlock := New(PMeScriptFunction, Create);
+            Result := PMeScriptFunction(vBlock).iParserDeclareFunc(aTokenizer);
+            if Result then
+              Functions.Add(vBlock)
+            else begin
+              MeFreeAndNil(vBlock);
+            end;
           end;
         else begin
           Result := iParserToken(aTokenizer);
@@ -1286,7 +1295,8 @@ begin
       Errors.Add(vToken, cMeTokenErrorMissedToken, 'function name missed ');
       Exit;
     end;
-    vName := vToken.Token;
+    //the function name.
+    Name := vToken.Token;
     vToken := ReadToken;
     Result := Assigned(vToken) and vToken.TokenId = Ord(ttArgsBegin);
     if not Result then
@@ -1295,6 +1305,7 @@ begin
       Exit;
     end;
 
+    Arguments.Clear;
     vToken := ReadToken;
     while Result and Assigned(vToken) and (vToken.TokenId <> Ord(ttArgsEnd)) do
     begin
@@ -1304,9 +1315,12 @@ begin
         Errors.Add(vToken, cMeTokenErrorMissedToken, vName + ' function arguments missed ');
         Exit;
       end;
-      Arguments.Add(vToken.Token);
-      if Assigned(vToken) and (vToken.TokenId = Ord(ttVarTypeSpliter)) then
+      vName := vToken.Token;
+
+      //the argument type. not used yet.
+      if Assigned(NextToken) and (NextToken.TokenId = Ord(ttVarTypeSpliter)) then
       begin
+        vToken := ReadToken; //Skip ttVarTypeSpliter.
         vToken := ReadToken;
         Result := Assigned(vToken) and (vToken.TokenId = Ord(ttToken));
         if not Result then 
@@ -1315,11 +1329,11 @@ begin
           Exit; 
         end;
         vType := vToken.Token;
-      end
+      end; //}
 
       if Result then
       begin
-        Result := DeclareVar(vName, vType);
+        FArguments.Add(vName);
       end;
       vToken := ReadToken;
     end; //while
