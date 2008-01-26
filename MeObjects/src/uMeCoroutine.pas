@@ -114,7 +114,7 @@ type
   //PYieldInteger = ^TYieldInteger;
   {$ENDIF}
 
-  TMeCoroutineProc = procedure (const aCoRoutine: {$IFDEF YieldClass_Supports}TMeCustomCoRoutine{$ELSE} PMeCustomCoRoutine{$endif});
+  TMeCoroutineProc = procedure (const aCoRoutine: {$IFDEF YieldClass_Supports}TMeCoRoutineEnumerator{$ELSE} PMeCoRoutineEnumerator{$endif});
   TMeCoroutineMethod = procedure () of object;
 
   {
@@ -227,9 +227,8 @@ type
     @author sjrd, based on an idea of Sergey Antonov
     @version 1.0
   }
-  TMeCoRoutineEnumerator = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeCustomCoRoutine)
+  TMeCoRoutineEnumerator = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeCoRoutine)
   protected
-    procedure Yield(const Value); {$IFDEF SUPPORTS_REINTRODUCE}reintroduce;{$ENDIF}
 
     {*
       Store the value sent by Yield
@@ -238,6 +237,7 @@ type
     *}
     procedure SetNextValue(const Value); virtual; abstract;
   public
+    procedure Yield(const Value); {$IFDEF SUPPORTS_REINTRODUCE}reintroduce;{$ENDIF}
     function MoveNext: Boolean;
   end;
 
