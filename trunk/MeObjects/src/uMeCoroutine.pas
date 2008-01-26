@@ -142,17 +142,10 @@ type
 
   {
     CoRoutine support class
-    The Invoke method can't be executed twice at the same moment. It can't be
+    The Resume method can't be executed twice at the same moment. It can't be
     called simultaneously in two separate threads ; nor can it be called from
     Execute (which should cause recursive call).
     However, it can be called successively by two separate threads.
-
-    The Loop property determines how the CoRoutine loops. It can either not
-    loop(clRunOnce): calling Invoke when Terminated is True will raise an exception.
-    Either loop immediately (clLoop): as soon as Execute ends, it is
-    re-called without go back to the caller. Or loop at next Invoke
-    (clNextInvoke): the caller gets running between the end of Execute and the
-    next beginning.
 
     The Execute method shoud test for the Terminating property after each call
     to Yield, and terminate itself gracefully if Terminating is True. It will
@@ -164,8 +157,6 @@ type
     The amount of simultaneous instances of TMeCustomCoRoutine must never exceed 32 K,
     because each one must reserve a virtual memory range of 64 Ko minimum.
 
-    @author sjrd, based on an idea of Bart van der Werf
-    @version 1.0
   }
   TMeCustomCoRoutine = {$IFDEF YieldClass_Supports}class{$ELSE}object(TMeDynamicObject){$ENDIF}
   protected
@@ -173,7 +164,6 @@ type
     FStackBuffer: Pointer; /// Entire virtual stack
     FStack: Pointer;       /// Beginning (top) of the stack
 
-    FLoop: TMeCoRoutineLoop; /// Loop kind
     FStates: TMeCoroutineStates;
 
     //FIsRunning: Boolean;
@@ -186,21 +176,20 @@ type
     FExceptObject: TObject;  /// Exception object raised by the CoRoutine
     FExceptAddress: Pointer; /// Exception raise address
 
-    procedure InitCoRoutine;
+    procedure InitCoRoutine; virtual;
     procedure MainExecute;
     procedure SwitchRunningFrame;
     procedure Terminate;
     function GetState(const Index: TMeCoroutineState): Boolean;
 
   protected
-    procedure Invoke;
+    procedure Resume;
     procedure Yield;
     procedure Reset;
 
     { the CoRoutine itself. Override Execute to give the CoRoutine code. }
     procedure Execute; virtual; abstract;
 
-    property Loop: TMeCoRoutineLoop read FLoop write FLoop;
 
     property IsRunning: Boolean index Ord(coRunning) read GetState;
     property Terminating: Boolean index Ord(coTerminating) read GetState;
@@ -211,8 +200,7 @@ type
   @param ALoop       Loop kind (default: clRunOnce)
   @param StackSize   Stack size (default and minimum: MinStackSize)
 }
-    constructor Create(const ALoop: TMeCoRoutineLoop = clRunOnce;
-      const aStackSize: Cardinal = MinStackSize);
+    constructor Create(const aStackSize: Cardinal = MinStackSize);
     destructor Destroy; {$IFDEF YieldClass_Supports}override{$ELSE} virtual{$endif}; 
 
     {$IFDEF YieldClass_Supports}
@@ -228,7 +216,7 @@ type
     FCoRoutineProc: TMeCoRoutineProc;
     procedure Execute;{$IFDEF YieldClass_Supports}override{$ELSE} virtual{$endif}; 
   public
-    constructor Create(const CoRoutineProc: TMeCoRoutineProc; const ALoop: TMeCoRoutineLoop = clRunOnce);
+    constructor Create(const CoRoutineProc: TMeCoRoutineProc; const aStackSize: Cardinal = MinStackSize);
   end;
 
   { the abstract enumerator running in a CoRoutine
@@ -251,6 +239,24 @@ type
     procedure SetNextValue(const Value); virtual; abstract;
   public
     function MoveNext: Boolean;
+  end;
+
+  {
+    The Loop property determines how the CoRoutine loops. It can either not
+    loop(clRunOnce): calling Invoke when Terminated is True will raise an exception.
+    Either loop immediately (clLoop): as soon as Execute ends, it is
+    re-called without go back to the caller. Or loop at next Invoke
+    (clNextInvoke): the caller gets running between the end of Execute and the
+    next beginning.
+  }
+  TMeCustomCoRoutineEx = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeCustomCoRoutine)
+  protected
+    FLoop: TMeCoRoutineLoop;
+
+    procedure InitCoRoutine; {$IFDEF YieldClass_Supports}override{$ELSE} virtual{$endif}; 
+    procedure MainExecute;
+  public
+    property Loop: TMeCoRoutineLoop read FLoop write FLoop;
   end;
 
 implementation
@@ -433,8 +439,7 @@ begin
 end;
 
 { TMeCustomCoRoutine class }
-constructor TMeCustomCoRoutine.Create(const ALoop: TMeCoRoutineLoop = clRunOnce;
-  const aStackSize: Cardinal = MinStackSize);
+constructor TMeCustomCoRoutine.Create(const aStackSize: Cardinal);
 begin
   inherited Create;
   FCoRoutineFrame.AllocStackSpace(aStackSize);
@@ -442,34 +447,6 @@ begin
   FStackSize := aStackSize;
   FStack := FCoRoutineFrame.StackTop;
   
-  {// Check stack size
-  if (aStackSize < MinStackSize) or (aStackSize mod MinStackSize <> 0) then
-    Error(@rsCoRoutineErrBadStackSize, aStackSize);
-
-  // Reserve stack address space
-  FStackSize := aStackSize;
-  FStackBuffer := VirtualAlloc(nil, FStackSize, MEM_RESERVE, PAGE_READWRITE);
-  if not Assigned(FStackBuffer) then
-    RaiseLastOSError;
-  FStack := Pointer(Cardinal(FStackBuffer) + FStackSize);
-
-  // Allocate base stack
-  if not Assigned(VirtualAlloc(Pointer(Cardinal(FStack) - PageSize),
-    PageSize, MEM_COMMIT, PAGE_READWRITE)) then
-    RaiseLastOSError;
-  if not Assigned(VirtualAlloc(Pointer(Cardinal(FStack) - 2*PageSize),
-    PageSize, MEM_COMMIT, PAGE_READWRITE or PAGE_GUARD)) then
-    RaiseLastOSError;
-}
-
-  // Set up configuration
-  FLoop := ALoop;
-
-  // Set up original state
-  //FIsRunning := False;
-  //FTerminating := False;
-  //FTerminated := False;
-
   // Initialize CoRoutine
   InitCoRoutine;
 end;
@@ -522,11 +499,7 @@ procedure TMeCustomCoRoutine.MainExecute;
 begin
   if not (coTerminating in FStates) then
   try
-    repeat
       Execute;
-      if (Loop = clNextInvoke) and (not (coTerminating in FStates)) then
-        Yield;
-    until (Loop = clRunOnce) or (coTerminating in FStates);
   except
     FExceptObject  := AcquireExceptionObject;
     FExceptAddress := ExceptAddr;
@@ -610,8 +583,8 @@ asm
 @@exit:
 end;
 
-{ Execute the CoRoutine until the next call to Yield }
-procedure TMeCustomCoRoutine.Invoke;
+{ Resume the CoRoutine until the next call to Yield }
+procedure TMeCustomCoRoutine.Resume;
 var
   TempError: TObject;
 begin
@@ -729,10 +702,10 @@ begin
 end;
 
 { TMeCoRoutine }
-constructor TMeCoRoutine.Create(const CoRoutineProc: TMeCoRoutineProc; const aLoop: TMeCoRoutineLoop = clRunOnce);
+constructor TMeCoRoutine.Create(const CoRoutineProc: TMeCoRoutineProc; const aStackSize: Cardinal);
 begin
   FCoRoutineProc := CoRoutineProc;
-  inherited Create(aLoop);
+  inherited Create(aStackSize);
 end;
 
 procedure TMeCoRoutine.Execute;
@@ -759,8 +732,36 @@ end;
 function TMeCoRoutineEnumerator.MoveNext: Boolean;
 begin
   if not (coDead in FStates) then
-    Invoke;
+    Resume;
   Result := not (coDead in FStates);
+end;
+
+{ TMeCustomCoRoutineEx }
+procedure TMeCustomCoRoutineEx.InitCoRoutine;
+begin
+  inherited;
+  with FCoRoutineFrame do
+  begin
+    InstructionPtr := @TMeCustomCoRoutineEx.MainExecute;
+  end;
+  
+end;
+
+procedure TMeCustomCoRoutineEx.MainExecute;
+begin
+  if not (coTerminating in FStates) then
+  try
+    repeat
+      Execute;
+      if (Loop = clNextInvoke) and (not (coTerminating in FStates)) then
+        Yield;
+    until (Loop = clRunOnce) or (coTerminating in FStates);
+  except
+    FExceptObject  := AcquireExceptionObject;
+    FExceptAddress := ExceptAddr;
+  end;
+
+  Terminate;
 end;
 
 initialization
