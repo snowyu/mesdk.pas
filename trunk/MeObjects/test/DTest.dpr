@@ -74,6 +74,7 @@ uses
   , uMeTokenizerTest
   , uTypInfoExTest
   , uMeYieldTest
+  , uMeCoRoutineTest
   {$ENDIF}
   ;
 
