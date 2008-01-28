@@ -169,7 +169,20 @@ type
     MethodCount: Word;   // #methods 
     MethodRTTICount: Word; // $FFFF if no method RTTI, 
     // #methods again if has RTTI 
-    Methods: packed array[0..$1FFF-1] of TIntfMethodEntry;
+    //Methods: packed array[0..$FFFF-1] of TIntfMethodEntry;
+  end;
+
+  PInterfaceMethod = ^TInterfaceMethod;
+  TInterfaceMethod = Object
+  protected
+    function GetName: ShortStringBase; //packed ShortString; 
+    function GetKind: TMethodKind; // mkProcedure or mkFunction
+    function GetCallConv: TCallingConvention;
+    function GetParamCount: byte;  // including Self
+    function Parameters(const Index: Byte): PIntfParameter;
+    function GetResult: TIntfMethodResult;
+  public
+    Property Name: ShortStringBase read GetName;
   end;
   (*
         IntfParent : PPTypeInfo; { ancestor }
@@ -397,6 +410,32 @@ begin
 end;
 
 function TInterfaceType.GetMethodHasRTTI: Boolean;
+begin
+  Result := GetIntfEntry.MethodRTTICount <> $FFFF;
+end;
+
+{ TInterfaceMethod }
+function TInterfaceMethod.GetName: ShortStringBase; //packed ShortString; 
+begin
+end;
+
+function TInterfaceMethod.GetKind: TMethodKind; // mkProcedure or mkFunction
+begin
+end;
+
+function TInterfaceMethod.GetCallConv: TCallingConvention;
+begin
+end;
+
+function TInterfaceMethod.GetParamCount: byte;  // including Self
+begin
+end;
+
+function TInterfaceMethod.Parameters(const Index: Byte): PIntfParameter;
+begin
+end;
+
+function TInterfaceMethod.GetResult: TIntfMethodResult;
 begin
 end;
 
