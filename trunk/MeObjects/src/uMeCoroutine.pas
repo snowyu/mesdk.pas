@@ -1,45 +1,36 @@
 
-{Summary: MeCoroutine - implements the coroutine object. }
-{
-  CoRoutines management classes
-  CoRoutines provides two main classes. TMeCustomCoRoutine is the base class for
-  CoRoutine management. TMeCoRoutineEnumerator is a derived class, specialised in
-  Delphi 2005 enumerators implementation.
-  This unit needs tests under Windows 95/98/Me, in case of growth of the stack,
-  because PAGE_GUARD is not supported under these versions.
-}
-(*
- * The contents of this file are released under a dual license, and
- * you may choose to use it under either the Mozilla Public License 
- * 1.1 (MPL 1.1, available from http://www.mozilla.org/MPL/MPL-1.1.html) 
- * or the GNU Lesser General Public License 2.1 (LGPL 2.1, available from
- * http://www.opensource.org/licenses/lgpl-license.php).
- *
- * Software distributed under the License is distributed on an "AS
- * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
- * implied. See the License for the specific language governing
- * rights and limitations under the License.
- *
- * The Original Code is $RCSfile: uMeCoroutine.pas,v $.
- *
- * The Initial Developers of the Original Code are Riceball LEE.
- * Portions created by sjrd is Copyright (C) 2007
- * Portions created by Riceball LEE<riceballl@hotmail.com> is Copyright (C) 2007-2008
- * All rights reserved.
- *
- * limitations:
- *  Does not support continuation invoke chains that include the same instance twice.
- *  Limited to 32000 instances because of the 64kb minimum stacksize. (or 48k if 3gb mode is used)
- *
- * Contributor(s):
- *   sjrd (based on an idea of Bart van der Werf)
- *
- *
- *
- * Usage:
- *
-
- *)
+{ Summary
+   MeCoroutine - implements the coroutine object.
+  
+    CoRoutines management classes CoRoutines provides two main classes. TMeCustomCoRoutine is the base class for CoRoutine management. TMeCoRoutineEnumerator is a derived class, specialised in Delphi 2005 enumerators implementation. This unit needs tests under Windows 95/98/Me, in case of growth of the stack, because PAGE_GUARD is not supported under these versions.
+  * limitations *
+    * Does not support continuation invoke chains that include the same instance twice.
+    * Limited to 32000 instances because of the 64kb minimum stacksize. (or 48k if 3gb mode is used)
+  License
+    * The contents of this file are released under a dual
+      \license, and
+    * you may choose to use it under either the Mozilla Public
+      \License
+    * 1.1 (MPL 1.1, available from
+      http://www.mozilla.org/MPL/MPL-1.1.html)
+    * or the GNU Lesser General Public License 2.1 (LGPL 2.1,
+      available from
+    * http://www.opensource.org/licenses/lgpl-license.php).
+    * Software distributed under the License is distributed on
+      an "AS
+    * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express
+      or
+    * implied. See the License for the specific language
+      governing
+    * rights and limitations under the License.
+    * The Original Code is $RCSfile: uMeCoroutine.pas,v $.
+  The Initial Developers of the Original Code are Riceball LEE.
+    * Portions created by sjrd is Copyright (C) 2007
+    * Portions created by Riceball LEEis Copyright (C)
+      2007-2008
+    * All rights reserved.
+    * Contributor(s):
+    * sjrd (based on an idea of Bart van der Werf)                                                                                                                                                                                                                                                                                                                               }
 unit uMeCoroutine;
 
 interface
