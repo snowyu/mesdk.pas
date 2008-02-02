@@ -38,18 +38,19 @@ function GetX86OpCodeLength(const aOpCode: Pointer): Integer;
 
 {modified from Catchy32 v1.6 - Length Disassembler Engine 32bit by sars [HI-TECH] 2003}
 { Description
-;in:   esi - pointer to opcode
-;out:  eax - opcode length or 0ffffffffh if error
 
-==Brief description==
+  * ;in:   esi - pointer to opcode
+  * ;out:  eax - opcode length or 0ffffffffh if error
+
+* Brief description *
 This Length-Disassembler was created for processing the executable x86 code instruction's lengths in 32bit mode. When we are saying "executable code" it means the CPU can execute the code. That is Catchy32 will NOT distinguish between the executable code and the data. There are a lot of opcodes that are not used as for now, but the place for them is reserved therefore they will be disassembled as well.
 
-==Example==
+* Example *
 db 0C0h,030h,001h - the instruction does not exist, but Catchy32 will disassemble it using the general disassembly rules
 
 We used the tables with the flags 4 bits each and it allowed us to reduce the size of the engine but the beauty of the code is suffering now :-) The engine does not contain any absolute offsets, variables or external function calls.
 
-==How to use==
+* How to use *
 To use Catcy32 you have to include it into your codes and put an offset to a disassembled instruction into ESI. If the disassembly was successful the return value is the instruction length in EAX. Otherwise EAX contains 0FFFFFFFFh. the ecx, EBX, EDI, ESI, EAX, EDX registers are affected, the other registers are not affected.
 }
 procedure _GetX86OpCodeLength;

@@ -38,7 +38,7 @@ Tokens.Add(aTokenId, aTokenBegin, aTokenEnd, aTokenFlags);
 
 
 
-属性和事件：
+* 属性和事件 *
 
 IgnoreCase: 是否忽略大小写
 BlankChars: 哪些字符是需要忽略的空白字符
@@ -51,7 +51,7 @@ property OnEscapedChar: TMeEscapedCharEvent read FOnEscapedChar write FOnEscaped
 property OnComment: TMeOnCommentEvent read FOnComment write FOnComment; 
 
 
-方法：
+* 方法 *
 
 function HasTokens: Boolean;
 function ReadToken: PMeToken;  从字符流中读入一个Token,如果返回nil表示再无Token可读。
