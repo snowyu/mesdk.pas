@@ -26,14 +26,13 @@
       governing
     * rights and limitations under the \license.
     * The Original Code is $RCSfile: TypInfoEx.pas,v $.
-    * The Initial Developers of the Original Code are Riceball
-      LEE.
-    * Portions created by Riceball LEE is Copyright (C)
-      2006-2008
+    * The Initial Developers of the Original Code are Riceball LEE.
+    * Portions created by Riceball LEE is Copyright (C) 2006-2008
     * All rights reserved.
 
     * Contributor(s):
-    * hallvards                                                               }
+    * hallvards
+}
 
 unit TypInfoEx;
 

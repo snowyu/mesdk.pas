@@ -1,38 +1,39 @@
 
 {Summary: MeYield - implements the equivalent of the C# yield statement. }
-(*
- * The contents of this file are released under a dual license, and
- * you may choose to use it under either the Mozilla Public License 
- * 1.1 (MPL 1.1, available from http://www.mozilla.org/MPL/MPL-1.1.html) 
- * or the GNU Lesser General Public License 2.1 (LGPL 2.1, available from
- * http://www.opensource.org/licenses/lgpl-license.php).
- *
- * Software distributed under the License is distributed on an "AS
- * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
- * implied. See the License for the specific language governing
- * rights and limitations under the License.
- *
- * The Original Code is $RCSfile: uMeYield.pas,v $.
- *
- * The Initial Developers of the Original Code are Sergey Antonov.
- * Portions created by Sergey Antonov<santonov.blogspot.com> is Copyright (C) 2007
- * Portions created by Riceball LEE<riceballl@hotmail.com> is Copyright (C) 2007
- * All rights reserved.
- *
- * Contributor(s):
- *  Sergey Antonov
- *  Riceball LEE (port to MeObject and little optimal)
- *
- * History
+{
+   @author  Riceball LEE<riceballl@hotmail.com>
+   @version $Revision: 69 $
+
+  License:
+    * The contents of this file are released under a dual \license, and
+    * you may choose to use it under either the Mozilla Public License
+    * 1.1 (MPL 1.1, available from http://www.mozilla.org/MPL/MPL-1.1.html)
+    * or the GNU Lesser General Public License 2.1 (LGPL 2.1, available from
+    * http://www.opensource.org/licenses/lgpl-license.php).
+    * Software distributed under the License is distributed on an "AS
+    * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+    * implied. See the License for the specific language governing
+    * rights and limitations under the \license.
+    * The Original Code is $RCSfile: uMeTypinfo.pas,v $.
+    * The Initial Developers of the Original Code are Riceball LEE.
+    * Portions created by Sergey Antonov<santonov.blogspot.com> is Copyright (C) 2007
+    * Portions created by Riceball LEE is Copyright (C) 2007-2008
+    * All rights reserved.
+    * Contributor(s):
+    *  Sergey Antonov
+    *  Riceball LEE (port to MeObject and little optimal)
+
+ History:
  *   Riceball LEE
  *     + little optimal
  *     + TMeCustomCoRoutine
  *     + TMeCustomCoRoutine.Continuation supports
  *        Note: Continuations are the functional expression of the GOTO statement
  *              Re-invocable continuations must be simple enough and no local memory allocation in it, No Unwind SEH supports..
+}
 
+(*
  Usage:
-
 
 Continuation Usage[this just a demo, but it's ugly coding]:
 

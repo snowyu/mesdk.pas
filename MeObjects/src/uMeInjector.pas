@@ -17,6 +17,26 @@
   Enabled属性为真。注意，注入后，如果想改为注入其他方法，首先必须要设置Enabled属性
   为假。如果在注入后，又有其他注入器再次注入，那么只有当那个注入器首先撤销注入后，
   你才能撤销注入！！
+
+   @author  Riceball LEE<riceballl@hotmail.com>
+   @version $Revision: 1.5 $
+
+  License:
+    * The contents of this file are released under a dual \license, and
+    * you may choose to use it under either the Mozilla Public License
+    * 1.1 (MPL 1.1, available from http://www.mozilla.org/MPL/MPL-1.1.html)
+    * or the GNU Lesser General Public License 2.1 (LGPL 2.1, available from
+    * http://www.opensource.org/licenses/lgpl-license.php).
+    * Software distributed under the License is distributed on an "AS
+    * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+    * implied. See the License for the specific language governing
+    * rights and limitations under the \license.
+    * The Original Code is $RCSfile: uMeInjector.pas,v $.
+    * The Initial Developers of the Original Code are Riceball LEE.
+    * Portions created by Riceball LEE is Copyright (C) 2006-2008
+    * All rights reserved.
+
+    * Contributor(s):
 }
 unit uMeInjector;
 
