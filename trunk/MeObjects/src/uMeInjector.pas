@@ -1,3 +1,4 @@
+
 { Summary the method(procedure) Code Injector }
 { Description
   Provide the lightest and simplest injector object -- TMeInjector.
@@ -18,7 +19,7 @@
   为假。如果在注入后，又有其他注入器再次注入，那么只有当那个注入器首先撤销注入后，
   你才能撤销注入！！
 
-   @author  Riceball LEE<riceballl@hotmail.com>
+   @author  Riceball LEE(riceballl@hotmail.com)
    @version $Revision: 1.5 $
 
   License:
@@ -55,12 +56,23 @@ uses
   ;
 
 const
-  //for static method or procedure
+  //the x86 instruction for injected static method or procedure
   DefaultInjectDirective = cX86JumpDirective;
 
 type
-  EMeInjectorError = Class(EMeError);
+  EMeInjectorError = EMeError;
+
   PMeInjector = ^TMeInjector; 
+  { Summary: Provide the lightest and simplest injector object to inject function or method. }
+  {
+  Description:
+  This object do not use any virtual method, so you can use it directly.
+  Each injector only take 36 bytes about in the memory. One injector 
+  maintains the one injected method(procedure) only. Call the InjectXXX 
+  Method to inject. The injector object is the smallest, simplest and 
+  fastest object in the MeAOP .
+  
+  }
   TMeInjector = object
   protected
     //必须要，因为要恢复
@@ -107,7 +119,7 @@ type
     }
     function OriginalProc: Pointer;
     {###only when the enabled is false can inject!!}
-    { Summay: Inject the procedure }
+    { Summary: Inject the procedure }
     { Description
       @param aDirective the inject directive: near CALL or JMP.
                         the default is the near JMP directive used.
@@ -150,16 +162,27 @@ type
     //set enabled to true will patch the NewLocation again if NewLocation <> nil.
     property Enabled: Boolean read FEnabled write SetEnabled;
 
+    //keep the injected method type
     property MethodType: TMethodType read FMethodType;  
+    //keep the injected method new entry
     property MethodNewLocation: Pointer read FMethodNewLocation;
+    //keep the injected method Original entry
     property MethodOriginalLocation: Pointer read FMethodOriginalLocation; 
 
+    //keep the injected method class
     property MethodClass: TClass read FMethodClass;  
+    // for virtual method(Index) or dynamic method(Slot) 
+    // or published method(PPublishedMethodEntry)
+    // or static method(procedure) it is the drecitve: JMP or CALL
     property MethodIndex: Integer read FMethodIndex;  
 
 
     //only for static method or procedure.
+    // the actual original static method(procedure) location
+    // if the procedure is in BPL(DLL) then the OriginalLocation <> OriginalActualLocation
+    // else the OriginalLocation = OriginalActualLocation 
     property MethodOriginalActualLocation: Pointer read FMethodOriginalActualLocation; 
+    //<COMBINE MethodOriginalActualLocation>
     property MethodOriginalBackup: TRedirectCodeRec read FMethodOriginalBackup; 
   end;
 

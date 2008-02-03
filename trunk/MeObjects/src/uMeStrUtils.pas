@@ -1,7 +1,7 @@
 
 { Summary Various character and string routines (searching, testing and transforming).}
 {
-   @author  Riceball LEE<riceballl@hotmail.com>
+   @author  Riceball LEE(riceballl@hotmail.com)
    @version $Revision: 1.7 $
 
   License:

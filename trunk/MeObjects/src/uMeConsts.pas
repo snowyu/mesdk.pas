@@ -1,6 +1,6 @@
 {Summary MeConsts - the constants for the MeSDK Core.}
 {
-   @author  Riceball LEE<riceballl@hotmail.com>
+   @author  Riceball LEE(riceballl@hotmail.com)
    @version $Revision: 1.15 $
 
   License:

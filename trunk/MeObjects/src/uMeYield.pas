@@ -1,7 +1,7 @@
 
 {Summary: MeYield - implements the equivalent of the C# yield statement. }
 {
-   @author  Riceball LEE<riceballl@hotmail.com>
+   @author  Riceball LEE(riceballl@hotmail.com)
    @version $Revision: 69 $
 
   License:

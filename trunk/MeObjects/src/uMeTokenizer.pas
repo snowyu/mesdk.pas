@@ -3,7 +3,7 @@
 
 Description
 
-   @author  Riceball LEE<riceballl@hotmail.com>
+   @author  Riceball LEE(riceballl@hotmail.com)
    @version $Revision: 1.21 $
 
 ·ÖÎö

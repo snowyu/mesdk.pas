@@ -2,7 +2,7 @@
 { Summary
    the RTTI types info objects.
   Author
-  Riceball LEE
+  Riceball LEE(riceballl@hotmail.com)
   Version
   \$Revision: 1.40 $
   Description
