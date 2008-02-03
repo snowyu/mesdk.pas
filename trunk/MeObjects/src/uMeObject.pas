@@ -73,7 +73,8 @@ interface
 {.$DEFINE PUREPASCAL}
 
 uses
-  SysUtils
+  Windows
+  , SysUtils
   , TypInfo
   , uMeConsts
   , uMeSystem
@@ -312,7 +313,7 @@ type
         when object is released in result of Release, and attempt to
         destroy it follow leads to AV exception).
      }
-    procedure Release;
+    function Release: Integer;
 
 
     {Summary Adds an object to the DependentList. }
@@ -1239,54 +1240,30 @@ begin
   end;
 end;
 
-procedure TMeComponent.Assign(const aObject: PMeNamedObject); 
+procedure TMeComponent.Assign(const aObject: PMeNamedObject);
 begin
 end;
 
 { TMeInterfacedObject }
 destructor TMeInterfacedObject.Destroy;
-{$IFDEF PUREPASCAL}
 begin
-  Dec(FRefCount);
-  if FRefCount < 0 then
+  if InterlockedDecrement(FRefCount) < 0 then
   begin
     Done;
     inherited Destroy;
   end;
 end;
-{$ELSE PUREPASCAL} 
-asm
-        DEC      [EAX].FRefCount
-        JGE      @@exit
-        PUSH      EAX
-        CALL      Done
-        POP       EAX
-        JMP       TMeDynamicObject.Destroy
-@@exit:
-end;
-{$ENDIF PUREPASCAL}
 
-procedure TMeInterfacedObject.Release;
-{$IFDEF PUREPASCAL}
+function TMeInterfacedObject.Release: Integer;
 begin
-  Dec(FRefCount);
-  if FRefCount < 0 then
+  Result := InterlockedDecrement(FRefCount);
+  if Result < 0 then
     Destroy;
 end;
-{$ELSE PUREPASCAL} 
-asm
-        DEC      [EAX].FRefCount
-        JGE      @@exit
-        MOV      EDX, [EAX]
-        PUSH     LongWord ptr [EDX+4]
-@@exit:
-end;
-{$ENDIF PUREPASCAL}
 
 function TMeInterfacedObject.AddRef: Integer;
 begin
-  Inc(FRefCount);
-  Result := FRefCount;
+  Result := InterlockedIncrement(FRefCount);
 end;
 
 procedure TMeInterfacedObject.Done;
