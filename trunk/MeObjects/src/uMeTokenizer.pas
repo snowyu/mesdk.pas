@@ -62,28 +62,22 @@ procedure LoadFromString(const aValue: string);
 procedure Clear;
 function DeQuotedString(const aToken: PMeToken): string;  如果aToken是ComplexToken那么将该Token 作 DeQuotedString 处理.
 
+  License:
+    * The contents of this file are released under a dual \license, and
+    * you may choose to use it under either the Mozilla Public License
+    * 1.1 (MPL 1.1, available from http://www.mozilla.org/MPL/MPL-1.1.html)
+    * or the GNU Lesser General Public License 2.1 (LGPL 2.1, available from
+    * http://www.opensource.org/licenses/lgpl-license.php).
+    * Software distributed under the License is distributed on an "AS
+    * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+    * implied. See the License for the specific language governing
+    * rights and limitations under the \license.
+    * The Original Code is $RCSfile: uMeTokenizer.pas,v $.
+    * The Initial Developers of the Original Code are Riceball LEE.
+    * Portions created by Riceball LEE is Copyright (C) 2007-2008
+    * All rights reserved.
+    * Contributor(s):
 }
-(*
- * The contents of this file are released under a dual license, and
- * you may choose to use it under either the Mozilla Public License 
- * 1.1 (MPL 1.1, available from http://www.mozilla.org/MPL/MPL-1.1.html) 
- * or the GNU Lesser General Public License 2.1 (LGPL 2.1, available from
- * http://www.opensource.org/licenses/lgpl-license.php).
- *
- * Software distributed under the License is distributed on an "AS
- * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
- * implied. See the License for the specific language governing
- * rights and limitations under the License.
- *
- * The Original Code is $RCSfile: uMeTokenizer.pas,v $.
- *
- * The Initial Developers of the Original Code are Riceball LEE<riceballl@hotmail.com>.
- * Portions created by Riceball LEE<riceballl@hotmail.com> is Copyright (C) 2007
- * All rights reserved.
- *
- * Contributor(s):
- *
- *)
 unit uMeTokenizer;
 
 interface

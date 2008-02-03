@@ -7,27 +7,19 @@
     * Does not support continuation invoke chains that include the same instance twice.
     * Limited to 32000 instances because of the 64kb minimum stacksize. (or 48k if 3gb mode is used)
   License
-    * The contents of this file are released under a dual
-      \license, and
-    * you may choose to use it under either the Mozilla Public
-      \License
-    * 1.1 (MPL 1.1, available from
-      http://www.mozilla.org/MPL/MPL-1.1.html)
-    * or the GNU Lesser General Public License 2.1 (LGPL 2.1,
-      available from
+    * The contents of this file are released under a dual \license, and
+    * you may choose to use it under either the Mozilla Public \License
+    * 1.1 (MPL 1.1, available from http://www.mozilla.org/MPL/MPL-1.1.html)
+    * or the GNU Lesser General Public License 2.1 (LGPL 2.1,available from
     * http://www.opensource.org/licenses/lgpl-license.php).
-    * Software distributed under the License is distributed on
-      an "AS
-    * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express
-      or
-    * implied. See the License for the specific language
-      governing
+    * Software distributed under the License is distributed on an "AS
+    * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+    * implied. See the License for the specific language governing
     * rights and limitations under the License.
     * The Original Code is $RCSfile: uMeCoroutine.pas,v $.
-  The Initial Developers of the Original Code are Riceball LEE.
+    * The Initial Developers of the Original Code are Riceball LEE.
     * Portions created by sjrd is Copyright (C) 2007
-    * Portions created by Riceball LEEis Copyright (C)
-      2007-2008
+    * Portions created by Riceball LEEis Copyright (C) 2007-2008
     * All rights reserved.
     * Contributor(s):
     * sjrd (based on an idea of Bart van der Werf)                                                                                                                                                                                                                                                                                                                               }

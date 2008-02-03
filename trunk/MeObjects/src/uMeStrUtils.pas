@@ -3,52 +3,49 @@
 {
    @author  Riceball LEE<riceballl@hotmail.com>
    @version $Revision: 1.7 $
+
+  License:
+    * The contents of this file are released under a dual \license, and
+    * you may choose to use it under either the Mozilla Public License
+    * 1.1 (MPL 1.1, available from http://www.mozilla.org/MPL/MPL-1.1.html)
+    * or the GNU Lesser General Public License 2.1 (LGPL 2.1, available from
+    * http://www.opensource.org/licenses/lgpl-license.php).
+    * Software distributed under the License is distributed on an "AS
+    * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+    * implied. See the License for the specific language governing
+    * rights and limitations under the \license.
+    * The Original Code is $RCSfile: uMeStrUtils.pas,v $.
+    * The Initial Developers of the Original Code are Riceball LEE.
+    * Portions created by Project JEDI Code Library (JCL), 
+    * Portions created by Marcel van Brakel are Copyright (C) Marcel van Brakel
+    * Portions created by Riceball LEE is Copyright (C) 2007-2008
+    * All rights reserved.
+
+    * Contributor(s):
+   Alexander Radchenko                                                                            
+   Andreas Hausladen                                                                              
+   Anthony Steele                                                                                 
+   Azret Botash                                                                                   
+   Barry Kelly                                                                                    
+   Huanlin Tsai                                                                                   
+   Jack N.A. Bakker                                                                               
+   Jean-Fabien Connault                                                                           
+   John C Molyneux                                                                                
+   Leonard Wennekers                                                                              
+   Martin Kimmings                                                                                
+   Martin Kubecka                                                                                 
+   Massimo Maria Ghisalberti                                                                      
+   Matthias Thoma (mthoma)                                                                        
+   Michael Winter                                                                                 
+   Nick Hodges                                                                                    
+   Olivier Sannier                                                                                
+   Pelle F. S. Liljendal                                                                          
+   Petr Vones                                                                                     
+   Rik Barker (rikbarker)                                                                         
+   Robert Lee                                                                                     
+   Robert Marquardt                                                                               
+   Robert Rossmair (rrossmair)                                                                    
 }
-(*
- * The contents of this file are released under a dual license, and
- * you may choose to use it under either the Mozilla Public License 
- * 1.1 (MPL 1.1, available from http://www.mozilla.org/MPL/MPL-1.1.html) 
- * or the GNU Lesser General Public License 2.1 (LGPL 2.1, available from
- * http://www.opensource.org/licenses/lgpl-license.php).
- *
- * Software distributed under the License is distributed on an "AS
- * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
- * implied. See the License for the specific language governing
- * rights and limitations under the License.
- *
- * The Original Code is $RCSfile: uMeStrUtils.pas,v $.
- *
- * The Initial Developers of the Original Code are Riceball LEE<riceballl@hotmail.com>.
- * Portions created by Project JEDI Code Library (JCL), 
- * Portions created by Marcel van Brakel are Copyright (C) Marcel van Brakel
- * Portions created by Riceball LEE<riceballl@hotmail.com> is Copyright (C) 2007
- * All rights reserved.
- *
- * Contributor(s):
-{   Alexander Radchenko                                                                            }
-{   Andreas Hausladen                                                                              }
-{   Anthony Steele                                                                                 }
-{   Azret Botash                                                                                   }
-{   Barry Kelly                                                                                    }
-{   Huanlin Tsai                                                                                   }
-{   Jack N.A. Bakker                                                                               }
-{   Jean-Fabien Connault                                                                           }
-{   John C Molyneux                                                                                }
-{   Leonard Wennekers                                                                              }
-{   Martin Kimmings                                                                                }
-{   Martin Kubecka                                                                                 }
-{   Massimo Maria Ghisalberti                                                                      }
-{   Matthias Thoma (mthoma)                                                                        }
-{   Michael Winter                                                                                 }
-{   Nick Hodges                                                                                    }
-{   Olivier Sannier                                                                                }
-{   Pelle F. S. Liljendal                                                                          }
-{   Petr Vones                                                                                     }
-{   Rik Barker (rikbarker)                                                                         }
-{   Robert Lee                                                                                     }
-{   Robert Marquardt                                                                               }
-{   Robert Rossmair (rrossmair)                                                                    }
- *)
 unit uMeStrUtils;
 
 {$I Setting.inc}
