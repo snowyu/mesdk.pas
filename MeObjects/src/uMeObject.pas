@@ -1,7 +1,7 @@
 
 {Summary MeObject - the MeSDK Core - the abstract mini class(dynamic) - PMeDynamicObject.}
 {
-   @author  Riceball LEE<riceballl@hotmail.com>
+   @author  Riceball LEE(riceballl@hotmail.com)
    @version $Revision: 1.40 $
 
 if you wanna the ClassParent supports for the class derived from TMeDynamicObject:
@@ -55,7 +55,7 @@ All Object use the EMeError class only!
     * rights and limitations under the \license.
     * The Original Code is $RCSfile: uMeObject.pas,v $.
     * The Initial Developers of the Original Code are Riceball LEE.
-    * Portions created by Vladimir Kladov<vk@kolmck.net> is Copyright (C) 2003-2005
+    * Portions created by Vladimir Kladov(vk@kolmck.net) is Copyright (C) 2003-2005
     * Portions created by Riceball LEE is Copyright (C) 2006-2008
     * All rights reserved.
 
@@ -741,8 +741,8 @@ function StrLComp_NoCase(const Str1, Str2: PChar; MaxLen: Cardinal): Integer;
 //##[Sorting TYPES]
 type
   {Summary Event type to define comparison function between two elements of an array.
-     This event handler must return -1 or +1 (correspondently for cases e1<e2
-     and e2>e2). Items are enumerated from 0 to uNElem. }
+     This event handler must return -1 or +1 (correspondently for cases e1 less than e2
+     and e2 greater than e2). Items are enumerated from 0 to uNElem. }
   TCompareEvent = function (const Data: Pointer; const e1,e2 : LongWord) : Integer;
   {Summary Event type to define swap procedure which is swapping two elements of an
      array. }
