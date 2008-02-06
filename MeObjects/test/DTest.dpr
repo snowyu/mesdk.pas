@@ -75,6 +75,8 @@ uses
   , uTypInfoExTest
   , uMeYieldTest
   , uMeCoRoutineTest
+  , uMeTypInfoTest
+  , uMeInjectorTest
   {$ENDIF}
   ;
 
