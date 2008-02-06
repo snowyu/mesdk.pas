@@ -192,6 +192,13 @@ type
 
 implementation
 
+{$IFDEF THREADSAFE_SUPPORT}
+uses
+  uMeSyncObjs;
+var
+  FLock:  TMeCriticalSection;
+{$ENDIF}
+
 {##### TMeInjector ######}
 procedure TMeInjector.SetEnabled(Value: Boolean);
 begin
@@ -424,15 +431,31 @@ end;
 
 function TMeInjector._InjectPublishedMethod: Boolean;
 begin
+  {$IFDEF THREADSAFE_SUPPORT}
+  FLock.Enter;
+  try
+  {$ENDIF}
+
   FMethodOriginalLocation := PPublishedMethodEntry(FMethodIndex).Address;
   FMethodOriginalActualLocation := @PPublishedMethodEntry(FMethodIndex).Address;
   //FMethodOriginalActualLocation := GetActualAddress(FMethodOriginalActualLocation);
   WriteMem(FMethodOriginalActualLocation, @FMethodNewLocation, SizeOf(FMethodNewLocation));
   Result := True;
+
+  {$IFDEF THREADSAFE_SUPPORT}
+  finally
+    FLock.Leave;
+  end;
+  {$ENDIF}
 end;
 
 function TMeInjector._InjectStaticMethod: Boolean;
 begin
+  {$IFDEF THREADSAFE_SUPPORT}
+  FLock.Enter;
+  try
+  {$ENDIF}
+
   Result := PatchDirective(FMethodOriginalActualLocation, FMethodNewLocation, FMethodOriginalBackup, FMethodIndex);
   {$IFDEF STATIC_METHOD_THREADSAFE_SUPPORT}
   with FMethodOriginalBackup do
@@ -446,33 +469,77 @@ begin
       raise EMeInjectorError.CreateRes(@rsCanNotInjectError); 
     {$ENDIF}
   {$ENDIF}
+
+  {$IFDEF THREADSAFE_SUPPORT}
+  finally
+    FLock.Leave;
+  end;
+  {$ENDIF}
 end;
 
 function TMeInjector._InjectVirtualMethod: Boolean;
 begin
+  {$IFDEF THREADSAFE_SUPPORT}
+  FLock.Enter;
+  try
+  {$ENDIF}
+
   FMethodOriginalLocation := SetVirtualMethod(FMethodClass, FMethodIndex, FMethodNewLocation);
   Result := FMethodOriginalLocation <> nil;
+
+  {$IFDEF THREADSAFE_SUPPORT}
+  finally
+    FLock.Leave;
+  end;
+  {$ENDIF}
 end;
 
 function TMeInjector._InjectDynamicMethod: Boolean;
 begin
+  {$IFDEF THREADSAFE_SUPPORT}
+  FLock.Enter;
+  try
+  {$ENDIF}
+
   FMethodOriginalLocation := SetDynamicMethod(FMethodClass, FMethodIndex, FMethodNewLocation);
   Result := FMethodOriginalLocation <> nil;
+
+  {$IFDEF THREADSAFE_SUPPORT}
+  finally
+    FLock.Leave;
+  end;
+  {$ENDIF}
 end;
 
 function TMeInjector._UnInjectPublishedMethod: Boolean;
 var
   P: Pointer;
 begin
+  {$IFDEF THREADSAFE_SUPPORT}
+  FLock.Enter;
+  try
+  {$ENDIF}
+
   ReadMem(FMethodOriginalActualLocation, @P, SizeOf(P));
-  if P <> FMethodNewLocation then 
+  Result := P = FMethodNewLocation;
+  if not Result then 
     raise EMeInjectorError.CreateRes(@rsInjectByOthersError); 
   WriteMem(FMethodOriginalActualLocation, @FMethodOriginalLocation, SizeOf(FMethodOriginalLocation));
-  Result := True;
+
+  {$IFDEF THREADSAFE_SUPPORT}
+  finally
+    FLock.Leave;
+  end;
+  {$ENDIF}
 end;
 
 function TMeInjector._UnInjectStaticMethod: Boolean;
 begin
+  {$IFDEF THREADSAFE_SUPPORT}
+  FLock.Enter;
+  try
+  {$ENDIF}
+
   {$IFDEF STATIC_METHOD_THREADSAFE_SUPPORT}
   with FMethodOriginalBackup do 
     if IsRedirectCodeNoop(FMethodOriginalBackup) then 
@@ -480,31 +547,62 @@ begin
     Integer(FMethodOriginalActualLocation) := Integer(FMethodOriginalActualLocation)
       - cNearJMPDirectiveSize;
   {$ENDIF}
-  if not IsPatchedDirective(FMethodOriginalActualLocation, FMethodNewLocation, FMethodIndex) then
+  Result := IsPatchedDirective(FMethodOriginalActualLocation, FMethodNewLocation, FMethodIndex);
+  if not Result then
     raise EMeInjectorError.CreateRes(@rsInjectByOthersError); 
   Result := UnPatchDirective(FMethodOriginalActualLocation, FMethodOriginalBackup);
+
+  {$IFDEF THREADSAFE_SUPPORT}
+  finally
+    FLock.Leave;
+  end;
+  {$ENDIF}
 end;
 
 function TMeInjector._UnInjectVirtualMethod: Boolean;
 var
   p: Pointer;
 begin
+  {$IFDEF THREADSAFE_SUPPORT}
+  FLock.Enter;
+  try
+  {$ENDIF}
+
   p := GetVirtualMethod(FMethodClass, FMethodIndex);
-  if p <> FMethodNewLocation then
+  Result := p = FMethodNewLocation;
+  if not Result then
     raise EMeInjectorError.CreateRes(@rsInjectByOthersError); 
   p := SetVirtualMethod(FMethodClass, FMethodIndex, FMethodOriginalLocation);
   Result := p <> nil;
+
+  {$IFDEF THREADSAFE_SUPPORT}
+  finally
+    FLock.Leave;
+  end;
+  {$ENDIF}
 end;
 
 function TMeInjector._UnInjectDynamicMethod: Boolean;
 var
   p: Pointer;
 begin
+  {$IFDEF THREADSAFE_SUPPORT}
+  FLock.Enter;
+  try
+  {$ENDIF}
+
   p := GetDynamicMethodBySlot(FMethodClass, FMethodIndex);
-  if p <> FMethodNewLocation then
+  Result := p = FMethodNewLocation;
+  if not Result then
     raise EMeInjectorError.CreateRes(@rsInjectByOthersError); 
   p := SetDynamicMethod(FMethodClass, FMethodIndex, FMethodOriginalLocation);
   Result := p <> nil;
+
+  {$IFDEF THREADSAFE_SUPPORT}
+  finally
+    FLock.Leave;
+  end;
+  {$ENDIF}
 end;
 
 function TMeInjector.OriginalProc: Pointer;
@@ -521,4 +619,13 @@ begin
   {$ENDIF}
 end;
 
+initialization
+{$IFDEF THREADSAFE_SUPPORT}
+  FLock.Create;
+{$ENDIF}
+
+finalization
+{$IFDEF THREADSAFE_SUPPORT}
+  FLock.Free(False);
+{$ENDIF}
 end.

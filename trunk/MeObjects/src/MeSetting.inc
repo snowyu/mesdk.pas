@@ -17,6 +17,7 @@
 {.$DEFINE MeDynamicMemory_HoldMem_SUPPORT}
 
 {.$DEFINE YieldClass_Supports} //use the delphi class type instead.
+{$DEFINE THREADSAFE_SUPPORT}
 
 {Include Common setting File}
 {$I Setting.inc}
