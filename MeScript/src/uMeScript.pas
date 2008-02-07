@@ -428,9 +428,9 @@ var
   GMeScriptCoreWords: TMeScriptCoreWords;
 
 {$IFDEF PUREPASCAL}
-  {$I MeScript_Interpreter_inc.pas}
+  {$I uMeScript_Interpreter_inc.pas}
 {$ELSE}
-  {$I MeScript_X86Interpreter_inc.pas}
+  {$I uMeScript_X86Interpreter_inc.pas}
 {$ENDIF}
 
 //get dynamic Arguments from DataStack and Generate Arguments Object
