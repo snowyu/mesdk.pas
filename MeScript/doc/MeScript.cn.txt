@@ -1,0 +1,277 @@
+MeSDK - MeScript Engine
+
+根据MeAOP的MeProc 作为执行基础，构想能逐个运行 MeProc的机制(MeProc过程流控制)作为 MeScript.
+
+构建一系列的MeProc, IF 语句等都是MeProc. 然后在 TMeScriptBlock 的控制下逐个运行。
+在理解了JS的实现机制——动态函数式语言后，决定先弄一个原型，不考虑优化速度。
+
+MeScript Prototype V1:
+实现目标
+  1. Function, Variable, Object
+  2. AutoBinding, ManualBinding, LaterBinding
+  3. Operator(can be defined via user)
+  4. 无表达式，只是函数。
+
+是否需要考虑内存调度问题：将近期没有运行的函数从内存卸载，当需要的时候才加载。
+
+ScriptFunction
+  Prototype: PMeScriptCustomObject;
+
+ScriptObject
+  Attributes: PMeScriptAttributes
+
+ScriptAttribute:
+  Name
+  Value: TMeScriptValue;
+  Kind : TMeScriptAttributeKinds (akReadOnly, akDontEnum, akDontDelete)
+
+ScriptValue:
+  Ctor: PMeScriptCustomFunction;
+  Value: TMeScriptValueRecord
+
+
+uMeScript.pas
+
+架构：
+动态语言足够小，可以作为中间纯解释语言，就当练手，熟悉后，将它的一些特性加入到 TurboScript 中。
+
+脚本的最小执行块为: 代码块（ScriptBlock）
+TMeScriptCustomBlock： 抽象代码块
+  TMeScriptBlock： 脚本代码块，支持局部变量，无参数
+    TMeScriptFunction：脚本函数，支持参数
+      TMeScriptGlobalFunction： 全局脚本函数，脚本执行必须从此处开始，堆栈，虚拟CPU状态，全在此处。
+  TMeScriptCustomFunction： 抽象函数
+    TMeScriptInternalFunction： 引擎内部预定义函数，通过 TMeScriptFunction.RegisterFunction 方法注册到脚本函数上。
+
+脚本对象：
+  TMeScriptCustomObject: 抽象的脚本对象，内部脚本对象和纯脚本对象从该处派生
+    TMeScriptObject: 纯脚本对象,实现了属性列表。
+
+值对象：
+  TMeScriptValue： 没有名字，只有类型，值，和 Ctor。
+
+函数返回值的处理：在碰到分隔符后，如果没有赋值操作，应该直接丢掉返回值。
+在编译时处理，还是在运行时处理？
+如果没有表达式，就没有赋值语句，只有函数：变量赋值函数。
+
+f();  ==> call f; drop
+c(f(g())); ==> call g, call f, call c, drop
+assignValue(a, f());
+
+堆栈：分为数据栈(FDataStack), 返回栈(FReturnStack), this 指针栈，放在 TMeScriptGlobalFunction 上。
+
+数据栈(FDataStack)：所有数据栈的数据都是PMeScriptValue指针，运算是通过指针运算。注意处理 nil, nil 表示 undefined 值.
+返回栈(FReturnStack)：  当进入某个代码块前需要保存当前代码块的数据（局部变量，参数【如果是函数】，当前代码块的执行地址）(InitExecution)，这些数据被压入返回栈。并在退出代码块前被释放(FinalizeExecution)。
+  局部变量：仅在代码块内存在，局部变量编译后没有名字，没有后期绑定！
+  函数参数：当进入某脚本函数前(InitExecution)将数据栈上的所有参数【参数1..参数n, n(参数个数)】形成一个参数对象(GenerateArgumentsObject)，退出函数前释放(FinalizeExecution)。
+
+只有值和函数。在JS中所有的变量和函数都是后期绑定的（最终实现是既有前期绑定，又有后期绑定）。
+系统初始有一个全局函数(TMeScriptGlobalFunction)，执行这个函数就相当于执行程序的Main入口。
+
+函数的调用如果是方法，还要处理this指针。似乎该在Parser时处理。
+“.”引用如果作为后期绑定实现，可以将“.”作为一个内部函数实现。否则还是要作为关键字在编译时刻处理前期绑定的部分。
+可以这样，如果能在编译时刻找到，就作为前期绑定，否则就认为是一个后期绑定：凡是函数，标识符后必须有括号，否则就当作属性处理。
+"." 和 namespace 的问题。
+
+是否需要 namespace ？
+No,最简单的化为妙。
+
+当将一个方法赋值给变量，该变量还应该保持该方法的_this指针值。当对象释放后，必须将this指针置为nil.
+no, js中如果将方法赋值给变量，那么该变量为指向一个函数！
+
+
+Scope的搜索顺序：
+
+  该函数原型对象链中搜索
+  if SearchAttr and Assigned(FGlobalFunction._this) 那么搜索this中的属性是否有
+  [如果是函数则]最后搜索内部定义的函数表，然后再是父函数的内部函数表。
+
+TMeScriptValue.Ctor -> TMeScriptFunction
+TMeScriptFunction.prototype -> TMeScriptObject
+
+Car1.Ctor -> Car()
+Car().prototype -> CarProtoTypeObject(the TypeInfo Object)
+CarProtoTypeObject.Ctor -> Car()
+实际上 prototype 就是类型信息！
+
+  TMeScriptTypeKind = (mtkUndefined, mtkNumber, mtkBoolean, mtkFunction, mtkObject);
+  TMeScriptValueRecord = record
+    case Integer of
+      0: (
+        case TMeScriptTypeKind of
+          mtkLString:    (VAnsiString: Pointer);
+          mtkBoolean:    (VBool: Boolean);
+          mtkNumber:     (VNumber: Double);
+          mtkFunction:   (VFunc: PMeScriptFunction);
+          mtkObject:     (VFunc: PMeScriptObject);
+      );
+
+  end;
+
+  PMeScriptValue = ^ TMeScriptValue;
+  TMeScriptValue = Object
+    //TypeInfo: TMeScriptTypeKind; //(Number, String, Boolean, Function, Object), 如果为nil表示未定义。
+    Ctor: PMeScriptFunction; //constructor of the value.
+    Value: TMeScriptValueRecord;
+    procedure Clear; //clear value, undefined value.
+  end;
+
+  TMeScriptElement =  Object(TMeInterfacedObject)
+  protected
+    FName: string;
+    FSource: string;
+  end;
+
+  {
+   进入则将局部变量分配空间到数据栈，退出则释放局部变量，如果有的话
+   相关指令： 
+     LDVar index 将指定index号的变量压入数据栈:  push DataStack[_BP-index]
+     如何访问父亲的local var??
+ 
+   源程序：
+     Begin ...块
+     End;
+   编译： Identity 搜索顺序，首先搜LocalVars，然后搜索Parent的。   (这里看不到属性)
+    
+     
+  }
+  PMeScriptBlock = ^ TMeScriptBlock;
+  TMeScriptBlock = Object(TMeScriptElement)
+  protected
+    FGlobalFunction: PMeScriptGlobalFunction;
+    FParent: PMeScriptBlock;
+    FFuncs: array of PMeScriptFunctions; //collec the defined local functions in it.
+    FVarNames: array of string; //the local var names for compile-time.
+    //局部变量初始值：
+    FVars: array of TMeScriptValue;
+    FCodeMem: Pointer; //the compiled binary code. TMeDynamicMemory
+
+    procedure iCompile; virtual;
+  public
+    function Execute(const aParams: TMeScriptArguments): TMeScriptValue;
+    procedure Compile;
+    var
+      vMemory: PMeDynamicMemory;
+    begin
+    end;
+  end;
+
+  PMeScriptFunction = ^MeScriptFunction;
+  TMeScriptFunction = Object(TMeScriptBlock)
+  protected
+    FFlags: TMeScriptFunctionFlags; //ffInternal
+    FPrototype: PMeScriptObject;
+  public
+    function GetLocalVarId(const aName: string): Integer;
+    function GetVar(const aName: string; const SearchParent: Boolean = false): PMeScriptVar;
+    function GetLocalFuncId(const aName): Integer;
+  end;
+
+  TMeScriptPC = record
+    PC: tsInt;
+    Mem: Pointer;
+  end;
+  PMeScriptGlobalFunction = ^ TMeScriptGlobalFunction;
+  TMeScriptGlobalFunction = Object(TMeScriptFunction)
+  protected
+    procedure iVMCall(const aFunc: PMeScriptFunction);
+  public
+    {## the VM instructions ## }
+    procedure VMAssignment;
+    {代码体是在函数上的，如何处理？
+      法1： 进入某函数的时候，压入原来的_Mem和_PC,赋值给全局 _Mem 和 _PC. 修改返回栈的内容为： {_Mem, _PC}，退出函数则还原原来的。
+      //法2： 直接传递给VM指令。 选择法1。
+    }
+    procedure VMCall;
+
+  public
+    {所有数据栈的数据都是PMeScriptValue指针，运算是通过指针运算。
+     局部变量编译后没有名字，没有后期绑定！
+    }
+    DataStack: array of PMeScriptValue;
+    ReturnStack: array of TMeScriptPC;
+    _PC: tsInt;
+    //the ReturnStack Pointer.
+    _RP: tsInt;
+    //the DataStack Pointer
+    _SP: tsInt;
+    //the DataStack Base Pointer
+    _BP: tsInt;
+  end;
+
+  //prototype
+  TMeScriptObject = Object(TMeScriptElement)
+  public
+    Ctor: PMeScriptFunction; //constructor
+    Attributes: PMeList;
+    function GetLocalAttrId(const aName: string): Integer;
+    function GetAttr(const aName: string; const SearchParent: Boolean = false): PMeScriptVar;
+  end;
+
+最小指令集：
+    , opHalt       // ( -- )
+    , opCallBlock   // opCallBlock pBlock (  --  )
+    , opCallFunc    // opCallFunc pFunction ( Arguments -- pResultValue )
+    , opCall        // opCall ( Arguments pFuncValue -- pResultValue )
+    , opCallBind    // opCallBind <StrLen:byte>FuncNameStr ( Arguments -- pResultValue ) the runtime error raised if function is not exists at runtime
+    , opObjectBind  // opObjectBind <StrLen:byte>ObjNameStr ( -- pObject)
+    , opLoadAttrById   // opLoadAttrById ( pObject <Id:Int32> -- pValue)  if not found return nil
+    , opLoadAttr // opLoadAttr ( pObject <Len:Byte>AttrNameStr -- pValue) if not found return nil
+    , opAssign     // opAssign pVar ( pValue -- )
+    , opPush       // opPush Int32 ( -- Int32)
+    , opPushDouble // opPushDouble Double ( -- pValue)
+    , opPushString // opPushString <cnt:Longword>string ( -- pValue)
+    , opPushObject // opPushObject pObject ( -- pValue)
+    , opPushFunction // opPushFunction pFunc ( -- pValue)
+    , opPop        // opPop         (Int32 -- )
+    , opLoadArg    // opLoadArg <index> ( -- pValue)  load local argument
+    , opLoadArgFar // opLoadArgFar <stackIndex> <index> ( -- pValue)  load parent argument which argument in return stack:  FReturnStack[_RP - stackIndex].Arguments.Attributes[index]
+    , opLoadVar    // opLoadVar <index> (-- pValue)  load loal varaible
+    , opLoadVarFar // opLoadVarFar <stackIndex> <index> ( -- pValue)  load parent varaible which varaible in return stack:  FReturnStack[_RP - stackIndex].Varaibles.Items[index]
+    , opLoadBind   // opCallBind <Len:byte>NameStr ( -- pValue ) the runtime error raised if function is not exists at runtime
+    , opDeclareVar//  opDeclareVar:  decalre a local variable. allocate the space for variable.
+
+
+_________________________________________________
+
+TRemoteObject: 属性和方法都是远程
+TRemoteObject  抽象的目的是为了保证远程属性的处理。需要做一些约定，比如所有以"R"打头的出版属性并且必须有设置属性的方法。
+或者抽象的出版方法为远程方法，属性的写方法为抽象方法的为远程方法。如果这样就没有必要对远程对象从指定类上派生。
+
+TRemoteInvokerFeature: 注入后的类的某些约定的抽象方法获得远程执行的能力。Singleton.
+  GRemoteInvokerFeature.Transport : the default transport.
+  GRemoteInvokerFeature.Add(aClass, aTransport = nil); aTransport is nil means the default transport used.
+
+Class Specifiction:
+ * the abstract published methods in the aClass are the remote invoke methods.
+
+TODO: transport object define.
+the transport object will transfer the data from here to there.
+the transport can wrap(wrap links) the data before transfering, and unwrap it after transfered.
+1.Compress;2.Encrypt;3.Data Format
+
+TRemoteObjectFeature = Class(TRemoteInvokerFeature)
+
+Class Specifiction:
+ * the remote properties
+   * write to the remote [Cache mechism?]
+   * read from the remote when changed.
+   * confiction resolve.
+
+属性方法注入的支持：简单属性，数组属性[]。
+
+缺少对接口注入的支持。或者直接使用接口作为远程Class.
+Interface 分析
+事实上就是一张函数表
+当接口变量没有联系函数表的时候为空
+  Mov  EAX, vIntf
+  MOV  EDX, [EAX] //如果没有联系，则EDX=0
+  Call DWord ptr [EDX+$0C] //第一个方法，因为接口默认有三个方法(QueryInterface, _AddRef, _Release)，用户定义的第n个方法在表中的偏移地址就是: (n-1)*4 + 3*4..
+
+其呼叫(Call)地址也是一个跳转表：
+  ADD EAX, -$0C
+  JMP TMyObject.Method1
+  ADD dword ptr [ESP+$04], -$0C           //因为 stdcall 方式的缘故，第一个Self参数在 [ESP+$04] 中。
+  JMP TInterfacedObject.QueryInterface 
+  
+如果要使用Interface实现，那么必须声明接口变量，然后在将该接口变量指向俺们的远程对象，这不是多此一举。所以不用接口。
