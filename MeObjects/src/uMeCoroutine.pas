@@ -1,7 +1,7 @@
 
 { Summary
    MeCoroutine - implements the coroutine object.
-  
+
     CoRoutines management classes CoRoutines provides two main classes. TMeCustomCoRoutine is the base class for CoRoutine management. TMeCoRoutineEnumerator is a derived class, specialised in Delphi 2005 enumerators implementation. This unit needs tests under Windows 95/98/Me, in case of growth of the stack, because PAGE_GUARD is not supported under these versions.
   * limitations *
     * Does not support continuation invoke chains that include the same instance twice.
@@ -22,7 +22,8 @@
     * Portions created by Riceball LEEis Copyright (C) 2007-2008
     * All rights reserved.
     * Contributor(s):
-    * sjrd (based on an idea of Bart van der Werf)                                                                                                                                                                                                                                                                                                                               }
+    * sjrd (based on an idea of Bart van der Werf)
+}
 unit uMeCoroutine;
 
 interface
@@ -184,7 +185,7 @@ type
   @param StackSize   Stack size (default and minimum: MinStackSize)
 }
     constructor Create(const aStackSize: Cardinal = MinStackSize);
-    destructor Destroy; {$IFDEF YieldClass_Supports}override{$ELSE} virtual{$endif}; 
+    destructor Destroy; {$IFDEF YieldClass_Supports}override{$ELSE} virtual{$endif};
 
     {$IFDEF YieldClass_Supports}
     procedure BeforeDestruction; override;
@@ -197,7 +198,7 @@ type
   TMeCoRoutine = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeCustomCoRoutine)
   protected
     FCoRoutineProc: TMeCoRoutineProc;
-    procedure Execute;{$IFDEF YieldClass_Supports}override{$ELSE} virtual{$endif}; 
+    procedure Execute;{$IFDEF YieldClass_Supports}override{$ELSE} virtual{$endif};
   public
     constructor Create(const CoRoutineProc: TMeCoRoutineProc; const aStackSize: Cardinal = MinStackSize);
   end;
@@ -236,7 +237,7 @@ type
   protected
     FLoop: TMeCoRoutineLoop;
 
-    procedure InitCoRoutine; {$IFDEF YieldClass_Supports}override{$ELSE} virtual{$endif}; 
+    procedure InitCoRoutine; {$IFDEF YieldClass_Supports}override{$ELSE} virtual{$endif};
     procedure MainExecute;
   public
     property Loop: TMeCoRoutineLoop read FLoop write FLoop;
@@ -429,7 +430,7 @@ begin
   FStackBuffer := FCoRoutineFrame.StackBottom;
   FStackSize := aStackSize;
   FStack := FCoRoutineFrame.StackTop;
-  
+
   // Initialize CoRoutine
   InitCoRoutine;
 end;
@@ -727,7 +728,7 @@ begin
   begin
     InstructionPtr := @TMeCustomCoRoutineEx.MainExecute;
   end;
-  
+
 end;
 
 procedure TMeCustomCoRoutineEx.MainExecute;
