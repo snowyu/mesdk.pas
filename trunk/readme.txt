@@ -1,3 +1,5 @@
+MeSDK Library
+
 * MeObjects *
 MeObjects Library for Delphi is a light object extension to make object type small and powerful. It makes the object type
 supports the ClassType, InheritsFrom and ClassName like the Class Type, but it's mini and faster than the delphi class type.
