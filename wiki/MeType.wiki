@@ -1,0 +1,8 @@
+#summary One-sentence summary of this page.
+
+= Introduction =
+
+the Mini Run-time Type Infomation of Object. the MeType is stream-able.
+
+
+= Details =
