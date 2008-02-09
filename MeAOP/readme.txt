@@ -5,6 +5,10 @@ Email: riceballl@hotmail.com
 Author: Riceball LEE
 Codebase: http://code.google.com/p/meaop/
 
+License:
+The contents of MeAOP are released under the Mozilla Public License
+1.1 (MPL 1.1, available from http://www.mozilla.org/MPL/MPL-1.1.html)
+
 == Introduce AOP ==
 Aspect Oriented Programming, IMO, the aspect is the general feature in fact. It's a helper for object-oriented programming to
 re-use the feature(function), such as the Login feature. Aspect Oriented Programming attempts to aid programmers in the 
