@@ -3,7 +3,7 @@
 HomePage: http://dev.cqhot.cn/mesdk/
 Email: riceballl@hotmail.com
 Author: Riceball LEE
-SVN: http://code.google.com/p/meaop/
+Codebase: http://code.google.com/p/meaop/
 
 == Introduce AOP ==
 Aspect Oriented Programming, IMO, the aspect is the general feature in fact. It's a helper for object-oriented programming to
