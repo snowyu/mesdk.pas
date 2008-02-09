@@ -2,7 +2,7 @@
 {Summary MeObject - the MeSDK Core - the abstract mini class(dynamic) - PMeDynamicObject.}
 {
    @author  Riceball LEE(riceballl@hotmail.com)
-   @version $Revision: 1.40 $
+   @version $Revision: 1.2 $
 
 if you wanna the ClassParent supports for the class derived from TMeDynamicObject:
 
@@ -691,7 +691,7 @@ function NewListInit(const AItems: array of Pointer): PMeList;
 {$ENDIF}
 
 
-{Summary Very fast adds Value to List elements from List[FromIdx] to List[FromIdx+Count-1].
+{Summary Very fast fill Value to List elements from List[FromIdx] to List[FromIdx+Count-1].
    Given elements must exist. Count must be > 0. }
 procedure FillListIn(List: TMeList; FromIdx, Count, Value: Integer);
 
@@ -882,28 +882,40 @@ begin
 end;
 
 procedure _FillDataIn(DataArray: Pointer; Value, Count: Integer);
+{$IFDEF PUREPASCAL}
+begin
+  while Count > 0 do
+  begin
+    PInteger(DataArray)^ := Value;
+    Inc(Cardinal(DataArray), SizeOf(Integer)); 
+    Dec(Count);
+  end;
+end;
+{$ELSE}
 asm
   PUSH ESI
   PUSH EDI
   {$IFDEF FPC}
   MOV ESI, [DataArray]
-  MOV EDX, [Value]
+  MOV EAX, [Value]
   MOV ECX, [Count]
   {$ELSE DELPHI}
   MOV ESI, EAX
+  MOV EAX, EDX
   {$ENDIF FPC/DELPHI}
   MOV EDI, ESI
   CLD
 
 @@1:
-  LODSD
-  ADD EAX, EDX
-  STOSD
-  LOOP @@1
+  //LODSD
+  //ADD EAX, EDX
+  REP STOSD
+  //LOOP @@1
 
   POP EDI
   POP ESI
 end {$IFDEF FPC} ['EAX', 'EDX', 'ECX'] {$ENDIF};
+{$ENDIF}
 
 procedure FillListIn(List: TMeList; FromIdx, Count, Value: Integer);
 begin
