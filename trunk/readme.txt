@@ -5,6 +5,9 @@ MeObjects Library for Delphi is a light object extension to make object type sma
 supports the ClassType, InheritsFrom and ClassName like the Class Type, but it's mini and faster than the delphi class type.
 You can treat it as mini-class type. The MeObjects Library is the MeSDK core too.
 
+* MeRTTI *
+the Mini Run-time Type Infomation of Object. the MeType is stream-able.
+
 * MeAOP *
 The MeAOP Library is Aspect Oriented Programming for delphi. IMO, the aspect is the general feature in fact. It's a helper for 
 object-oriented programming to re-use the feature(function), such as the Login feature. Aspect Oriented Programming 
