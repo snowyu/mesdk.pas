@@ -2,10 +2,10 @@
   ##Project Name: DTest.dpr
   ##Initial Date: 2006-5-4
   Summary
-    MeObject Test Suite Project.
+    MeSDK Test Suite Project.
 
   Description
-    the MeObject Of MeSDK for Delphi Library Test Suite 
+    the MeSDK for Delphi Library Test Suite 
 
   See Also
     参阅
@@ -24,10 +24,10 @@
     Riceball LEE(riceballl@hotmail.com)
 
   Copyright
-    Copyright(C) 2006 by Riceball LEE
+    Copyright(C) 2006-2008 by Riceball LEE
 
   Current Version
-    $Revision: 1.14 $
+    $Revision: 1.3 $
 
   History
     版本历史。
@@ -69,14 +69,22 @@ uses
     , testregistry
   {$ENDIF}
   , uMeObjectTest
+  //, uMeStreamTest
   {$IFNDEF FPC}
   , uFastCompareTextExTest
   , uMeTokenizerTest
+
   , uTypInfoExTest
   , uMeYieldTest
   , uMeCoRoutineTest
   , uMeTypInfoTest
   , uMeInjectorTest
+
+  , uMeTypesTest
+  , uMeProcTypeTest
+
+  , uMeInterceptorTest
+  , uMeFeature
   {$ENDIF}
   ;
 
@@ -211,7 +219,7 @@ end.
 {.$R *.RES}
 
 const
-  rcs_id :string = '#(@)$Id: DTest.dpr,v 1.14 2007/09/08 23:22:43 riceball Exp $';
+  rcs_id :string = '#(@)$Id: DTest.dpr,v 1.3 2008/02/08 16:31:06 riceball Exp $';
   SwitchChars = ['-','/'];
 
 procedure RunInConsoleMode;
