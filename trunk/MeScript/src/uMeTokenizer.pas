@@ -106,8 +106,8 @@ const
 
 ResourceString
   //1: %i: Line; 2: %i: Col; 3. %i: the ErrorCode; 4. %s: the ErrorToken; 
-  rsMeTokenErrorMissedToken = '(%i:%i) Fatal: %i the %s is expected. ';
-  rsMeTokenErrorUnknown =  '(%i:%i) Fatal: Unknown Token Error %i the error token is "%s" . ';
+  rsMeTokenErrorMissedToken = '(%d:%d) Fatal: %d the %s is expected. ';
+  rsMeTokenErrorUnknown =  '(%d:%d) Fatal: Unknown Token Error %d the error token is "%s" . ';
 
 type
   TMeCharset = set of char;
