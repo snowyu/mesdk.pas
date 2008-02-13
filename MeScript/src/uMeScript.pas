@@ -27,7 +27,7 @@ unit uMeScript;
 
 interface
 
-{$I Setting.inc}
+{$I MeSetting.inc}
 {$Define PUREPASCAL}
 
 uses
@@ -150,7 +150,14 @@ type
   TMeScriptCustomBlock = Object(TMeScriptElement)
   protected
     FGlobalFunction: PMeScriptGlobalFunction;
+    FFunctions: PMeNamedObjects;
   protected
+
+    function GetFunctions: PMeNamedObjects;
+    //1. search Functions; 2. search Parent.Functions until Parent = nil.
+    //only find function in attributes or Functions
+    //仅当在运行时刻才去搜索this属性,才对：当GlobalFunction._This不能空。
+    function FindFunction(const aName: string; const SearchAttr: Boolean = True): PMeScriptCustomFunction; virtual;
 
     {## Compiler: }
     function IsCompileAllowed: Boolean; virtual;
@@ -171,6 +178,7 @@ type
     //function Eval(const aParams: array of const): PMeScriptValue;
 
     property GlobalFunction: PMeScriptGlobalFunction read FGlobalFunction;
+    property Functions: PMeNamedObjects read GetFunctions;
   end;
 
   {: 最小的脚本函数块}
@@ -213,14 +221,12 @@ type
     // the local variable count.
     //FVariableCount: Integer;
     //FConstants: TMeScriptDynaValues;
-    FFunctions: PMeNamedObjects;
     FBody: PMeScriptCodeMemory;
     //for compile-time only, the index means the variable index.
     FVariablesName: array of string;
   protected
     function GetBody: PMeScriptCodeMemory;
     //function GetVariables: PTurboSymbols;
-    function GetFunctions: PMeNamedObjects;
     procedure DoTokenError(const Sender: PMeTokenErrors; const aError: PMeTokenErrorInfo);
     function IndexOfLocalVariable(const aName: string): Integer;
     function IsLocalVariableExists(const aName: string): Boolean;
@@ -247,10 +253,6 @@ type
 
     //declare local variable.
     function DeclareVar(const aName, aType: string): Boolean;
-    //1. search Functions; 2. search Parent.Functions until Parent = nil.
-    //only find function in attributes or Functions
-    //仅当在运行时刻才去搜索this属性,才对：当GlobalFunction._This不能空。
-    function FindFunction(const aName: string; const SearchAttr: Boolean = True): PMeScriptCustomFunction; virtual;
     function FindVariable(const aName: string; var aStackIndex: Integer): Integer;
   public
     destructor Destroy; virtual; {override}
@@ -259,9 +261,11 @@ type
   public
     //the local variables and initilization value if any.
     //property Variables: PTurboSymbols read GetVariables;
-    property Functions: PMeNamedObjects read GetFunctions;
     property Body: PMeScriptCodeMemory read GetBody;
   end;
+
+  {Summary 约定如果没有返回值则返回nil， nil表示undefined.}
+  TMeScriptInternalFunctionType = function (const GlobalFunction: PMeScriptGlobalFunction): PMeScriptValue;
 
   { Summary this is an abstract class for internal function. }
   TMeScriptCustomFunction = Object(TMeScriptCustomBlock)
@@ -275,6 +279,9 @@ type
     function FindFunction(const aName: string; const SearchAttr: Boolean = True): PMeScriptCustomFunction; virtual; {override}
   public
     destructor Destroy; virtual; {override}
+
+    { Summary Register Internal Function}
+    procedure RegisterFunction(const aName: string; const aFunc: TMeScriptInternalFunctionType);
   public
     Prototype: PMeScriptCustomObject;
     //the defined arguments at compile-time. store the argument name.
@@ -282,8 +289,6 @@ type
   end;
 
   PMeScriptInternalFunction = ^ TMeScriptInternalFunction;
-  {Summary 约定如果没有返回值则返回nil， nil表示undefined.}
-  TMeScriptInternalFunctionType = function (const GlobalFunction: PMeScriptGlobalFunction): PMeScriptValue;
   TMeScriptInternalFunction = Object(TMeScriptCustomFunction)
   protected
     procedure iExecute();virtual; {override}
@@ -306,8 +311,6 @@ type
     function FindArgument(const aName: string; var aStackIndex: Integer): Integer;
   public
     destructor Destroy; virtual; {override}
-    { Summary Register Internal Function}
-    procedure RegisterFunction(const aName: string; const aFunc: TMeScriptInternalFunctionType);
   public
     Prototype: PMeScriptCustomObject;
     //the defined arguments at compile-time. store the argument name.
@@ -349,7 +352,7 @@ type
     property Attributes: PMeScriptAttributes read GetAttributes;
   end;
 
-  //Return Stack Frame
+  //Return Stack Frame(Continuation)
   TMeScriptPC = record
     Mem: tsUInt; //it is the current FBody.Memory of the execute function
     //the current execute function.
@@ -497,7 +500,7 @@ const
   cMeTokenErrorExpectArgsEnd = 3;
 
 ResourceString
-  rsMeTokenErrorExpectArgsEnd = '(%i:%i) Fatal: %i the %s is expected. ';
+  rsMeTokenErrorExpectArgsEnd = '(%d:%d) Fatal: %d the %s is expected. ';
   rsMeScriptAlreayRunningError = 'MeScript Alreay Running Error';
 
 procedure TMeScriptTokenizer.Init;
@@ -660,6 +663,42 @@ procedure TMeScriptCustomBlock.FinalizeExecution;
 begin
 end;
 
+function TMeScriptCustomBlock.FindFunction(const aName: string; const SearchAttr: Boolean): PMeScriptCustomFunction;
+var
+  vParent: PMeScriptElement;
+begin
+  if SearchAttr and Assigned(FGlobalFunction._this) then
+  begin
+    PMeScriptValue(vParent) := FGlobalFunction._this.Values[aName];
+    if Assigned(vParent) then
+    begin
+      if (PMeScriptValue(vParent).TypeKind = mtkFunction) then
+        Result := PMeScriptValue(vParent).Value.VFunc
+      else begin
+        Result := nil;
+        FGlobalFunction.RaiseMeScriptError(@Self, cSymbolErrorFunctionNotFound, aName);
+      end;
+      Exit;
+    end;
+  end;
+
+  Result := PMeScriptCustomFunction(FFunctions.Find(aName));
+  vParent := Parent;
+  while (Result = nil) and (vParent <> nil) do
+  begin
+    if vParent.InheritsFrom(TypeOf(TMeScriptBlock)) then
+      Result := PMeScriptCustomFunction(PMeScriptBlock(vParent).FFunctions.Find(aName));
+    vParent := vParent.Parent;
+  end;
+end;
+
+function TMeScriptCustomBlock.GetFunctions: PMeNamedObjects;
+begin
+  if not Assigned(FFunctions) then
+    New(FFunctions, Create);
+  Result := FFunctions;
+end;
+
 procedure TMeScriptCustomBlock.iExecute();
 begin
 end;
@@ -688,35 +727,6 @@ begin
   MeFreeAndNil(FFunctions);
   MeFreeAndNil(FBody);
   Inherited;
-end;
-
-function TMeScriptBlock.FindFunction(const aName: string; const SearchAttr: Boolean): PMeScriptCustomFunction;
-var
-  vParent: PMeScriptElement;
-begin
-  if SearchAttr and Assigned(FGlobalFunction._this) then
-  begin
-    PMeScriptValue(vParent) := FGlobalFunction._this.Values[aName];
-    if Assigned(vParent) then
-    begin
-      if (PMeScriptValue(vParent).TypeKind = mtkFunction) then
-        Result := PMeScriptValue(vParent).Value.VFunc
-      else begin
-        Result := nil;
-        FGlobalFunction.RaiseMeScriptError(@Self, cSymbolErrorFunctionNotFound, aName);
-      end;
-      Exit;
-    end;
-  end;
-
-  Result := PMeScriptCustomFunction(FFunctions.Find(aName));
-  vParent := Parent;
-  while (Result = nil) and (vParent <> nil) do
-  begin
-    if vParent.InheritsFrom(TypeOf(TMeScriptBlock)) then
-      Result := PMeScriptCustomFunction(PMeScriptBlock(vParent).FFunctions.Find(aName));
-    vParent := vParent.Parent;
-  end;
 end;
 
 function TMeScriptBlock.FindVariable(const aName: string; var aStackIndex: Integer): Integer;
@@ -858,7 +868,7 @@ begin
   with aTokenizer^ do
   begin
     vToken := ReadToken;
-    Result := Assigned(vToken) and vToken.TokenId = Ord(ttToken);
+    Result := Assigned(vToken) and (vToken.TokenId = Ord(ttToken));
     if Result then
       Repeat
         vName := vToken.Token;
@@ -874,7 +884,7 @@ begin
             Exit; 
           end;
           vType := vToken.Token;
-        end
+        end;
   
         if Result then
         begin
@@ -1066,7 +1076,7 @@ begin
       if not Result then exit;
     until vToken = nil
     else begin
-      Errors.Add(CurrentToken, cMeTokenErrorMissedToken, tkMeTokenBlockBegin);
+      Errors.Add(@CurrentToken, cMeTokenErrorMissedToken, tkMeTokenBlockBegin);
     end;
   end; //if
   if Result then
@@ -1134,15 +1144,15 @@ begin
   if Result then
   begin
     FBody.AddOpCode(opDeclareVar);
-    SetLength(FVariablesName, FVariablesName.Length+1);
-    FVariablesName[FVariablesName.Length-1] := aName;
+    SetLength(FVariablesName, Length(FVariablesName)+1);
+    FVariablesName[Length(FVariablesName)-1] := aName;
   end;
   
 end;
 
 function TMeScriptBlock.IndexOfLocalVariable(const aName: string): Integer;
 begin
-  for Result := 0 to FVariablesName.Count -1 do
+  for Result := 0 to Length(FVariablesName) -1 do
   begin
     if FVariablesName[Result] = aName then exit;
   end;
@@ -1154,13 +1164,6 @@ begin
     Result := IndexOfLocalVariable(aName) >= 0;
 end;
 
-function TMeScriptBlock.GetFunctions: PMeNamedObjects;
-begin
-  if not Assigned(FFunctions) then
-    New(FFunctions, Create);
-  Result := FFunctions;
-end;
-
 { TMeScriptCustomFunction }
 destructor TMeScriptCustomFunction.Destroy;
 begin
@@ -1170,6 +1173,7 @@ end;
 
 function TMeScriptCustomFunction.FindFunction(const aName: string; const SearchAttr: Boolean): PMeScriptCustomFunction;
 begin
+  Result := nil;
   if Assigned(Prototype) then
   begin
     PMeScriptValue(Result) := Prototype.Values[aName];
@@ -1177,8 +1181,9 @@ begin
     begin
       if (PMeScriptValue(Result).TypeKind = mtkFunction) then
         Result := PMeScriptValue(Result).Value.VFunc
+    end;
   end;
-  if not Result then
+  if not Assigned(Result) then
     Result := Inherited FindFunction(aName, SearchAttr);
 end;
 
@@ -1195,6 +1200,19 @@ begin
   if not Assigned(aParams) then //the internal calling
   begin
     FGlobalFunction._PC.Arguments := GenerateArgumentsObject(FGlobalFunction);
+  end;
+end;
+
+procedure TMeScriptCustomFunction.RegisterFunction(const aName: string; const aFunc: TMeScriptInternalFunctionType);
+var
+  vFunc: PMeScriptInternalFunction;
+begin
+  if (aName <> '') and Assigned(aFunc) then
+  begin
+    New(vFunc, Create);
+    vFunc.Name := aName;
+    vFunc.Func := aFunc;
+    Functions.Add(vFunc);
   end;
 end;
 
@@ -1228,7 +1246,7 @@ begin
 	//search local variables
   for Result := 0 to Arguments.Count - 1 do
   begin
-    if FArguments[Result] = aName then exit;
+    if FArguments.Items[Result] = aName then exit;
   end;
   //search parent local variables
   Result := -1;
@@ -1240,7 +1258,7 @@ begin
       Inc(aStackIndex);
       for Result := 0 to Arguments.Count - 1 do
       begin
-        if FArguments[Result] = aName then exit;
+        if FArguments.Items[Result] = aName then exit;
       end;
       Result := -1;
     end;
@@ -1253,7 +1271,7 @@ var
   vStackIndex: Integer;
 begin
   vStackIndex := 0;
-  Integer(Result) := FindArgument(CurrentToken.Token, vStackIndex);
+  Result := Boolean(FindArgument(aTokenizer.CurrentToken.Token, vStackIndex));
   if Integer(Result) >= 0 then
   begin
     if vStackIndex = 0 then
@@ -1284,7 +1302,7 @@ begin
   with aTokenizer^ do
   begin
     vToken := ReadToken;
-    Result := Assigned(vToken) and vToken.TokenId = Ord(ttToken);
+    Result := Assigned(vToken) and (vToken.TokenId = Ord(ttToken));
     if not Result then
     begin
       Errors.Add(vToken, cMeTokenErrorMissedToken, 'function name missed ');
@@ -1293,7 +1311,7 @@ begin
     //the function name.
     Name := vToken.Token;
     vToken := ReadToken;
-    Result := Assigned(vToken) and vToken.TokenId = Ord(ttArgsBegin);
+    Result := Assigned(vToken) and (vToken.TokenId = Ord(ttArgsBegin));
     if not Result then
     begin
       Errors.Add(vToken, cMeTokenErrorMissedToken, vName + ' function ArgsBegin missed ');
@@ -1304,7 +1322,7 @@ begin
     vToken := ReadToken;
     while Result and Assigned(vToken) and (vToken.TokenId <> Ord(ttArgsEnd)) do
     begin
-      Result := Assigned(vToken) and vToken.TokenId = Ord(ttToken);
+      Result := Assigned(vToken) and (vToken.TokenId = Ord(ttToken));
       if not Result then
       begin
         Errors.Add(vToken, cMeTokenErrorMissedToken, vName + ' function arguments missed ');
@@ -1313,7 +1331,7 @@ begin
       vName := vToken.Token;
 
       //the argument type. not used yet.
-      if Assigned(NextToken) and (NextToken.TokenId = Ord(ttVarTypeSpliter)) then
+      if Assigned(NextToken()) and (NextToken()^.TokenId = ttVarTypeSpliter) then
       begin
         vToken := ReadToken; //Skip ttVarTypeSpliter.
         vToken := ReadToken;
@@ -1332,19 +1350,6 @@ begin
       end;
       vToken := ReadToken;
     end; //while
-  end;
-end;
-
-procedure TMeScriptFunction.RegisterFunction(const aName: string; const aFunc: TMeScriptInternalFunctionType);
-var
-  vFunc: PMeScriptInternalFunction;
-begin
-  if (aName <> '') and Assigned(aFunc) then
-  begin
-    New(vFunc, Create);
-    vFunc.Name := aName;
-    vFunc.Func := aFunc;
-    Functions.Add(vFunc);
   end;
 end;
 
@@ -1443,6 +1448,7 @@ begin
   SetLength(FReturnStack, cMeScriptMaxReturnStackSize);
   //SetLength(FArgumentsStack, cMeScriptMaxReturnStackSize);
   FDataStack.Count := cMeScriptMaxDataStackSize;
+  FillListIn(FDataStack^, 0, cMeScriptMaxDataStackSize, 0);
   FGlobalFunction := @Self;
 end;
 
