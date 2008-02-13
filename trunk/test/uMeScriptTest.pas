@@ -21,7 +21,7 @@ uses
   , uMeObject
   , uMeStrUtils
   , uMeTokenizer
-  , uMeScriptConst
+  , uMeScriptConsts
   , uMeScript
   ;
 
