@@ -365,7 +365,7 @@ type
     FIsPacked: Boolean;
   protected
     //to generate new VMT for it.
-    class function ParentClassAddress: TMeClass;virtual;abstract;
+    //class function ParentClassAddress: TMeClass;virtual;abstract;
     //get the structured type real size(bytes)
     //function GetSize: Cardinal; virtual; abstract;
   protected
