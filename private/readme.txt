@@ -28,7 +28,7 @@ Properties:
   Property StartupTime: TDateTime;
   Property Host: PMeServiceHost;
 Methods:
-  Class Method GetFunctionList(const aList: PFunctionList);
+  //Class Method GetFunctionList(const aList: PFunctionList); //I can use the Query Service to do so.
 
 IMeServiceInfo -- the service type info.
   Property Name: string    
