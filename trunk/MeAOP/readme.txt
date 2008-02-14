@@ -161,7 +161,7 @@ the general features for AOP:
 || * Transactions             ||
 || * Remote Method Calling    ||
 
-== MeAOP: My AOP For Delphi Frame ==
+== MeAOP: AOP For Delphi Frame ==
 the MeAOP For Delphi Frame is base on the code injection. heavy hack to delphi, patch the binary codes to implement the interception of the method. 
 I do not like the implementation of the dynamic proxy. It's performance is very low, inject the code directly is the fastest and the best solver.
 The MeAOP is the simple, effective and easy to use enough.
@@ -521,7 +521,7 @@ Note[0.5.0.0]:
 
 
 === MeAOP Download ===
-Current Version: 0.8.0.0
+Current Version: 1.0.0.0
 
-http://www.mesdk.com/download.htm
+http://code.google.com/p/meaop/downloads/list
 
