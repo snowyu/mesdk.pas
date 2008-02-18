@@ -1,11 +1,17 @@
 = MeRemote Layer: =
 
 == MeTransport ==
-  MeStreamFormat -- Streamable the types.
+  MeStreamFormater -- convert the atreamable the types to any format.
 MeTransportClasses -- manage the registered transport classes
 
-== MeRemoteInvocation ==
-MeRemoteInvocation
+TODO: transport object define.
+the transport object will transfer the type data from here to there.
+the transport can wrap(wrap links) the data before transfering, and unwrap it after transfered.
+1.Compress;2.Encrypt;3.Data Format
+
+
+== MeRemoteInvoker ==
+MeRemoteInvoker
   MeRemoteObject
 
 TRemoteObject: 属性和方法都是远程
@@ -19,11 +25,6 @@ TRemoteInvokerFeature: 注入后的类的某些约定的抽象方法获得远程执行的能力。Singlet
 Class Specifiction:
  * the abstract published methods in the aClass are the remote invoke methods.
 
-TODO: transport object define.
-the transport object will transfer the data from here to there.
-the transport can wrap(wrap links) the data before transfering, and unwrap it after transfered.
-1.Compress;2.Encrypt;3.Data Format
-
 TRemoteObjectFeature = Class(TRemoteInvokerFeature)
 
 Class Specifiction:
@@ -36,8 +37,9 @@ Class Specifiction:
 
 = MeService Layer =
 MeService -- interfaced object for others
- collects the public functions provides to others.
+ collects the public functions and events(messages) provides to others.
 Properties:
+  //## ServiceInfo: 
   //Service Name
   Class Property Name: string    
   //Service Author
@@ -55,7 +57,7 @@ Properties:
 Methods:
   //Class Method GetFunctionList(const aList: PFunctionList); //I can use the Query Service to do so.
 
-IMeServiceInfo -- the service type info.
+TMeServiceInfo -- the service type info: the basic service information and manage the instances of the service
   Property Name: string    
   Property Author: string  
   Property Enabled: Boolean;
@@ -64,13 +66,13 @@ IMeServiceInfo -- the service type info.
   Property MaxIdleTime: Integer;
   Property Instances: IMeServiceList;
   Method CreateService: IMeService;
-IMeService -- interface only.
+TMeService -- //all published functions are service functions.
   //the service instance startup time.
   Property StartupTime: TDateTime;
   Property Host: IMeServiceHost;
   Property Info: IMeServiceInfo;
 
-MeServiceClasses -- manage the registered service classes
+TMeRegisteredServices -- manage the registered service classes
 
   MeServiceHost -- host the services here.
   //the host is about shutting down 
@@ -84,7 +86,7 @@ MeServices  -- manage the service instances.
   MeServicePool
 
 The MeService Library is a general service system framework.
- * TMeServiceMgr: the service list, manage the service.
+ * TMeServiceMgr(TMeRegisteredServices): the service list, manage the service.
    the TMeServiceMgr mediates the communication between services. the services and events are registered to TMeServiceMgr.
  * TMeService: 
    * TMeServiceFunction:
