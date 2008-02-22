@@ -8,6 +8,13 @@ TODO: transport object define.
 the transport object will transfer the type data from here to there.
 the transport can wrap(wrap links) the data before transfering, and unwrap it after transfered.
 1.Compress;2.Encrypt;3.Data Format
+消息：出版消息(publisher)，订阅消息(subscriber)
+    消息 = MSG.ServiceName.Subject (非强制的，可以存在跨Service的消息)
+      第一部分为消息的类型，
+      出版者：某Service +  刊号： Subject,允许子刊，用"."分隔。
+      订阅者列表：
+      内容：
+    对于远程服务而言，消息这一部分可以被放到transport中。完全和Service分离。
 
 
 == MeRemoteInvoker ==
@@ -55,7 +62,7 @@ Properties:
   Property StartupTime: TDateTime;
   Property Host: PMeServiceHost;
 Methods:
-  //Class Method GetFunctionList(const aList: PFunctionList); //I can use the Query Service to do so.
+  //Class Method GetFunctionList(const aList: PFunctionList); //I can use the Inventory Service to do so.
 
 TMeServiceInfo -- the service type info: the basic service information and manage the instances of the service
   Property Name: string    
@@ -89,8 +96,33 @@ The MeService Library is a general service system framework.
  * TMeServiceMgr(TMeRegisteredServices): the service list, manage the service.
    the TMeServiceMgr mediates the communication between services. the services and events are registered to TMeServiceMgr.
  * TMeService: 
-   * TMeServiceFunction:
-   * TMeServiceEvent:
+
+在本地 Service中 TMeServiceFunction 就是 Exported DLL 函数，需要定义的就是 Events。
+如果是在Delphi中通过Published方法就可以不必暴露函数，那么其它语言怎么办，对于其它语言可以通过接口：只要它获得service的接口规格即可。
+Event：
+Keypoint：
+  Spec:
+    只要是出版的方法都为 ServiceFunctions?
+    属性： 
+      出版的事件属性为 Service 事件。注意事件属性必须以"On"打头: OnChangedEvent: TServiceEvent; [只在本地服务中实现]
+        加载后由CoreService维护订阅者。
+      在本地服务中，不用实现这么复杂的消息机制。就事件机制足够。
+可不可以用纯 MeObject来实现MeService，然后在运行时刻动态创建和生成接口？应该是可行的。
+不过如果全部用 MeObject，那么Published就用不上了。 only depend the CoreService
+
+One Host can include mnay services.
+CoreService: this service must have in the host. its functionality are:
+  RegisterFunction();
+
+CoreLocalService
+  RegisterEvent()
+  Subscribe/UnSubscribe Event
+
+InventoryService: Informs clients about which services and functionality is available.
+ * List all services
+ * list all functions of a service 
+ * list all messages of a service
 
 MeRemoteService
 
+CoreRemoteService
