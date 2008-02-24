@@ -112,7 +112,8 @@ Keypoint£º
 
 One Host can include mnay services.
 CoreService: this service must have in the host. its functionality are:
-  RegisterFunction();
+  iRegisterFunction(const aProc: Pointer; const aProcType: PMeProcType); //only for delphi
+  RegisterFunction(const aProc: Pointer; const aProcDesc: PChar); stdcall; //for all other language
 
 CoreLocalService
   RegisterEvent()
