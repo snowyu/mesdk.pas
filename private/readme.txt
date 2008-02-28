@@ -150,7 +150,7 @@ MTAddr:
   Adjust Self paramater directive
 JMP XXXX
 ...
-83442404F0 add dword ptr [esp+4], -$10
+83442404F0 add dword ptr [esp+4], -$10 //调整Self参数指针的位置，在Delphi中为 - 实例记录长度 - 4。
 JMP TInterfacedObject.QueryInterface
 83442404F0 add dword ptr [esp+4], -$10
 JMP TInterfacedObject._AddRef
