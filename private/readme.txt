@@ -139,7 +139,8 @@ CoreRemoteService
 
 
 
-
+{$M+ TypeInfo ON}  
+{$MethodInfo ON} : 使得某类的Public的方法变成Published的方法，并且公开其方法的参数信息。
 
 Interface instance variable:
 [VMTAddr]  the records...  [MTAddr]
