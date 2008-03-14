@@ -456,6 +456,11 @@ function GetPublishedMethodEntry(MethodTable: PPublishedMethodTable; Index: Inte
 function GetFirstPublishedMethodEntry(aClass: TClass): PPublishedMethodEntry;
 function GetNextPublishedMethodEntry(aClass: TClass; PublishedMethodEntry: PPublishedMethodEntry): PPublishedMethodEntry;
 
+type
+  //Return true to stop Enumerating.
+  TGetPublishedMethodItemProc = function (const aItem: PPublishedMethodEntry): Boolean;
+procedure EnumeratePublishedMethods(const aClass: TClass; const DoItemProc: TGetPublishedMethodItemProc);
+
 {
 Note:
 TObject already contains methods to perform published method lookups using MethodAddress and MethodName. it will search on the parant class too.
@@ -822,6 +827,22 @@ begin
   if Assigned(Pmt)
   then Result := Pmt.Count
   else Result := 0;
+end;
+
+procedure EnumeratePublishedMethods(const aClass: TClass; const DoItemProc: TGetPublishedMethodItemProc);
+var
+  i: integer;
+  vItem: PPublishedMethodEntry;
+begin
+  if Assigned(aClass) and Assigned(DoItemProc) then
+  begin
+    vItem := GetFirstPublishedMethodEntry(aClass);
+    for i := 0 to GetPublishedMethodCount(aClass)-1 do
+    begin
+      if DoItemProc(vItem) then exit;
+      vItem := GetNextPublishedMethodEntry(aClass, vItem);
+    end;
+  end;
 end;
 
 function GetFirstPublishedMethodEntry(aClass: TClass): PPublishedMethodEntry;
