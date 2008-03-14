@@ -142,8 +142,6 @@ type
       the expression:
 
       Size :=  SizeOf(Size) + SizeOf(Address) + SizeOf(Name[0]) + Length(Name);
-      
-      
     }
     Size: word;  
     Address: Pointer;
