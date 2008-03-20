@@ -28,6 +28,15 @@ ResourceString
   rsFeatureNotSupportedError = '[%s] feature is not supported.';
 
 type
+  TSEScriptState = ( ssUncompiled,    // The script has yet to be compiled.
+                     ssCompileErrors, // Errors occurred while compiling.
+                     ssCompiled,      // The script has been compiled and is
+                                      // ready to be executed/started.
+                     ssRunningErrors, // Errors occured while the script was
+                                      // running.
+                     ssRunning );     // The script is currently active and
+                                      // is running without error.
+
   { Summary the script engine error type }
   TSEErrorType = (etNone, etHint, etWarning, etError);
   { Summary the script engine supported languages. }
@@ -114,7 +123,9 @@ type
     //procedure SetLanguage(const Value: TSEScriptLanguage); virtual;
     procedure SetPaused(const Value: Boolean); virtual; abstract;
     //procedure SetSourceCode(const Value: TStrings); virtual; abstract;
+    function GetState: TSEScriptState; virtual; abstract;
   public
+    destructor Destroy; override;
     { Summary Compile the script }
     //function Compile(const aScript: String = ''; const CanDebug: Boolean =
     //        False): Boolean;
@@ -157,11 +168,11 @@ type
     //property ScriptExec: IScriptExec read FScriptExec write SetScriptExec;
     //property SourceCode: TStrings read GetSourceCode write SetSourceCode;
     property SupportedFeatures: TSESupportedFeatures read GetSupportedFeatures;
+    property State : TSEScriptState read GetState;
     { Summary The compiled code: virtual machine code. }
     //property VMCode: String read GetVMCode;
     //property BreakPoint[Index: Integer]: TSEBreakPoint read GetBreakPoint write
     //        SetBreakPoint;
-    destructor Destroy; override;
   end;
 
 
@@ -228,19 +239,22 @@ function TCustomScriptEngineAdapter.Compile: Boolean;
 begin
   if Assigned(FCompilerSection) then
     FCompilerSection.Acquire;
-  if FScript=nil then
-    Result:=false
-  else if not FScript.Compiled then
-    Result:=InternalCompile
-  else
-    Result:=true;
-  if Assigned(FCompilerSection) then
-    FCompilerSection.Release;
+  try
+    if FScript=nil then
+      Result:=false
+    else if not FScript.Compiled then
+      Result:=InternalCompile
+    else
+      Result:=true;
+  finally
+    if Assigned(FCompilerSection) then
+      FCompilerSection.Release;
+  end;
 end;                                              
 
 destructor TCustomScriptEngineAdapter.Destroy;
 begin
-  FCompilerSection.Free;
+  FreeAndNil(FCompilerSection);
   inherited;
 end;
 
