@@ -87,6 +87,7 @@ uses
   , uMeFeature
   {$ENDIF}
   , uMeScriptTest
+  , uMeURITest
   ;
 
 

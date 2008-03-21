@@ -520,23 +520,28 @@ begin
       LURI := Copy(LURI, 1, LTokenPos - 1);
     end;
     // Get the user name, password, host and the port number
-    LTokenPos := RPos('/', LURI);
+    LBuffer := LURI;
+    while (Length(LBuffer) > 0) and (LBuffer[1] = '/') do
+      Delete(LBuffer, 1, 1);
+    LTokenPos := RPos('/', LBuffer);
     if LTokenPos > 0 then
     begin
-      LBuffer := Copy(LURI, 1, LTokenPos-1);
+      LBuffer := Copy(LBuffer, 1, LTokenPos-1);
+      LTokenPos := RPos('/', LURI);
       LURI := Copy(LURI, LTokenPos+1, MaxInt);
-      while (Length(LBuffer) > 0) and (LBuffer[1] = '/') do
-        Delete(LBuffer, 1, 1);
-    end
-    else
-      LBuffer := '';
+      LBuffer := StrFetch(LBuffer, '/', False);    {Do not Localize}
+    end;
     //LBuffer := StrFetch(LURI, '/', True);    {Do not Localize}
     // Get username and password
     LTokenPos := AnsiPos('@', LBuffer);    {Do not Localize}
     if LTokenPos > 0 then begin
-      FPassword := Copy(LBuffer, 1, LTokenPos  - 1);
+      FUsername := Copy(LBuffer, 1, LTokenPos  - 1);
       Delete(LBuffer, 1, LTokenPos);
-      FUserName := StrFetch(FPassword, ':');    {Do not Localize}
+      LTokenPos := AnsiPos(':', FUsername);    {Do not Localize}
+      if LTokenPos > 0 then begin
+        FPassword := Copy(FUsername, LTokenPos+1, MaxInt);
+        FUsername := Copy(FUsername, 1, LTokenPos-1);
+      end;
       // Ignore cases where there is only password (http://:password@host/pat/doc)
       if Length(FUserName) = 0 then begin
         FPassword := '';    {Do not Localize}
