@@ -419,6 +419,10 @@ type
     property Params: string read FParams write FParams;
     property Port: string read FPort write FPort;
     { Summary: the Scheme part}
+    { 
+    Components of all URIs: [<scheme>:]<scheme-specific-part>[#<fragment>]
+    null ==> relative URI
+    }
     property Protocol: string read FProtocol write FProtocol;
     property URI: string read GetURI write SetURI;
     property Username: string read FUserName write FUserName;
@@ -446,6 +450,7 @@ begin
   FBookmark := '';
   FPath := '';
   FUserName := '';
+  FDocument := '';
   inherited;
 end;
 
@@ -486,13 +491,25 @@ begin
   FParams := '';  {Do not localise}  //Peter Mee
   FIPVersion := ivIPv4;
 
-  LTokenPos := AnsiPos('://', LURI);    {Do not Localize}
+  // Parse the # bookmark from the document
+  LTokenPos := RPos('#', LURI);    {Do not Localize}
+  FBookmark := LURI;
+  LURI := StrFetch(FBookmark, '#');    {Do not Localize}
+
+  LTokenPos := AnsiPos(':', LURI);    {Do not Localize}
   if LTokenPos > 0 then begin
     // absolute URI
     // What to do when data don't match configuration ??    {Do not Localize}
     // Get the protocol
     FProtocol := Copy(LURI, 1, LTokenPos  - 1);
-    Delete(LURI, 1, LTokenPos + 2);
+    Delete(LURI, 1, LTokenPos);
+    {if (Length(LURI) >=2) and (LURI[1] = '/') and (LURI[2] = '/') then
+    begin
+      //it's a URL
+      Delete(LURI, 1, 2);
+    end;
+    //else //it is a URN}
+
     // separate the path from the parameters
     LTokenPos := AnsiPos('?', LURI);    {Do not Localize}
     if LTokenPos = 0 then begin
@@ -503,13 +520,23 @@ begin
       LURI := Copy(LURI, 1, LTokenPos - 1);
     end;
     // Get the user name, password, host and the port number
-    LBuffer := Fetch(LURI, '/', True);    {Do not Localize}
+    LTokenPos := RPos('/', LURI);
+    if LTokenPos > 0 then
+    begin
+      LBuffer := Copy(LURI, 1, LTokenPos-1);
+      LURI := Copy(LURI, LTokenPos+1, MaxInt);
+      while (Length(LBuffer) > 0) and (LBuffer[1] = '/') do
+        Delete(LBuffer, 1, 1);
+    end
+    else
+      LBuffer := '';
+    //LBuffer := StrFetch(LURI, '/', True);    {Do not Localize}
     // Get username and password
     LTokenPos := AnsiPos('@', LBuffer);    {Do not Localize}
     if LTokenPos > 0 then begin
       FPassword := Copy(LBuffer, 1, LTokenPos  - 1);
       Delete(LBuffer, 1, LTokenPos);
-      FUserName := Fetch(FPassword, ':');    {Do not Localize}
+      FUserName := StrFetch(FPassword, ':');    {Do not Localize}
       // Ignore cases where there is only password (http://:password@host/pat/doc)
       if Length(FUserName) = 0 then begin
         FPassword := '';    {Do not Localize}
@@ -518,12 +545,12 @@ begin
     // Get the host and the port number
     if (AnsiPos('[', LBuffer) > 0) and (AnsiPos(']', LBuffer) > AnsiPos('[', LBuffer)) then begin {Do not Localize}
       //This is for IPv6 Hosts
-      FHost := Fetch(LBuffer, ']'); {Do not Localize}
-      Fetch(FHost, '['); {Do not Localize}
-      Fetch(LBuffer, ':'); {Do not Localize}
+      FHost := StrFetch(LBuffer, ']'); {Do not Localize}
+      StrFetch(FHost, '['); {Do not Localize}
+      StrFetch(LBuffer, ':'); {Do not Localize}
       FIPVersion := ivIPv6;
     end else begin
-      FHost := Fetch(LBuffer, ':', True);    {Do not Localize}
+      FHost := StrFetch(LBuffer, ':', True);    {Do not Localize}
     end;
     FPort := LBuffer;
     // Get the path
@@ -553,9 +580,6 @@ begin
   end;
   // Get the document
   FDocument := LURI;
-  // Parse the # bookmark from the document
-  FBookmark := FDocument;
-  FDocument := Fetch(FBookmark, '#');    {Do not Localize}
 end;
 
 function TMeURI.GetURI: String;
