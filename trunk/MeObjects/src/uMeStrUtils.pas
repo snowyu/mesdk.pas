@@ -200,7 +200,7 @@ function PathIsAbsolute(const Path: string): Boolean;
 }
 function StrTrim(const aText: string; const IgnoreCase: boolean = False; const IgnoreBlanks: boolean = False): string;
 
-function StrToken(var S: string; Separator: Char): string;
+function Fetch(var S: string; const aDelim: string; const aDelete: Boolean = True): string;
 
 function StrToHex(const Source: string): string;
 procedure StrToStrings(S, Sep: string; const List: PMeStrings; const AllowEmptyString: Boolean = True);
@@ -209,7 +209,10 @@ function StrFind(const Substr, S: string; const Index: Integer = 1): Integer;
 function StrSearch(const Substr, S: string; const Index: Integer = 1): Integer;
 //StrMatches: *, ? matches
 function StrMatches(const Substr, S: AnsiString; const Index: Integer = 1): Boolean;
-function LeftPos(const SubStr, S: string): Integer;
+//Pos from right
+function RPos(const SubStr, S: string): Integer;
+{This searches an array of string for an occurance of SearchStr}
+function PosInStrArray(const SearchStr: string; const Contents: array of string; const CaseSensitive: Boolean = True): Integer;
 
 //convert the '#10' or '#$FF' to Chr(10) or Chr($FF);
 function StrDelphiUnEscape(const S: string): string;
@@ -224,6 +227,7 @@ function StrMid(const S: string; Start, Count: Integer): string;
 function StrRestOf(const S: string; N: Integer): string;
 function StrRight(const S: string; Count: Integer): string;
 
+function TextIsSame(const A1, A2: string): Boolean;
 
 // Character Transformation Routines
 function CharHex(const C: Char): Byte;
@@ -235,6 +239,11 @@ function CharIsUpper(const C: Char): Boolean; {$IFDEF CLR} inline; {$ENDIF}
 function CharIsLower(const C: Char): Boolean; {$IFDEF CLR} inline; {$ENDIF}
 function CharIsDigit(const C: Char): Boolean; {$IFDEF CLR} inline; {$ENDIF}
 function CharIsNumberChar(const C: Char): Boolean; {$IFDEF CLR} inline; {$ENDIF}
+function CharPosInSet(const AString: string; const ACharPos: Integer; const ASet: String): Integer;{$IFDEF CLR} inline; {$ENDIF}
+function CharIsInSet(const AString: string; const ACharPos: Integer; const ASet:  String): Boolean;{$IFDEF CLR} inline; {$ENDIF}
+function CharIsInEOL(const AString: string; const ACharPos: Integer): Boolean;{$IFDEF CLR} inline; {$ENDIF}
+function IsLeadChar(ACh : Char):Boolean;
+function CharRange(const AMin, AMax : Char): String;
 
 // String Test Routines
 function StrIsInteger(const S: string): Boolean;
@@ -359,7 +368,7 @@ begin
 end;
 {$ENDIF}
 
-function LeftPos(const SubStr, S: string): Integer;
+function RPos(const SubStr, S: string): Integer;
 begin
   Result := Length(S) - Length(SubStr)+1;
   while Result > 0 do
@@ -420,20 +429,22 @@ begin
   end;
 end;
 
-function StrToken(var S: string; Separator: Char): string;
+function Fetch(var S: string; const aDelim: string; const aDelete: Boolean): string;
 var
   I: Integer;
 begin
-  I := Pos(Separator, S);
+  I := AnsiPos(aDelim, S);
   if I <> 0 then
   begin
     Result := Copy(S, 1, I - 1);
-    Delete(S, 1, I);
+    if aDelete then
+      Delete(S, 1, I);
   end
   else
   begin
     Result := S;
-    S := '';
+    if aDelete then
+      S := '';
   end;
 end;
 
@@ -1142,7 +1153,7 @@ function ExtractFileBaseName(const aFileName: string): string;
 var
   i: integer;
 begin
-  i := LeftPos('.', aFileName);
+  i := RPos('.', aFileName);
   if i <= 0 then i := Length(aFileName);
   Result := Copy(aFileName, 1, i-1);
 end;
@@ -1530,6 +1541,80 @@ begin
   Result := TextToFloat(PChar(S), Value, fvCurrency);
 end;
 {$ENDIF COMPILER5}
+
+function TextIsSame(const A1, A2: string): Boolean;
+begin
+  {$IFDEF DOTNET}
+  Result := System.String.Compare(A1, A2, True) = 0;
+  {$ELSE}
+  Result := AnsiCompareText(A1, A2) = 0;
+  {$ENDIF}
+end;
+
+{This searches an array of string for an occurance of SearchStr}
+function PosInStrArray(const SearchStr: string; const Contents: array of string; const CaseSensitive: Boolean = True): Integer;
+begin
+  for Result := Low(Contents) to High(Contents) do begin
+    if CaseSensitive then begin
+      if SearchStr = Contents[Result] then begin
+        Exit;
+      end;
+    end else begin
+      if TextIsSame(SearchStr, Contents[Result]) then begin
+        Exit;
+      end;
+    end;
+  end;
+  Result := -1;
+end;
+
+function CharPosInSet(const AString: string; const ACharPos: Integer; const ASet: String): Integer;
+begin
+  if ACharPos <= Length(AString) then begin
+    Result := AnsiPos(AString[ACharPos], ASet);
+  end else begin
+    Result := 0;
+  end;
+end;
+
+function CharIsInSet(const AString: string; const ACharPos: Integer; const ASet:  String): Boolean;
+begin
+  Result := CharPosInSet(AString, ACharPos, ASet) > 0;
+end;
+
+function CharIsInEOL(const AString: string; const ACharPos: Integer): Boolean;
+begin
+  Result := CharIsInSet(AString, ACharPos, AnsiCrLf);
+end;
+
+function IsLeadChar(ACh : Char):Boolean;
+begin
+  {$IFDEF DOTNET}
+  Result := False;
+  {$ELSE}
+  Result := ACh in LeadBytes;
+  {$ENDIF}
+end;
+
+function CharRange(const AMin, AMax : Char): String;
+var
+  i : Char;
+{$IFDEF DOTNET}
+  LSB : System.Text.StringBuilder;
+begin
+  LSB := System.Text.StringBuilder.Create;
+  for i := AMin to AMax do begin
+    LSB.Append(i);
+  end;
+  Result := LSB.ToString;
+{$ELSE}
+begin
+  Result := '';
+  for i := AMin to AMax do begin
+    Result := Result + i;
+  end;
+{$ENDIF}
+end;
 
 initialization
   gAppPath := ExtractFilePath(ParamStr(0));
