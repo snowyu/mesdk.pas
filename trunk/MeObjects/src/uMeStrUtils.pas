@@ -201,6 +201,8 @@ function PathIsAbsolute(const Path: string): Boolean;
 function StrTrim(const aText: string; const IgnoreCase: boolean = False; const IgnoreBlanks: boolean = False): string;
 
 function StrFetch(var S: string; const aDelim: string; const aDelete: Boolean = True): string;
+//form right
+function StrRFetch(var S: string; const aDelim: string; const aDelete: Boolean = True): string;
 
 function StrToHex(const Source: string): string;
 procedure StrToStrings(S, Sep: string; const List: PMeStrings; const AllowEmptyString: Boolean = True);
@@ -439,7 +441,7 @@ begin
   else
     I := AnsiPos(aDelim, S);
 
-  if I <> 0 then
+  if I > 0 then
   begin
     Result := Copy(S, 1, I - 1);
     if aDelete then
@@ -450,9 +452,32 @@ begin
   end
   else
   begin
-    Result := S;
+    Result := '';
+    //if aDelete then
+      //S := '';
+  end;
+end;
+
+function StrRFetch(var S: string; const aDelim: string; const aDelete: Boolean): string;
+var
+  I: Integer;
+begin
+  I := RPos(aDelim, S);
+
+  if I > 0 then
+  begin
+    Result := Copy(S, 1, I - 1);
     if aDelete then
-      S := '';
+      //slower Delete(AInput, 1, LPos + Length(ADelim) - 1); because the
+      //remaining part is larger than the deleted
+      //Delete(S, 1, I + Length(aDelim)-1);
+      S := Copy(S, I + Length(aDelim), MaxInt);
+  end
+  else
+  begin
+    Result := '';
+    //if aDelete then
+      //S := '';
   end;
 end;
 
