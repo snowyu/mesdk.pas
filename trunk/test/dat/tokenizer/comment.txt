@@ -28,6 +28,8 @@ Coment 中话 2323
 31,21,ttComment,3,1,5,2, haha#13#10Food eat#13#10
 54,22,ttString,6,1,8,1,字符串#13#10d中'dd'#13#10
 78,14,ttString,9,1,9,14,d中Vdc"dd"
+92,2, ttToken,10,1,10,2
+94,1,ttSpliter,10,3,10,4
 [src]
 //Coment 中话 2323
 bbb 好的
@@ -38,3 +40,4 @@ Food eat
 d\中\'dd\'
 '
 "d中Vdc""dd"""
+da;

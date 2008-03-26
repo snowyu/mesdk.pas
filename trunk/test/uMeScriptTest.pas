@@ -57,9 +57,15 @@ begin
 end;
 
 procedure TTest_MeScript.Test_Compile();
+var
+  c: PChar;
 begin
-  FScript.Parser('aaa();');
-  //CheckEquals(aExcept.Size, aFact.Size, aExcept.Token+ ' the Token Size is error.');
+  FScript.Parser('{aaa();}');
+  c := FScript.Body.Memory;
+  CheckEquals(Ord(opPush), Ord(c^), ' the OpCode opPush error.');
+  Inc(c);
+  CheckEquals(0, PInteger(c)^, ' the ParamCount error.');
+  
 end;
 
 Initialization
