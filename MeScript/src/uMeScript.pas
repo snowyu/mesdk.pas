@@ -1018,6 +1018,7 @@ begin
       case vToken.TokenId of
         Ord(ttToken): //it should be a function name or var|attribute name.
           begin
+          writeln(vToken.Token);
             vNextToken := NextToken;
             case vNextToken.TokenId of
               ttArgsBegin:  //it's a Function-Ref

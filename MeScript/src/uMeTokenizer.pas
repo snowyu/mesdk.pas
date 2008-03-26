@@ -161,7 +161,7 @@ type
     TokenType: TMeTokenType;
     //note: the 0-31 is preserved for system
     TokenId: Integer;
-    //the Token should be not empty.
+    //the Token should not be empty.
     Token: TMeTokenString;
   end;
 
@@ -188,6 +188,7 @@ type
     procedure Add(const aTokenId: TMeCustomTokenType; const aTokenName: string);overload;
     {$ENDIF}
     procedure AddStandardToken(const aTokenId: TMeCustomTokenType; const aTokenName: string);
+    function IsSimpleToken(const aToken: PChar): Boolean;
   public
     property Items[const Index: Integer]: PMeSimpleTokenType read GetItem; default;
   end;
@@ -452,6 +453,38 @@ end;
 function TMeSimpleTokenTypes.GetItem(const Index: Integer): PMeSimpleTokenType;
 begin
   Result := Inherited Get(Index);
+end;
+
+function IsSameTokenStr(aToken: PChar; const s: string): Boolean;
+var
+  i: Integer;
+begin
+  Result := False;
+  for i := 1 to Length(s) do
+  begin
+    if (aToken = #0) then exit;
+    Result := aToken^ = s[i];
+     //writeln('  ', aToken,':',s[i],':',Result);
+    if not Result then exit;
+    Inc(aToken);
+  end;
+end;
+
+function TMeSimpleTokenTypes.IsSimpleToken(const aToken: PChar): Boolean;
+var
+  i: Integer;
+begin
+  for i := 0 to Count - 1 do
+  begin
+    with Items[i]^ do 
+    //if TokenId = Ord(aTokenId) then
+    begin
+      Result := IsSameTokenStr(aToken, Token);
+      //writeln(aToken,':',Token,':',Result);
+      if Result then exit;
+    end;
+  end;
+  Result := False;
 end;
 
 { TMeComplexTokenTypes }
@@ -854,7 +887,7 @@ NextTk:
       Inc(vPChar);
       Inc(aToken.ColEnd);
 
-      if (vPChar^ in cMeControlCharset) or (vPChar^ in FBlankChars) then
+      if SimpleTokens.IsSimpleToken(vPChar) or (vPChar^ in cMeControlCharset) or (vPChar^ in FBlankChars) then
       begin
         vFound := True;
       end;
