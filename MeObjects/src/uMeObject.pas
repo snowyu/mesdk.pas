@@ -39,6 +39,16 @@ example
     end;
   </code>
 
+About the Property of object:
+  you can use the Property(not method property) in the static record object.
+  but you CAN NOT USE the Get/Set method on the property for the static record object
+  the compiler always treat it is VMT object, so the Self parameter is not correct.
+    property XXX: TXXX  read GetXXX write SetXXX;
+  
+  you can use the Property(include method property) totally in the dynamic object(TMeDynamicObject).
+  (the VMT record must be filled first!!)
+
+
 需要废弃Exception Class 使用自己的 MeExceptionObject??
 No, use the EMeError instead of create new Exception Class.
 All Object use the EMeError class only!
