@@ -1102,7 +1102,6 @@ function TMeTokenizer.ReadToken: PMeToken;
 begin
   if Assigned(FNextToken.Pos) then
   begin
-  writeln('ReadToken');
     FCurrentToken := FNextToken;
     FNextToken.Reset;
     Assert(FNextToken.Pos=nil);
