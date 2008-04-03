@@ -682,7 +682,7 @@ begin
     end;
   end;
 
-  Result := PMeScriptCustomFunction(FFunctions.Find(aName));
+  Result := PMeScriptCustomFunction(Functions.Find(aName));
   vParent := Parent;
   while (Result = nil) and (vParent <> nil) do
   begin
@@ -783,6 +783,7 @@ begin
         while Assigned(vToken) and Result do
         begin
           vToken := ReadToken();
+          if Assigned(vToken) then
           case vToken.TokenId of
             Ord(ttToken):
               begin
@@ -1019,7 +1020,8 @@ begin
         Ord(ttToken): //it should be a function name or var|attribute name.
           begin
             vNextToken := NextToken;
-            writeln('iParser:',vToken.Token, ',N:', vNextToken.Token, ' ',vNextToken.TokenId);
+            if Assigned(vNextToken) then
+            //writeln('iParser:',vToken.Token, ',N:', vNextToken.Token, ' ',vNextToken.TokenId);
             case vNextToken.TokenId of
               ttArgsBegin:  //it's a Function-Ref
                 begin
@@ -1451,6 +1453,7 @@ begin
   FDataStack.Count := cMeScriptMaxDataStackSize;
   FillListIn(FDataStack^, 0, cMeScriptMaxDataStackSize, 0);
   FGlobalFunction := @Self;
+    _this := nil;
 end;
 
 procedure TMeScriptGlobalFunction.iExecute();
