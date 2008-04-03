@@ -389,16 +389,27 @@ procedure TTest_MeTokenizer.WalkThroughReadToken;
 var
   vToken: PMeToken;
   vItem: PMeToken;
+  vNext: TMeToken;
   i: Integer;
 begin
   i := 0;
   FFactTokens.Clear;
   with PMeScriptTokenizer(FTokenizer)^ do
   begin
+    vNext.Pos := nil;
     repeat
       vToken := ReadToken();
       if Assigned(vToken) then
       begin
+        if Assigned(vNext.Pos) then
+          CheckToken(vToken^, vNext);
+        vItem := NextToken;
+        if Assigned(vItem) then
+        begin
+          vNext := vItem^;
+        end
+        else
+          vNext.Pos := nil;
         {$IFDEF Debug_WriteToConsole_Support}
         Status(TokenString(vToken^));
         {$ENDIF}
