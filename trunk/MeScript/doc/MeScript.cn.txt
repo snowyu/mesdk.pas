@@ -232,3 +232,5 @@ CarProtoTypeObject.Ctor -> Car()
     , opDeclareVar//  opDeclareVar:  decalre a local variable. allocate the space for variable.
 
 
+Todo:
+!* [Bug] found bug in NextToken.
