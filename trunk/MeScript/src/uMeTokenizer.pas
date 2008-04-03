@@ -1083,8 +1083,15 @@ begin
 end;
 
 function TMeTokenizer.NextToken: PMeToken;
+//var
+  //vToken: TMeToken;
 begin
-  if not Assigned(FNextToken.Pos) then ConsumeToken(FNextToken);
+  if not Assigned(FNextToken.Pos) then
+  begin
+    FNextToken := FCurrentToken;
+    ConsumeToken(FNextToken);
+    //FNextToken := vToken;
+  end;
   if Assigned(FNextToken.Pos) then
     Result := @FNextToken
   else
@@ -1095,8 +1102,10 @@ function TMeTokenizer.ReadToken: PMeToken;
 begin
   if Assigned(FNextToken.Pos) then
   begin
+  writeln('ReadToken');
     FCurrentToken := FNextToken;
     FNextToken.Reset;
+    Assert(FNextToken.Pos=nil);
   end
   else
     ConsumeToken(FCurrentToken);
