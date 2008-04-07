@@ -200,8 +200,9 @@ function PathIsAbsolute(const Path: string): Boolean;
 }
 function StrTrim(const aText: string; const IgnoreCase: boolean = False; const IgnoreBlanks: boolean = False): string;
 
+//Fetch the left string until aDelim found.
 function StrFetch(var S: string; const aDelim: string; const aDelete: Boolean = True): string;
-//form right
+//Fetch the right string until aDelim found.
 function StrRFetch(var S: string; const aDelim: string; const aDelete: Boolean = True): string;
 
 function StrToHex(const Source: string): string;
