@@ -453,9 +453,9 @@ begin
   end
   else
   begin
-    Result := '';
-    //if aDelete then
-      //S := '';
+    Result := S;
+    if aDelete then
+      S := '';
   end;
 end;
 
@@ -476,9 +476,9 @@ begin
   end
   else
   begin
-    Result := '';
-    //if aDelete then
-      //S := '';
+    Result := S;
+    if aDelete then
+      S := '';
   end;
 end;
 
