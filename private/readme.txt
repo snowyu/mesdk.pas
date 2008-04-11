@@ -1,5 +1,12 @@
 = MeRemote Layer: =
 
+V1.0 Impl:
+  the Simplest MeTransport(Wrap a net lib)
+  MeRemoteInvoker for remote function
+  TMeRemoteFunction
+  
+  
+
 == MeTransport ==
   MeStreamFormater -- convert the atreamable the types to any format.
 MeTransportClasses -- manage the registered transport classes
@@ -21,8 +28,10 @@ the transport can wrap(wrap links) the data before transfering, and unwrap it af
 MeRemoteInvoker
   MeRemoteObject
 
-TRemoteObject: 属性和方法都是远程
-TRemoteObject  抽象的目的是为了保证远程属性的处理。需要做一些约定，比如所有以"R"打头的出版属性并且必须有设置属性的方法。
+TMeRemoteFunction: 汇集远程函数调用，所有的远程函数为出版的纯虚类方法
+
+TMeRemoteObject: 属性和方法都是远程
+TMeRemoteObject  抽象的目的是为了保证远程属性的处理。需要做一些约定，比如所有以"R"打头的出版属性并且必须有设置属性的方法。
 或者抽象的出版方法为远程方法，属性的写方法为抽象方法的为远程方法。如果这样就没有必要对远程对象从指定类上派生。
 
 TRemoteInvokerFeature: 注入后的类的某些约定的抽象方法获得远程执行的能力。Singleton.
