@@ -134,6 +134,43 @@ type
    {Entries: array [1..65534] of TFieldEntry;}
   end;
 
+  //Delphi (since version 7) supports extended RTTI on the methods of a class - by compiling the class with $METHODINFO ON defined. This RTTI includes the signature information of the public and published methods. Delphi uses this to implement scripting of Delphi code in the WebSnap framework - see ObjAuto and friends for the details.
+  TParamLocation = (plUnknown=-1, plEAX=0, plEDX=1, plECX=2, plStack1=3, plStackN=$FFFF);
+  TParamFlag =  (pfVar, pfConst, pfArray, pfAddress, pfReference, pfOut, pfResult);
+  TParamFlags = set of TParamFlag;
+  PMethodParam = ^TMethodParam;
+  TMethodParam = record
+    Flags: TParamFlags;
+    ParamName: string;
+    TypeName: string;
+    TypeInfo: PTypeInfo;
+    Location: TParamLocation; 
+  end;
+  TMethodParamList = array of TMethodParam;
+  PMethodSignature = ^TMethodSignature;
+  TMethodSignature = record
+    Name: string;
+    MethodKind: TMethodKind;
+    CallConv: TCallingConvention;
+    HasSignatureRTTI: boolean;
+    Address: Pointer;
+    ParamCount: Byte;
+    Parameters: TMethodParamList;
+    ResultTypeName: string;
+    ResultTypeInfo: PTypeInfo;
+  end;  
+  PPackedShortString = ^TPackedShortString;
+  TPackedShortString = string[1];
+  PClassInfo = ^TClassInfo;
+  TClassInfo = record
+    UnitName: string; 
+    Name: string;
+    ClassType: TClass;
+    ParentClass: TClass;
+    MethodCount: Word;
+    Methods: array of TMethodSignature;  
+  end;
+
   //the published method table structure:
   PPublishedMethodEntry = ^TPublishedMethodEntry;
   TPublishedMethodEntry = packed record
@@ -147,12 +184,12 @@ type
     Address: Pointer;
     Name: {packed} Shortstring; // really string[Length(Name)]
   end;
-  TPublishedMethodEntrys = packed array[0..High(Word)-1] of TPublishedMethodEntry;
+  TPublishedMethodEntries = packed array[0..High(Word)-1] of TPublishedMethodEntry;
 
   PPublishedMethodTable = ^TPublishedMethodTable;
   TPublishedMethodTable = packed record
     Count: Word;
-    Methods: TPublishedMethodEntrys; // really [0..Count-1]
+    Methods: TPublishedMethodEntries; // really [0..Count-1]
   end;
 
   //the Dynamic method table structure
@@ -1520,6 +1557,204 @@ begin
   WriteMem(PatchAddress, @aNewSize, SizeOf(Integer));
 end;
 	
+function Skip(Value: PShortstring): pointer; overload;
+begin
+  Result := Value;
+  Inc(PChar(Result), SizeOf(Value^[0]) + Length(Value^));
+end;  
+
+function Skip(Value: PPackedShortString; var NextField{: Pointer}): PShortString; overload;
+begin
+  Result := PShortString(Value);
+  Inc(PChar(NextField), SizeOf(Char) + Length(Result^) - SizeOf(TPackedShortString));
+end;  
+
+function Skip(CurrField: pointer; FieldSize: integer): pointer; overload;
+begin
+  Result := PChar(Currfield) + FieldSize;
+end;
+
+function Dereference(P: PPTypeInfo): PTypeInfo;
+begin
+  if Assigned(P) 
+  then Result := P^
+  else Result := nil;
+end;  
+
+function SkipPackedShortString(Value: PShortstring): pointer;
+begin
+  Result := Value;
+  Inc(PChar(Result), SizeOf(Value^[0]) + Length(Value^));
+end;  
+
+function PackedShortString(Value: PShortstring; var NextField{: Pointer}): PShortString; overload;
+begin
+  Result := Value;
+  PShortString(NextField) := Value;
+  Inc(PChar(NextField), SizeOf(Result^[0]) + Length(Result^));
+end;  
+
+function PackedShortString(var NextField{: Pointer}): PShortString; overload;
+begin
+  Result := PShortString(NextField);
+  Inc(PChar(NextField), SizeOf(Result^[0]) + Length(Result^));
+end;  
+
+function GetMethodSignature(Event: PPropInfo): TMethodSignature;        
+(* From TypInfo
+  TTypeData = packed record
+    case TTypeKind of
+     ...
+     tkMethod: (
+        MethodKind: TMethodKind;
+        ParamCount: Byte;
+        Parameters: array[0..1023] of Char
+       {Parameters: array[1..ParamCount] of
+          record
+            Flags: TParamFlags;
+            ParamName: ShortString;
+            TypeName: ShortString;
+          end;
+        ResultTypeName: ShortString);*)
+type
+  PParamListRecord = ^TParamListRecord;
+  TParamListRecord = packed record 
+    Flags: TParamFlags;
+    ParamName: {packed} ShortString; // Really string[Length(ParamName)]
+    TypeName:  {packed} ShortString; // Really string[Length(TypeName)]
+  end;
+var
+  EventData: PTypeData;
+  i: integer;
+  MethodParam: PMethodParam;
+  ParamListRecord: PParamListRecord;
+begin
+  Assert(Assigned(Event) and Assigned(Event.PropType));
+  Assert(Event.PropType^.Kind = tkMethod);
+  EventData := GetTypeData(Event.PropType^);
+  Result.MethodKind := EventData.MethodKind;
+  Result.ParamCount := EventData.ParamCount;
+  SetLength(Result.Parameters, Result.ParamCount);
+  ParamListRecord := @EventData.ParamList;
+  for i := 0 to Result.ParamCount-1 do
+  begin
+    MethodParam := @Result.Parameters[i];
+    MethodParam.Flags     := ParamListRecord.Flags;
+    MethodParam.ParamName := PackedShortString(@ParamListRecord.ParamName, ParamListRecord)^;
+    MethodParam.TypeName  := PackedShortString(ParamListRecord)^;
+  end;  
+  Result.ResultTypeName := PackedShortString(ParamListRecord)^;
+end;  
+
+type
+  // compiler implementation-specific structures, subject to change in future Delphi versions
+  // Derived from declarations in ObjAuto.pas
+  PReturnInfo = ^TReturnInfo;
+  TReturnInfo = packed record
+    Version: Byte; 
+    CallingConvention: TCallingConvention;
+    ReturnType: PPTypeInfo;
+    ParamSize: Word;
+  end;
+  PParamInfo = ^TParamInfo;
+  TParamInfo = packed record
+    Flags: TParamFlags;
+    ParamType: PPTypeInfo;
+    Access: Word;
+    Name: ShortString;
+  end;
+  
+function ClassOfTypeInfo(P: PPTypeInfo): TClass;
+begin
+  Result := nil;
+  if Assigned(P) and (P^.Kind = tkClass) then
+    Result := GetTypeData(P^).ClassType;
+end;  
+  
+procedure GetClassInfo(ClassTypeInfo: PTypeInfo; 
+  var ClassInfo: TClassInfo);
+// Converts from raw RTTI structures to user-friendly Info structures
+var
+  TypeData: PTypeData;
+  i, j: integer;
+  MethodInfo: PMethodSignature;
+  PublishedMethod: PPublishedMethodEntry;
+  MethodParam: PMethodParam;
+  ReturnRTTI: PReturnInfo;
+  ParameterRTTI: PParamInfo;
+  SignatureEnd: Pointer;
+begin
+  Assert(Assigned(ClassTypeInfo));
+  Assert(ClassTypeInfo.Kind = tkClass);
+  // Class
+  TypeData  := GetTypeData(ClassTypeInfo);
+  ClassInfo.UnitName        := TypeData.UnitName;
+  ClassInfo.ClassType       := TypeData.ClassType;
+  ClassInfo.Name            := TypeData.ClassType.ClassName;
+  ClassInfo.ParentClass     := ClassOfTypeInfo(TypeData.ParentInfo);  
+  ClassInfo.MethodCount     := GetPublishedMethodCount(ClassInfo.ClassType);
+  SetLength(ClassInfo.Methods, ClassInfo.MethodCount);
+  // Methods
+  PublishedMethod := GetFirstPublishedMethodEntry(ClassInfo.ClassType);
+  for i := Low(ClassInfo.Methods) to High(ClassInfo.Methods) do
+  begin
+    // Method
+    MethodInfo := @ClassInfo.Methods[i];
+    MethodInfo.Name       := PublishedMethod.Name;
+    MethodInfo.Address    := PublishedMethod.Address;
+    MethodInfo.MethodKind := mkProcedure; // Assume procedure by default
+    
+    // Return info and calling convention
+    ReturnRTTI := Skip(@PublishedMethod.Name);
+    SignatureEnd := Pointer(Cardinal(PublishedMethod) 
+      + PublishedMethod.Size);
+    if Cardinal(ReturnRTTI) >= Cardinal(SignatureEnd) then
+    begin
+      MethodInfo.CallConv := ccRegister; // Assume register calling convention 
+      MethodInfo.HasSignatureRTTI := False;
+    end
+    else  
+    begin
+      MethodInfo.ResultTypeInfo := Dereference(ReturnRTTI.ReturnType);
+      if Assigned(MethodInfo.ResultTypeInfo) then 
+      begin
+        MethodInfo.MethodKind := mkFunction;
+        MethodInfo.ResultTypeName := MethodInfo.ResultTypeInfo.Name;
+      end  
+      else 
+        MethodInfo.MethodKind := mkProcedure;
+      MethodInfo.CallConv := ReturnRTTI.CallingConvention;
+      MethodInfo.HasSignatureRTTI := True;
+      // Count parameters
+      ParameterRTTI := Pointer(Cardinal(ReturnRTTI) + SizeOf(ReturnRTTI^));
+      MethodInfo.ParamCount := 0;
+      while Cardinal(ParameterRTTI) < Cardinal(SignatureEnd) do
+      begin
+        Inc(MethodInfo.ParamCount); // Assume less than 255 parameters ;)!
+        ParameterRTTI := Skip(@ParameterRTTI.Name);
+      end;  
+      // Read parameter info
+      ParameterRTTI := Pointer(Cardinal(ReturnRTTI) + SizeOf(ReturnRTTI^));
+      SetLength(MethodInfo.Parameters, MethodInfo.ParamCount);
+      for j := Low(MethodInfo.Parameters) to High(MethodInfo.Parameters) do
+      begin
+        MethodParam := @MethodInfo.Parameters[j];
+        MethodParam.Flags      := ParameterRTTI.Flags;
+        if pfResult in MethodParam.Flags 
+        then MethodParam.ParamName  := 'Result'
+        else MethodParam.ParamName  := ParameterRTTI.Name;
+        MethodParam.TypeInfo   := Dereference(ParameterRTTI.ParamType);
+        if Assigned(MethodParam.TypeInfo) then
+          MethodParam.TypeName := MethodParam.TypeInfo.Name;
+        MethodParam.Location   := TParamLocation(ParameterRTTI.Access);
+        ParameterRTTI := Skip(@ParameterRTTI.Name);
+      end;  
+    end;
+    PublishedMethod := GetNextPublishedMethodEntry(ClassInfo.ClassType, 
+      PublishedMethod);
+  end;  
+end;  
+
 initialization
   //NOTE: canot use AbstractErrorProc := @GetAbstractErrorProc;!!! it's error! this only return the address of GetAbstractErrorProc!!!!
   //so only should be this!!
