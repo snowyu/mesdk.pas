@@ -93,17 +93,15 @@ begin
     try
       try
         LoadFromFile(ParamStr(2));
+        vScript := Text;
       except
         vScript := ParamStr(2);
       end;
-      vScript := Text;
     finally
       free;
     end;
     FSite.Execute(vScript);
-    writeln('Done');
   finally
-    writeln('Done1');
     FSite.Release;//it will raise error for RefCount <> 0 if it is TInterfacedObject 
   end;
 
