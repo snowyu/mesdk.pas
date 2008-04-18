@@ -29,15 +29,46 @@ interface
 uses
   Windows, SysUtils, ActiveX, ComObj, Contnrs, Classes
   //, Forms
-  {$IFDEF COMPILER5_UP}
+  {$IFDEF COMPILER6_UP}
   , Variants
   {$ENDIF}
   , uAXScriptInf
   ;
 
 
+ResourceString
+  SBreakPointManager='Breakpoint manager';
+
+  SErrDuplicateBreakpoints='Duplicated breakpoint';
+  SErrInvalidItemSize='Incorrect item size (%d)';
+  SErrReferencedObject='Object has references';
+  SErrEvaluateTimeOut='Exoression time is expired. Answer is not available';
+  SErrBreakPointNotSet='Can not set breakpoint on this line';
+  SErrProcessNotAccesible='process is not accessible';
+  SErrBreakpointBegin = 'Incorrect breakpoint condition: ';
+  SErrBreakpointEnd = '. Error message: ';
+
 type
   TOnActiveScriptError = procedure(Sender : TObject; Line, Pos : integer; ASrc : string; ADescription : string) of object;
+
+  { TUnknownObject }
+
+  TUnknownObject = class(Tobject, IUnknown)
+  protected
+    FDestroying:Boolean;
+    FRefCount: Integer;
+  public
+    destructor Destroy;override;
+
+    function _AddRef:Integer;stdcall;
+    function _Release:Integer;stdcall;
+    function QueryInterface(Const IID:TGUID;out Obj):HResult;virtual;stdcall;
+
+    property Destroying:Boolean read FDestroying write FDestroying;
+    property RefCount: Integer read FRefCount;
+  end;
+
+  //TAxScriptProject = Class;
 
   TAXScriptGlobalObjects = class(TObject)
   private
@@ -86,7 +117,10 @@ type
     procedure  Execute(ACode : WideString);
     procedure CloseScriptEngine;
     procedure AddNamedItem(AName : string; AIntf : IUnknown);
+
+  {$IFDEF UseComp}
   published
+  {$ENDIF}
     property ScriptLanguage : string read FScriptLanguage write SetScriptLanguage;
     property OnError : TOnActiveScriptError read FOnError write FOnError;
     property UseSafeSubset : boolean read FUseSafeSubset write FUseSafeSubset default false;
@@ -178,8 +212,44 @@ begin
   end;
 end;
 
-{ TAXScriptSite }
+{ TUnknownObject }
 
+destructor TUnknownObject.Destroy;
+begin
+  if (RefCount <> 0) and not FDestroying then
+    Raise Exception.CreateRes(@SErrReferenceDobject);
+  Inherited;
+end;
+
+function TUnknownObject.QueryInterface(Const IID:TGUID;out Obj):HResult;
+begin
+  If GetInterface(IID,Obj) Then
+    Result:=S_OK
+  Else
+    Result:=E_NOINTERFACE;
+end;
+
+function TUnknownObject._AddRef:Integer;
+begin
+  Result:=InterlockedIncrement(FRefCount);
+end;
+
+function TUnknownObject._Release: Integer;
+begin
+  Result:=InterlockedDecrement(FRefCount);
+  if Result = 0 then
+  begin
+    if not FDestroying then
+    begin
+      FDestroying := True;
+      Destroy;
+    end;
+    Result:= 0;
+  end;
+end;
+
+
+{ TAXScriptSite }
 
 constructor TAXScriptSite.Create;
 begin
