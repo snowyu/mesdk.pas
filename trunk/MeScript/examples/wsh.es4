@@ -75,12 +75,18 @@ public class Greeter
       greeting = "Hello, " + userName + ".";			
     }
     else {				
-      greeting = "Sorry, " + userName + "Your name is not present in the list.";			
+      greeting = "Sorry, " + userName + ". Your name is not present in the list.";			
     }			
     return greeting;		
   }				
   /**		 * Check whether a name is in the validNames list		 */				
+  public static function validName(userName:String):Boolean {
+    for (var i in validNames) {
+      if (validNames[i] == userName) return true;
+    }
+    return false;
+  }
   
 }
 
-WScript.Echo(Greeter.sayHello(""))
+WScript.Echo(Greeter.sayHello("Frank"))
