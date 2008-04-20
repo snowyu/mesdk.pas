@@ -76,6 +76,15 @@ type
   end;
 
 type
+  PTIB = ^TTIB;
+  {: Thread Information Block }
+  { FS:[0]}
+  TTIB = packed record
+    SEH: Pointer;
+    StackTop: Pointer;
+    StackBottom: Pointer;
+  end;
+
   { Summary the Near Jump directive }
   PRedirectCodeRec = ^TRedirectCodeRec;
   {$IFDEF STATIC_METHOD_SCRAMBLING_CODE_SUPPORT}
@@ -176,6 +185,14 @@ function iSqrt(X: DWORD): Integer;
 {: cubic root }
 function iCbrt(X: DWORD): Integer;
 
+function ToMethod(const aProc: Pointer; const aData: Pointer {$IFDEF SUPPORTS_DEFAULTPARAMS}= nil{$ENDIF}): TMethod;
+
+{ Summary:  Reset a clean running state for Delphi code, and find the TIB
+
+  @return TIB linear address
+}
+function CleanUpAndGetTIB: PTIB;
+
 implementation
 
 uses
@@ -185,6 +202,33 @@ uses
 var
   FCurrentProcess: Cardinal;
 {$ENDIF}
+
+function CleanUpAndGetTIB: PTIB;
+const
+  TIBSelfPointer = $18;
+asm
+        // Clear Direction flag
+        CLD
+
+        // Reinitialize the FPU - see System._FpuInit
+        FNINIT
+        FWAIT
+        //FLDCW means Set8087CW procedure
+        FLDCW Default8087CW
+
+        // Get TIB
+        MOV     EAX,TIBSelfPointer
+        MOV     EAX,FS:[EAX]
+end;
+
+function ToMethod(const aProc: Pointer; const aData: Pointer): TMethod;
+begin
+  with Result do
+  begin
+    Data := aData;
+    Code := aProc;
+  end;
+end;
 
 procedure Swap(var X, Y: Integer);
 {$IFDEF FPC}
