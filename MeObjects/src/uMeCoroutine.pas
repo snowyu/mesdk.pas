@@ -34,8 +34,8 @@ interface
 uses
   Windows
   , SysUtils
-  {$IFNDEF YieldClass_Supports}
   , uMeSystem
+  {$IFNDEF YieldClass_Supports}
   , uMeObject
   {$ENDIF}
   ;
@@ -59,15 +59,6 @@ resourcestring
     'Can''t reset: the CoRoutine is not terminated';
 
 type
-  PTIB = ^TTIB;
-  {: Thread Information Block }
-  { FS:[0]}
-  TTIB = packed record
-    SEH: Pointer;
-    StackTop: Pointer;
-    StackBottom: Pointer;
-  end;
-
   TPreservedRegisters = packed record
     FEAX,FEBX,FECX,FEDX,FESI,FEDI,FEBP:pointer;
   end;
@@ -246,7 +237,7 @@ type
 implementation
 
 var
-  PageSize: Cardinal = 4096;
+  FSystemPageSize: Cardinal = 4096;
 
 {-----------------}
 { Global routines }
@@ -255,20 +246,16 @@ var
 {*
   Initialize all global variables
 *}
-procedure InitGlobalVars;
+procedure _Init;
 var
   SystemInfo: TSystemInfo;
 begin
   GetSystemInfo(SystemInfo);
-  PageSize := SystemInfo.dwPageSize;
+  FSystemPageSize := SystemInfo.dwPageSize;
 end;
 
 { Global routines used by TMeCustomCoRoutine }
 
-{  Reset a clean running state for Delphi code, and find the TIB
-
-  @return TIB linear address
-}
 function CleanUpAndGetTIB: PTIB;
 const
   TIBSelfPointer = $18;
@@ -386,11 +373,11 @@ begin
   StackTop := Pointer(Cardinal(StackBottom) + aStackSize);
 
   // Allocate base stack
-  if not Assigned(VirtualAlloc(Pointer(Cardinal(StackTop) - PageSize),
-    PageSize, MEM_COMMIT, PAGE_READWRITE)) then
+  if not Assigned(VirtualAlloc(Pointer(Cardinal(StackTop) - FSystemPageSize),
+    FSystemPageSize, MEM_COMMIT, PAGE_READWRITE)) then
     RaiseLastOSError;
-  if not Assigned(VirtualAlloc(Pointer(Cardinal(StackTop) - 2*PageSize),
-    PageSize, MEM_COMMIT, PAGE_READWRITE or PAGE_GUARD)) then
+  if not Assigned(VirtualAlloc(Pointer(Cardinal(StackTop) - 2*FSystemPageSize),
+    FSystemPageSize, MEM_COMMIT, PAGE_READWRITE or PAGE_GUARD)) then
     RaiseLastOSError;
 
   StackPtr := StackTop;
@@ -586,7 +573,7 @@ begin
     if FExceptObject is EStackOverflow then
     try
       // Reset guard in our stack - in case of upcoming call to Reset
-      if not Assigned(VirtualAlloc(FStackBuffer, PageSize, MEM_COMMIT,
+      if not Assigned(VirtualAlloc(FStackBuffer, FSystemPageSize, MEM_COMMIT,
         PAGE_READWRITE or PAGE_GUARD)) then
         RaiseLastOSError;
     except
@@ -749,5 +736,5 @@ begin
 end;
 
 initialization
-  InitGlobalVars;
+  _Init;
 end.

@@ -521,17 +521,24 @@ begin
     end;
     // Get the user name, password, host and the port number
     LBuffer := LURI;
-    while (Length(LBuffer) > 0) and (LBuffer[1] = '/') do
+    while (Length(LBuffer) > 0) and (LBuffer[1] = '/') do  //Get rid of the '//', the result is 'user:pwd@host:port/xxx/xx'
       Delete(LBuffer, 1, 1);
     LTokenPos := RPos('/', LBuffer);
     if LTokenPos > 0 then
     begin
-      LBuffer := Copy(LBuffer, 1, LTokenPos-1);
+      FPath := Copy(LBuffer, 1, LTokenPos-1);
       LTokenPos := RPos('/', LURI);
-      LURI := Copy(LURI, LTokenPos+1, MaxInt);
-      LBuffer := StrFetch(LBuffer, '/', False);    {Do not Localize}
+      FDocument := Copy(LURI, LTokenPos+1, MaxInt);
+      //remove the path part, the result is 'user:pwd@host:port'
+      LBuffer := StrFetch(FPath, '/', True);    {Do not Localize}
+      if (FPath <> '') and (FPath[Length(FPath)] <> '/') then
+        FPath := '/' + FPath + '/';
+    end
+    else
+    begin
+      FDocument := '';
+      LURI := ''; //no path
     end;
-    //LBuffer := StrFetch(LURI, '/', True);    {Do not Localize}
     // Get username and password
     LTokenPos := AnsiPos('@', LBuffer);    {Do not Localize}
     if LTokenPos > 0 then begin
@@ -558,14 +565,17 @@ begin
       FHost := StrFetch(LBuffer, ':', True);    {Do not Localize}
     end;
     FPort := LBuffer;
+    
+    (*
     // Get the path
     LTokenPos := RPos('/', LURI);
     if LTokenPos > 0 then begin
       FPath := '/' + Copy(LURI, 1, LTokenPos);    {Do not Localize}
       Delete(LURI, 1, LTokenPos);
     end else begin
-      FPath := '/';    {Do not Localize}
+      FPath := '';    {Do not Localize}
     end;
+    *)
   end else begin
     // received an absolute path, not an URI
     LTokenPos := AnsiPos('?', LURI);    {Do not Localize}
@@ -582,9 +592,9 @@ begin
       FPath := Copy(LURI, 1, LTokenPos);
       Delete(LURI, 1, LTokenPos);
     end;
+    // Get the document
+    FDocument := LURI;
   end;
-  // Get the document
-  FDocument := LURI;
 end;
 
 function TMeURI.GetURI: String;
