@@ -16,7 +16,136 @@
     * Portions created by Riceball LEE is Copyright (C) 2007-2008
     * All rights reserved.
     * Contributor(s):
+
+
 }
+
+(*
+The following information on IBindEventHandler might be useful to you.
+
+I've just discovered, IBindEventHandler has no appication with IE (at least
+IE5). Even more, all IE objects that support
+  function <object>.<event>() { .. }
+binding don't expose IBindEventHandler. Still note, complex things like this
+  <script>
+  function window.document.onkeydown() { alert("Blah") }
+  </script>
+do work!
+
+My IBindEventHandler was never being queried for. It turns out, when JScript
+sees
+  function <object>.<event>() { alert("Blah") }
+syntax, it understands it and merely assigns object.event, which is much the
+same as:
+  <object>.<event> = function() { alert("Blah") }
+
+I implemented a special property per event (like IE does):
+
+[propput] HRESULT event([in] IDispatch* handler)
+[propget] HRESULT event([out, retval] IDispatch** handler)
+
+and it works perfectly. You should call Invoke(DISPID_VALUE,...) on passed
+IDispatch when the corresponding event occurs. Some time it's even easier and
+more efficient than implementing standard IConnectionPointContainer schema. It
+allows you to sink events from children objects as easy as:
+  function <root>.<child1>.<child2>.<event>() { alert("Blah") }
+with VBScript, you can do the same with
+ sub handler
+ end sub
+ <root>.<child1>.<child2>.<event> = GetRef(handler);
+
+Eric please, should IBindEventHandler be consdered as legacy interface?
+
+Btw, new cool features are here for engines V5. Look:
+
+****************
+interface IActiveScriptProperty : IUnknown
+{
+  // NOTES:
+  // * This is a generic information passing interface to allow
+  //     the host to get and set pre-defined properties of the engine
+  // * dwProperty must be a SCRIPTPROP_* value
+  // * pvarIndex (when used) further identifies the dwProperty
+  // * pvarValue is the value of the property, can be any VARIANT including
+  //     binary data in a VT_BSTR, most common is VT_BOOL
+        HRESULT GetProperty(
+                [in] DWORD dwProperty,
+                [in] VARIANT *pvarIndex,
+                [out] VARIANT *pvarValue
+        );
+        HRESULT SetProperty(
+                [in] DWORD dwProperty,
+                [in] VARIANT *pvarIndex,
+                [in] VARIANT *pvarValue
+        );
+
+}
+
+/* Properties for IActiveScriptProperty */
+#define SCRIPTPROP_NAME                     0x00000000
+#define SCRIPTPROP_MAJORVERSION             0x00000001
+#define SCRIPTPROP_MINORVERSION             0x00000002
+#define SCRIPTPROP_BUILDNUMBER              0x00000003
+
+#define SCRIPTPROP_DELAYEDEVENTSINKING      0x00001000
+#define SCRIPTPROP_CATCHEXCEPTION           0x00001001
+
+#define SCRIPTPROP_DEBUGGER                 0x00001100
+#define SCRIPTPROP_JITDEBUG                 0x00001101
+
+// These properties are defined and available, but are not
+// officially supported.
+#define SCRIPTPROP_HACK_FIBERSUPPORT        0x70000000
+#define SCRIPTPROP_HACK_TRIDENTEVENTSINK    0x70000001
+
+****************
+
+I'm especially interested at SCRIPTPROP_DEBUGGER, SCRIPTPROP_DEBUGGER,
+SCRIPTPROP_CATCHEXCEPTION.
+Note also this:
+
+****************
+
+[
+        object,
+        uuid(1DC9CA50-06EF-11d2-8415-006008C3FBFC),
+        pointer_default(unique)
+]
+interface ITridentEventSink : IUnknown
+{
+        HRESULT FireEvent(
+                [in] LPCOLESTR pstrEvent,
+                [in] DISPPARAMS *pdp,
+                [out] VARIANT *pvarRes,
+                [out] EXCEPINFO *pei
+        );
+
+}
+
+These are NOT cool new features, these are hacks we added to the engine in
+order to get performance features into IE and ASP without re-writing the
+Windows Script Interfaces entirely.  DO NOT USE THEM.  As far as I know,
+they will NEVER be documented or supported.  Their behaviour is entirely
+dependent on my whims, and you know how capricious I can be.  ;-)  If by
+some strange twist of fate we do decide to support these as public WSIs,
+we'll add them to the doc then.  Until then, please don't muck with them as
+we cannot guarantee that future script engines will be forward compatible
+with any host that uses these interfaces.
+
+In particular, ITridentEventSink is a hack that we added which allows
+VBScript to walk the IE type info looking for events to bind much faster
+than the traditional type info walking code.  We found that we had
+situations where there would be a table with a thousand entries, say, and
+we'd spend thirty, forty seconds just looking at every entry to see if there
+were any events bound on it.  (JScript doesn't have this problem because
+JScript doesn't have automagic event hookup, events must be hooked up
+explicitly in the code or the HTML.)  This interface is a PRIVATE interface
+between VBScript and the IE HTML rendering surface, DO NOT USE IT.  Pay no
+attention to the man behind the curtain!
+
+
+
+*)
 
 unit uAXScriptInf;
 
@@ -100,9 +229,28 @@ const
    IActiveScriptParse::ParseScriptText() input flags *)
 
   SCRIPTTEXT_NULL              = $00000000;    { added for demo}
+  {
+  SCRIPTTEXT_DELAYEXECUTION will do nothing if you're evaluating an expression; if the SCRIPTTEST_ISEXPRESSION flag is set or the pvarResult parameter is non-NULL, the script code you pass in will be executed immediately if the script engine is at the very least initialized. 
+
+The SCRIPTTEXT_DELAYEXECUTION flag causes the code you're
+adding to the engine to be placed in queue for execution.  The code will not
+be executed until the script engine's state is shifted from
+SCRIPTSTATE_INITIALIZED to SCRIPTSTATE_STARTED.  This means that if you add
+SCRIPTTEXT_DELAYEXECUTION code to a script engine in the SCRIPTSTATE_STARTED
+state, the code will be put into a queue for execution, but it will not
+immediatey execute.  The code will not run until you revert the engine state
+to SCRIPTSTATE_INITIALIZED and back to SCRIPTSTATE_STARTED.  Of course, the
+state switch to SCRIPTSTATE_INITIALIZED will reset the engine to a
+pre-running state, and the subsequent switch to SCRIPTSTATE_STARTED will
+cause all of the persistent code you've added so far to run from scratch. 
+
+  }
   SCRIPTTEXT_DELAYEXECUTION    = $00000001;
+  //Indicates that the script text should be visible (and, therefore, callable by name) as a global method in the name space of the script.
   SCRIPTTEXT_ISVISIBLE         = $00000002;
+  //If the distinction between a computational expression and a statement is important but syntactically ambiguous in the script language, this flag specifies that the scriptlet is to be interpreted as an expression, rather than as a statement or list of statements. By default, statements are assumed unless the correct choice can be determined from the syntax of the scriptlet text.
   SCRIPTTEXT_ISEXPRESSION      = $00000020;
+  //Indicates that the code added during this call should be saved if the scripting engine is saved (for example, through a call to IPersist*::Save), or if the scripting engine is reset by way of a transition back to the initialized state.
   SCRIPTTEXT_ISPERSISTENT      = $00000040;
   SCRIPTTEXT_HOSTMANAGESSOURCE = $00000080;
   SCRIPTTEXT_ALL_FLAGS         = (SCRIPTTEXT_DELAYEXECUTION or
@@ -143,14 +291,14 @@ const
   
 
 const
-  INTERFACESAFE_FOR_UNTRUSTED_CALLER = $00000001  // Caller of interface may be untrusted
-  ;
-  INTERFACESAFE_FOR_UNTRUSTED_DATA = $00000002  // Data passed into interface may be untrusted
-  ;
-  INTERFACE_USES_DISPEX = $00000004  // Object knows to use IDispatchEx
-  ;
-  INTERFACE_USES_SECURITY_MANAGER = $00000008  // Object knows to use IInternetHostSecurityManager
-  ;
+  // Caller of interface may be untrusted
+  INTERFACESAFE_FOR_UNTRUSTED_CALLER = $00000001;
+  // Data passed into interface may be untrusted
+  INTERFACESAFE_FOR_UNTRUSTED_DATA = $00000002;
+  // Object knows to use IDispatchEx
+  INTERFACE_USES_DISPEX = $00000004;
+  // Object knows to use IInternetHostSecurityManager
+  INTERFACE_USES_SECURITY_MANAGER = $00000008;
 
 (* script state values *)
 
@@ -158,6 +306,15 @@ type
   tagSCRIPTSTATE = longword;
   SCRIPTSTATE = tagSCRIPTSTATE;
 const
+{
+脚本引擎的各种状态：
+    Uninitialized（未初始化） 这表明脚本引擎还没有准备好，通常，主机在脚本引擎离开这一状态前，要装入运行脚本所需的脚本和实体。
+    Initialized（已初始化） 脚本已装入（通常用IPersist ），运行站点已设定（使用IActiveScriptSite），但脚本引擎还没有真正地与一个主机相联系。脚本引擎处于这种状态时，不能运行任何代码。一旦脚本引擎进入已启动状态，则由IActiveScriptParse.ParseScriptText()执行的代码将开始运行。
+    Started（已启动）这是一种过渡状态。从这种状态使用IDispatch就能运行代码了。所有代码与对象一起装入。但是，脚本引擎尚未在脚本元素与对象事件之间建立连接。如果脚本运行到需要执行事件处理的地方，它就被阻塞（停止），直至脚本引擎完成所需的初始化。
+    Connected（已连接） 脚本引擎做好了去执行需要由它来执行的每项任务的准备时，就是进入了这种状态。
+    Disconnected（连接暂停）脚本引擎进入这一状态后，实际上脚本已暂停。脚本仍处于装入状态，所有连接依然存在，但脚本引擎却不准备回答主机的请求。脚本引擎可以在不丢失脚本当前运行位置的情况下，离开这一状态并返回已连接状态。
+    Closed（关闭） 在这种状态中的脚本引擎，不再回答调用。发出IActiveScript.Close()调用后，就进入这一状态。
+}
   SCRIPTSTATE_UNINITIALIZED = $00000000;
   SCRIPTSTATE_INITIALIZED   = $00000005;
   SCRIPTSTATE_STARTED       = $00000001;
@@ -204,11 +361,10 @@ const
   DBGPROP_INFO_ALL      = DBGPROP_INFO_NAME or DBGPROP_INFO_TYPE or DBGPROP_INFO_VALUE or
                           DBGPROP_INFO_FULLNAME or DBGPROP_INFO_ATTRIBUTES or DBGPROP_INFO_DEBUGPROP;
 
-Type
+type
   TEXT_DOC_ATTR = DWORD;
 
-Const
-
+const
   // Indicates that the document is read-only.
   TEXT_DOC_ATTR_READONLY = $00000001;
 
@@ -288,7 +444,7 @@ type
   TTextDocAttr = DWORD;
   TSourceTextAttr = WORD;
 
-Type
+type
   TDocumentNameType = (
     DOCUMENTNAMETYPE_APPNODE,// Gets the name as it appears in the app tree
     DOCUMENTNAMETYPE_TITLE,// Gets the name as it appears on the doc viewer title bar
@@ -317,7 +473,7 @@ Type
     eraSkipError// resume execution from beyond the error
   );
 
-  TBREAKREASON = (
+  TBreakReason = (
     BREAKREASON_STEP,// Caused by the stepping mode
     BREAKREASON_BREAKPOINT,// Caused by an explicit breakpoint
     BREAKREASON_DEBUGGER_BLOCK,// Caused by another thread breaking
@@ -333,11 +489,11 @@ Type
 
 {$IFDEF Compiler4_Up}
   {$IFDEF BCB4_UP}
-Type
+type
   POleVariant = ^OleVariant;
   {$ENDIF}
 {$ELSE}
-Type
+type
   POleVariant = ^OleVariant;
 {$ENDIF}
 
@@ -427,27 +583,87 @@ type
   IActiveScriptParse = interface(IUnknown)
     [SID_IActiveScriptParse]
     function InitNew: HResult; stdcall;
+    {
+    What is the best way to add event-handling code to the script engine?
+
+Events can be synced from any object that has been added to IActiveScript::AddNamedItem with the SCRIPTITEM_ISSOURCE flag, and any immediate child object of such objects. So, for example, when
+IE adds the window object with the SCRIPTITEM_ISSOURCE flag, the OnClick event of a button on that window object can automatically be synced.
+
+To add an event handler for that child object, you use IActiveScriptParse::AddScriptlet like the following:
+
+   pScriptEngineParse->AddScriptlet( 
+   NULL,   /*pstrDefaultName*/
+   L"MsgBox \"Hello\"",   /*pstrCode*/
+   L"window",   /*pstrItemName*/
+   L"button1",   /*pstrSubItemName*/
+   L"OnClick",   /*pstrEventName*/
+   NULL,   /*pstrDelimiter*/
+   0,   /*dwSourceContextCookie/*
+   ulStartingLineNumber,
+   SCRIPTTEXT_ISPERSTENT,   /*dwFlags*/
+   &bstrName, 
+   &excepInfo );
+
+
+When called like this, the script engine will call IActiveScriptSite::GetItemInfo() on the window object, and then IDispatch::GetIDsOfNames/Invoke on the button1 object. Then it will QI for IConnectionPointContainer and use Connection Points to sync the OnClick event.
+    }
     function AddScriptlet(
+      //a default name to associate with the scriptlet. If the scriptlet does not contain naming information (as in the ONCLICK example above), this name will be used to identify the scriptlet. If this parameter is NULL, the scripting engine manufactures a unique name, if necessary.
       pstrDefaultName: LPCOLESTR;
+      //the scriptlet text 
       pstrCode: LPCOLESTR;
+      //a buffer that contains the item name associated with this scriptlet. This parameter, in addition to pstrSubItemName, identifies the object for which the scriptlet is an event handler.
       pstrItemName: LPCOLESTR;
+      //a buffer that contains the name of a subobject of the named item with which this scriptlet is associated; this name must be found in the named item's type information. This parameter is NULL if the scriptlet is to be associated with the named item instead of a subitem. This parameter, in addition to pstrItemName, identifies the specific object for which the scriptlet is an event handler.
       pstrSubItemName: LPCOLESTR;
+      //a buffer that contains the name of the event for which the scriptlet is an event handler.
       pstrEventName: LPCOLESTR;
+      //the end-of-scriptlet delimiter. When the pstrCode parameter is parsed from a stream of text, the host typically uses a delimiter, such as two single quotation marks (''), to detect the end of the scriptlet. This parameter specifies the delimiter that the host used, allowing the scripting engine to provide some conditional primitive preprocessing (for example, replacing a single quotation mark ['] with two single quotation marks for use as a delimiter). Exactly how (and if) the scripting engine makes use of this information depends on the scripting engine. Set this parameter to NULL if the host did not use a delimiter to mark the end of the scriptlet.
       pstrDelimiter: LPCOLESTR;
       dwSourceContextCookie: DWORD;
       ulStartingLineNumber: ULONG;
       dwFlags: DWORD;
+      //Actual name used to identify the scriptlet. This is to be in order of preference: a name explicitly specified in the scriptlet text, the default name provided in pstrDefaultName, or a unique name synthesized by the scripting engine.
       out pbstrName: WideString;
       out pexcepinfo: EXCEPINFO): HResult; stdcall;
+    {
+    Returns one of the following values:
+    Return Value 	     Meaning
+    S_OK               Success.
+    DISP_E_EXCEPTION   An exception occurred in the processing of the scriptlet. The pexcepinfo parameter contains information about the exception.
+    E_INVALIDARG       An argument was invalid.
+    E_POINTER          An invalid pointer was specified.
+    E_NOTIMPL          This method is not supported. The scripting engine does not support run-time evaluation of expressions or statements.
+    E_UNEXPECTED       The call was not expected (for example, the scripting engine is in the uninitialized or closed state, or the SCRIPTTEXT_ISEXPRESSION flag was set and the scripting engine is in the initialized state).
+    OLESCRIPT_E_SYNTAX An unspecified syntax error occurred in the scriptlet. 
+
+    Remarks
+    
+    If the scripting engine is in the initialized state, no code will actually be evaluated during this call; rather, such code is queued and executed when the scripting engine is transitioned into (or through) the started state. Because execution is not allowed in the initialized state, it is an error to call this method with the SCRIPTTEXT_ISEXPRESSION flag when in the initialized state.
+    
+    The scriptlet can be an expression, a list of statements, or anything allowed by the script language. For example, this method is used in the evaluation of the HTML <SCRIPT> tag, which allows statements to be executed as the HTML page is being constructed, rather than just compiling them into the script state.
+    
+    The code passed to this method must be a valid, complete portion of code. For example, in VBScript it is illegal to call this method once with Sub Function(x) and then a second time with End Sub. The parser must not wait for the second call to complete the subroutine, but rather must generate a parse error because a subroutine declaration was started but not completed. 
+
+    }
     function ParseScriptText(
+      //scriptlet text
       pstrCode: LPCOLESTR;
+      //item name that gives the context in which the scriptlet is to be evaluated. If this parameter is NULL, the code is evaluated in the scripting engine's global context.
       pstrItemName: LPCOLESTR;
+      //debugging context. This object is reserved for use in a debugging environment, where such a context may be provided by the debugger to represent an active run-time context. If this parameter is NULL, the engine uses pstrItemName to identify the context.
       const punkContext: IUnknown;
+      //end-of-scriptlet delimiter. When pstrCode is parsed from a stream of text, the host typically uses a delimiter, such as two single quotation marks (''), to detect the end of the scriptlet. This parameter specifies the delimiter that the host used, allowing the scripting engine to provide some conditional primitive preprocessing (for example, replacing a single quotation mark ['] with two single quotation marks for use as a delimiter). Exactly how (and if) the scripting engine makes use of this information depends on the scripting engine. Set this parameter to NULL if the host did not use a delimiter to mark the end of the scriptlet.
       pstrDelimiter: LPCOLESTR;
+      //Application-defined value that is used for debugging purposes.
       dwSourceContextCookie: DWORD;
+      //starting line of the script. Zero-based value that specifies which line the parsing will begin at.
       ulStartingLineNumber: ULONG;
+      //scriptlet flags. Flags associated with the scriptlet. Can be a combination of these values:SCRIPTTEXT_ISEXPRESSION,SCRIPTTEXT_ISPERSISTENT,SCRIPTTEXT_ISVISIBLE
       dwFlags: DWORD;
+      //buffer for results. Address of a buffer that receives the results of scriptlet processing, or NULL if the caller expects no result (that is, the SCRIPTTEXT_ISEXPRESSION value is not set).
       out pvarResult: OleVariant;
+      //buffer for error data. Address of a structure that receives exception information. This structure is filled if IActiveScriptParse::ParseScriptText returns DISP_E_EXCEPTION.
       out pexcepinfo: EXCEPINFO): HResult; stdcall;
   end;
 
@@ -799,7 +1015,7 @@ type
     // Indicates the thread in which the breakpoint occured.
       const prpt : IRemoteDebugApplicationThread;
     // Indicates the reason for the breakpoint.
-      const br : TBREAKREASON;
+      const br : TBreakReason;
     // optional runtime error info (for when br == BREAKREASON_ERROR)
       const pError : IActiveScriptErrorDebug) : HRESULT; stdcall;
 

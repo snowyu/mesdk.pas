@@ -7,6 +7,7 @@ uses
   windows, SysUtils, Classes,
   ComObj,ObjComAuto,
   ActiveX
+  , uMeSystem
   , uAXScript
   , uAXScriptInf
   , uAXScriptObj
@@ -59,6 +60,14 @@ end;
 
 
 //}
+
+procedure DoScriptError(Self: TObject; Sender : TObject; Line, Pos : integer; ASrc : string; ADescription : string);
+begin
+  Writeln('Script(', Line, ',', Pos, ') Error:', ADescription);
+  if ASrc <> '' then
+    Writeln( ' in  ', ASrc);
+end;
+
 const
   NULL_GUID: TGUID = '{00000000-0000-0000-0000-000000000000}';
   IID_IUnknown: TGUID = (D1:$00000000;D2:$0000;D3:$0000;D4:($C0,$00,$00,$00,$00,$00,$00,$46));
@@ -77,8 +86,9 @@ var
 begin
   if System.ParamCount < 2 then exit;
   oldCW := Default8087CW;
+  Default8087CW := Default8087CW or $3F;
   //disable the FPU Exception.
-  Set8087CW(Default8087CW or $3F);
+  Set8087CW(Default8087CW);
 
   //try
   CoInitialize(nil);
@@ -88,11 +98,13 @@ begin
     writeln('Lang=',FSite.ScriptLanguage);
     vObj := TActiveAppHelper.Create;
     FSite.AddNamedItem('WScript', vObj);
+    FSite.OnError := TAXScriptErrorEvent(ToMethod(@DoScriptError));
 
     with TStringList.Create do
     try
       try
         LoadFromFile(ParamStr(2));
+        writeln('loading file:', ParamStr(2));
         vScript := Text;
       except
         vScript := ParamStr(2);
@@ -100,7 +112,13 @@ begin
     finally
       free;
     end;
+    //Writeln(vScript);
+    try
     FSite.Execute(vScript);
+    except
+      on e: exception do
+        Writeln(e.className, ' ', e.message);
+    end;
   finally
     FSite.Release;//it will raise error for RefCount <> 0 if it is TInterfacedObject 
   end;

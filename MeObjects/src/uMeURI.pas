@@ -537,6 +537,7 @@ begin
     else
     begin
       FDocument := '';
+      FPath := '';
       LURI := ''; //no path
     end;
     // Get username and password

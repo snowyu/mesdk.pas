@@ -49,11 +49,11 @@ ResourceString
   SErrBreakpointEnd = '. Error message: ';
 
 type
-  TOnActiveScriptError = procedure(Sender : TObject; Line, Pos : integer; ASrc : string; ADescription : string) of object;
+  TAXScriptErrorEvent = procedure(Sender : TObject; Line, Pos : integer; ASrc : string; ADescription : string) of object;
 
   { TUnknownObject }
 
-  TUnknownObject = class(Tobject, IUnknown)
+  TUnknownObject = class(TObject, IUnknown)
   protected
     FDestroying:Boolean;
     FRefCount: Integer;
@@ -89,12 +89,14 @@ type
   protected
     FUseSafeSubset : boolean;
     FGlobalObjects : TAXScriptGlobalObjects;
-    FOnError : TOnActiveScriptError;
+    FOnError : TAXScriptErrorEvent;
     FEngine: IActiveScript;
     FParser: IActiveScriptParse;
     FScriptLanguage : string;
     procedure CreateScriptEngine(const Language: string);
     procedure SetScriptLanguage(const Value: string);
+    function GetScriptState: SCRIPTSTATE;
+    procedure SetScriptState(const Value: SCRIPTSTATE);
   protected
     { IActiveScriptSite }
     function  GetLCID(out plcid: LongWord): HResult; stdcall;
@@ -106,23 +108,25 @@ type
     function  GetDocVersionString(out pbstrVersion: WideString): HResult; stdcall;
     function  OnScriptTerminate(var pvarResult: OleVariant; var pexcepinfo: EXCEPINFO): HResult; stdcall;
     function  OnStateChange(ssScriptState: tagSCRIPTSTATE): HResult; stdcall;
-    function  OnScriptError(const pscripterror: IActiveScriptError): HResult; stdcall;
+    function  OnScriptError(const pScriptError: IActiveScriptError): HResult; stdcall;
     function  OnEnterScript: HResult; stdcall;
     function  OnLeaveScript: HResult; stdcall;
   public
     constructor Create({$IFDEF UseComp}aOwner: TComponent = nil{$ENDIF}); {$IFDEF UseComp}override;{$ELSE}virtual;{$ENDIF}
     destructor Destroy; override;
     function Release: Integer;
-    function RunExpression(ACode : Widestring) : string;
-    procedure  Execute(ACode : WideString);
+    function Compile(const aCode: WideString): HResult;
+    function RunExpression(const ACode : Widestring) : string;
+    procedure  Execute(const ACode : WideString);
     procedure CloseScriptEngine;
     procedure AddNamedItem(AName : string; AIntf : IUnknown);
 
+    property ScriptState: SCRIPTSTATE read GetScriptState write SetScriptState;
   {$IFDEF UseComp}
   published
   {$ENDIF}
     property ScriptLanguage : string read FScriptLanguage write SetScriptLanguage;
-    property OnError : TOnActiveScriptError read FOnError write FOnError;
+    property OnError : TAXScriptErrorEvent read FOnError write FOnError;
     property UseSafeSubset : boolean read FUseSafeSubset write FUseSafeSubset default false;
   end;
 
@@ -130,8 +134,8 @@ type
   protected
     FWindowHandle: HWND;
     {IActiveSriptSiteWindow}
-    function GetWindow(out phwnd: HWND): HResult; stdcall;
-    function EnableModeless(fEnable: BOOL): HResult; stdcall;
+    function GetWindow(out pHwnd: HWND): HResult; stdcall;
+    function EnableModeless(aEnable: BOOL): HResult; stdcall;
   public
     property WindowHandle: HWND read FWindowHandle write FWindowHandle;
   end;
@@ -359,10 +363,10 @@ begin
   FEngine := nil;
 end;
 
-function TAXScriptSite.RunExpression(ACode: WideString): string;
+function TAXScriptSite.RunExpression(const ACode: WideString): string;
 var
   AResult: OleVariant;
-  ExcepInfo: TEXCEPINFO;
+  ExcepInfo: TExcepInfo;
 begin
   if not Assigned(FEngine) then
     CreateScriptEngine(FScriptLanguage);
@@ -374,16 +378,58 @@ begin
           Result := '';
 end;
 
-procedure TAXScriptSite.Execute(ACode: Widestring);
+function TAXScriptSite.Compile(const aCode: WideString): HResult;
 var
-  Result: OleVariant;
-  ExcepInfo: TEXCEPINFO;
+  vResult: OleVariant;
+  ExcepInfo: TExcepInfo;
+begin
+  if not Assigned(FEngine) then
+    CreateScriptEngine(FScriptLanguage);
+  Result := FParser.ParseScriptText(PWideChar(ACode), nil, nil, nil, 0, 0, SCRIPTTEXT_DELAYEXECUTION, vResult, ExcepInfo);
+end;
+
+procedure TAXScriptSite.Execute(const ACode: Widestring);
+var
+  vName: Widestring;
+  vResult: OleVariant;
+  ExcepInfo: TExcepInfo;
+  vScript: IActiveScript;
+  Disp: IDispatch;
 begin
   if not Assigned(FEngine) then
     CreateScriptEngine(FScriptLanguage);
   //FEngine.SetScriptState(SCRIPTSTATE_INITIALIZED);
-  FParser.ParseScriptText(PWideChar(ACode), nil, nil, nil, 0, 0, 0, Result, ExcepInfo);
+  writeln('1ScriptState=',GetScriptState);
+  vName := 'Main';
+  //OLECHECK(FParser.AddScriptlet(PWideChar(vName), PWideChar(ACode), PWideChar(vName), nil, nil, '', 0, 0, SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_ISVISIBLE, vName, ExcepInfo));
+  FParser.ParseScriptText(PWideChar(ACode), nil, nil, nil, 0, 0, SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_ISVISIBLE or SCRIPTTEXT_DELAYEXECUTION, vResult, ExcepInfo);
+  writeln('2ScriptState=',GetScriptState,' vName=');
+  //FParser.ParseScriptText('__Main__', nil, nil, nil, 0, 0, 0, vResult, ExcepInfo);
+  //FParser.ParseScriptText(nil, nil, nil, nil, 0, 0, SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_DELAYEXECUTION, vResult, ExcepInfo);
   FEngine.SetScriptState(SCRIPTSTATE_CONNECTED);
+  writeln('3ScriptState=',GetScriptState,' vName=');
+  //vName := nil;
+  FParser.ParseScriptText(PWideChar(ACode), nil, nil, nil, 0, 0, SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_ISVISIBLE or SCRIPTTEXT_DELAYEXECUTION, vResult, ExcepInfo);
+  //OLECHECK(FParser.AddScriptlet(nil, PWideChar(ACode), PWideChar(vName), nil, '', '', 0, 0, SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_ISVISIBLE, vName, ExcepInfo));
+
+  //OleCheck(FEngine.GetScriptDispatch(nil, Disp));
+end;
+
+function TAXScriptSite.GetScriptState: SCRIPTSTATE;
+begin
+  if Assigned(FEngine) then
+  begin
+    if FEngine.GetScriptState(Result) <> S_OK then
+      Result := LongWord(-1);
+  end
+  else
+    Result := LongWord(-1);
+end;
+
+procedure TAXScriptSite.SetScriptState(const Value: SCRIPTSTATE);
+begin
+  if Assigned(FEngine) then
+    FEngine.SetScriptState(Value)
 end;
 
 function TAXScriptSite.GetDocVersionString(
@@ -427,11 +473,11 @@ begin
 end;
 
 function TAXScriptSite.OnScriptError(
-  const pscripterror: IActiveScriptError): HResult;
+  const pScriptError: IActiveScriptError): HResult;
 var
   wCookie   : Dword;
   ExcepInfo : TExcepInfo;
-  CharNo    : integer;
+  CharNo    : Integer;
   LineNo    : DWORD;
   SourceLineW : WideString;
   SourceLine : string;
@@ -441,12 +487,12 @@ begin
   wCookie := 0;
   LineNo  := 0;
   CharNo  := 0;
-  if Assigned(pscripterror) then
+  if Assigned(pScriptError) then
     begin
-      pscripterror.GetExceptionInfo(ExcepInfo);
+      pScriptError.GetExceptionInfo(ExcepInfo);
       Desc := ExcepInfo.bstrDescription;
-      pscripterror.GetSourcePosition(wCookie, LineNo, CharNo);
-      pscripterror.GetSourceLineText(SourceLineW);
+      pScriptError.GetSourcePosition(wCookie, LineNo, CharNo);
+      pScriptError.GetSourceLineText(SourceLineW);
       SourceLine := SourceLineW;
       if Assigned(FOnError) then
         FOnError(Self, LineNo, CharNo, SourceLine, Desc);
@@ -485,14 +531,14 @@ end;
 
 { TAXScriptSiteWindow }
 
-function TAXScriptSiteWindow.EnableModeless(fEnable: BOOL): HResult;
+function TAXScriptSiteWindow.EnableModeless(aEnable: BOOL): HResult;
 begin
   Result := S_OK;
 end;
 
-function TAXScriptSiteWindow.GetWindow(out phwnd: HWND): HResult;
+function TAXScriptSiteWindow.GetWindow(out pHwnd: HWND): HResult;
 begin
-    phwnd := FWindowHandle;
+    pHwnd := FWindowHandle;
     Result := S_OK;
     //Result := S_FALSE;
 end;
