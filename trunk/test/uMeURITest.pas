@@ -62,19 +62,23 @@ begin
   CheckEquals('http', FURI.Protocol, ' the Protocol is error.');
   CheckEquals('host', FURI.Host, ' the Host is error.');
   CheckEquals('port', FURI.Port, ' the Port is error.');
+  CheckEquals('/root/doc/', FURI.Path, ' the path is error.');
   CheckEquals('param=123&p2=hahha', FURI.Params, ' the Params is error.');
   CheckEquals('test.asp', FURI.Document, ' the Document is error.');
   CheckEquals('user', FURI.UserName, ' the UserName is error.');
   CheckEquals('passd', FURI.Password, ' the Password is error.');
+  CheckEquals('http://user:passd@host:port/root/doc/test.asp?param=123&p2=hahha#book2', FURI.GetFullURI, ' the GetFullURI is error.');
 
   FURI.URI := 'http:///user:passd@host:port/root/doc/test.asp?param=123&p2=hahha#book2';
   CheckEquals('http', FURI.Protocol, ' the Protocol is error.');
   CheckEquals('host', FURI.Host, ' the Host is error.');
   CheckEquals('port', FURI.Port, ' the Port is error.');
+  CheckEquals('/root/doc/', FURI.Path, ' the path is error.');
   CheckEquals('param=123&p2=hahha', FURI.Params, ' the Params is error.');
   CheckEquals('test.asp', FURI.Document, ' the Document is error.');
   CheckEquals('user', FURI.UserName, ' the UserName is error.');
   CheckEquals('passd', FURI.Password, ' the Password is error.');
+  CheckEquals('http://user:passd@host:port/root/doc/test.asp?param=123&p2=hahha#book2', FURI.GetFullURI, ' the GetFullURI is error.');
 end;
 
 procedure TTest_MeURI.Test_MailTo();
@@ -88,7 +92,7 @@ begin
   CheckEquals('mailto', FURI.Protocol, ' the Protocol is error.');
   CheckEquals('aa', FURI.UserName, ' the UserName is error.');
   CheckEquals('tws.com', FURI.Host, ' the Host is error.');
-  CheckEquals('mailto:///aa@tws.com', FURI.GetFullURI, ' the GetFullURI is error.');
+  CheckEquals('mailto://aa@tws.com', FURI.GetFullURI, ' the GetFullURI is error.');
 end;
 
 procedure TTest_MeURI.Test_RelavtiveURI;
