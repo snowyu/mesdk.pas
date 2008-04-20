@@ -186,6 +186,7 @@ function iSqrt(X: DWORD): Integer;
 function iCbrt(X: DWORD): Integer;
 
 function ToMethod(const aProc: Pointer; const aData: Pointer {$IFDEF SUPPORTS_DEFAULTPARAMS}= nil{$ENDIF}): TMethod;
+function IsSameMethod(Var A,B): Boolean;
 
 { Summary:  Reset a clean running state for Delphi code, and find the TIB
 
@@ -228,6 +229,11 @@ begin
     Data := aData;
     Code := aProc;
   end;
+end;
+
+function IsSameMethod(Var A,B): Boolean;
+begin
+  Result := (TMethod(A).Data=TMethod(b).Data) and (TMethod(A).Code=TMethod(B).Code);
 end;
 
 procedure Swap(var X, Y: Integer);

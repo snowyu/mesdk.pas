@@ -9,7 +9,7 @@
 // You can also use wscript.exe if you prefer, but cscript.exe provides a
 // console, so may be better for diagnostics.
 // (Note: we could register the .es4 extension, making this less ugly)
-
+//debugger;
 function getTickCount()
 {
   var now = new Date()
