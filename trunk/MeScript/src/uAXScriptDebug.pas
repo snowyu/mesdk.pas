@@ -107,11 +107,23 @@ type
     FProcessDebugManager: IProcessDebugManager;
     FDebugApp: IDebugApplication;
     FAppCookie: DWORD;
+    FAppName: string;
 
     procedure InitDebugApplication;
   public
   end;
 
 implementation
+
+procedure TAXScriptSiteDebug.InitDebugApplication;
+begin
+  CoCreateInstance(CLSID_ProcessDebugManager, nil,
+        CLSCTX_INPROC_SERVER or CLSCTX_INPROC_HANDLER
+        or CLSCTX_LOCAL_SERVER, IProcessDebugManager, FProcessDebugManager);
+
+  FProcessDebugManager.CreateApplication(FDebugApp);
+  FDebugApp.SetName(FAppName);
+  FProcessDebugManager.AddApplication(FDebugApp, FAppCookie);
+end;
 
 end.
