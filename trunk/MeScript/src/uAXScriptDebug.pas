@@ -95,6 +95,23 @@ unit uAXScriptDebug;
 
 interface
 
+uses
+  Windows, SysUtils, ActiveX
+  , uAXScriptInf
+  , uAXScript
+  ;
+
+type
+  TAXScriptSiteDebug = class(TAXScriptSite, IActiveScriptSiteDebug)
+  protected
+    FProcessDebugManager: IProcessDebugManager;
+    FDebugApp: IDebugApplication;
+    FAppCookie: DWORD;
+
+    procedure InitDebugApplication;
+  public
+  end;
+
 implementation
 
 end.
