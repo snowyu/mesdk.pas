@@ -399,17 +399,17 @@ begin
   if not Assigned(FEngine) then
     CreateScriptEngine(FScriptLanguage);
   //FEngine.SetScriptState(SCRIPTSTATE_INITIALIZED);
-  writeln('1ScriptState=',GetScriptState);
+  //writeln('1ScriptState=',GetScriptState);
   vName := 'Main';
   //OLECHECK(FParser.AddScriptlet(PWideChar(vName), PWideChar(ACode), PWideChar(vName), nil, nil, '', 0, 0, SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_ISVISIBLE, vName, ExcepInfo));
   FParser.ParseScriptText(PWideChar(ACode), nil, nil, nil, 0, 0, SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_ISVISIBLE or SCRIPTTEXT_DELAYEXECUTION, vResult, ExcepInfo);
-  writeln('2ScriptState=',GetScriptState,' vName=');
+  //writeln('2ScriptState=',GetScriptState,' vName=');
   //FParser.ParseScriptText('__Main__', nil, nil, nil, 0, 0, 0, vResult, ExcepInfo);
   //FParser.ParseScriptText(nil, nil, nil, nil, 0, 0, SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_DELAYEXECUTION, vResult, ExcepInfo);
   FEngine.SetScriptState(SCRIPTSTATE_CONNECTED);
-  writeln('3ScriptState=',GetScriptState,' vName=');
+  //writeln('3ScriptState=',GetScriptState,' vName=');
   //vName := nil;
-  FParser.ParseScriptText(PWideChar(ACode), nil, nil, nil, 0, 0, SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_ISVISIBLE or SCRIPTTEXT_DELAYEXECUTION, vResult, ExcepInfo);
+  //FParser.ParseScriptText(PWideChar(ACode), nil, nil, nil, 0, 0, SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_ISVISIBLE or SCRIPTTEXT_DELAYEXECUTION, vResult, ExcepInfo);
   //OLECHECK(FParser.AddScriptlet(nil, PWideChar(ACode), PWideChar(vName), nil, '', '', 0, 0, SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_ISVISIBLE, vName, ExcepInfo));
 
   //OleCheck(FEngine.GetScriptDispatch(nil, Disp));
@@ -475,7 +475,7 @@ end;
 function TAXScriptSite.OnScriptError(
   const pScriptError: IActiveScriptError): HResult;
 var
-  wCookie   : Dword;
+  wCookie   : DWord;
   ExcepInfo : TExcepInfo;
   CharNo    : Integer;
   LineNo    : DWORD;
@@ -489,7 +489,6 @@ begin
   CharNo  := 0;
   if Assigned(pScriptError) then
     begin
-      pScriptError.GetExceptionInfo(ExcepInfo);
       Desc := ExcepInfo.bstrDescription;
       pScriptError.GetSourcePosition(wCookie, LineNo, CharNo);
       pScriptError.GetSourceLineText(SourceLineW);

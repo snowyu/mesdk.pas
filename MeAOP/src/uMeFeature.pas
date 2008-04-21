@@ -94,14 +94,11 @@ type
   end;
 
 type
+  {
+  this very simplest version to implement the FreeNotify On object.Free.
+  it inject the TObject.FreeInstance method and check it here!!
+  }
   TFreeNotifyProc = procedure(Instance : TObject) of object;
-
-procedure AddFreeNotification(const aInstance : TObject; const aProc : TFreeNotifyProc);
-procedure RemoveFreeNotification(const aInstance : TObject; const aProc : TFreeNotifyProc);
-
-implementation
-
-type
   TFreeNotificationObjects = class;
   PFreeNotificationInfo = ^ TFreeNotificationInfo;
   TFreeNotificationInfo = object
@@ -122,7 +119,6 @@ type
     FFreeInstanceInjector: TMeInjector;
     FFreeInstance: PProcedure;
 
-    procedure DoObjectFreeInstance;
     procedure Inject(const aInstance : TObject);
 
     procedure Notify(Ptr: Pointer; Action: TListNotification); override;
@@ -134,6 +130,14 @@ type
     function IndexOfInstance(const aInstance : TObject): Integer;
     property Items[const Index: Integer]: PFreeNotificationInfo read GetItem;
   end;
+
+procedure AddFreeNotification(const aInstance : TObject; const aProc : TFreeNotifyProc);
+procedure RemoveFreeNotification(const aInstance : TObject; const aProc : TFreeNotifyProc);
+
+function GFreeNotificationObjects: TFreeNotificationObjects;
+
+implementation
+
 
 { TFreeNotificationInfo }
 procedure TFreeNotificationInfo.AddFreeNotification(const aProc : TFreeNotifyProc);
@@ -242,21 +246,20 @@ begin
   inherited;
 end;
 
-procedure TFreeNotificationObjects.DoObjectFreeInstance;
+procedure DoObjectFreeInstance(aSelf: TObject);
 var
-  vSender: TObject;
   vInfo: PFreeNotificationInfo;
 begin
-  asm
-    MOV vSender, EAX
-  end;
-  vInfo := FindByInstance(vSender);
-  if Assigned(vInfo) then
+  with GFreeNotificationObjects do
   begin
-    vInfo.NotifyObjectFree();
-    Remove(vInfo);
+    vInfo := FindByInstance(aSelf);
+    if Assigned(vInfo) then
+    begin
+      vInfo.NotifyObjectFree();
+      Remove(vInfo);
+    end;
+    FFreeInstance(aSelf);
   end;
-  FFreeInstance(vSender);
 end;
 
 procedure TFreeNotificationObjects.Inject(const aInstance : TObject);
@@ -265,7 +268,7 @@ var
 begin
   if not FFreeInstanceInjector.Enabled and Assigned(aInstance) then
   begin
-    vMethodIndex := Integer(FFreeInstanceInjector.InjectStaticMethod(TObject, @TObject.FreeInstance, @TFreeNotificationObjects.DoObjectFreeInstance));
+    vMethodIndex := Integer(FFreeInstanceInjector.InjectStaticMethod(TObject, @TObject.FreeInstance, @DoObjectFreeInstance));
     Assert(vMethodIndex <> 0, 'Can not Inject the FreeInstance virtual method.');
     {
     vMethodIndex := FindVirtualMethodIndex(TObject, @TObject.FreeInstance);
@@ -295,15 +298,19 @@ begin
     New(Result);
     Result.Instance := aInstance;
     New(Result.FFreeNotifies, Create);
+    Inject(aInstance);
     //Result.Owner := Self;
+    inherited Add(Result);
   end;
 end;
 
 function TFreeNotificationObjects.IndexOfInstance(const aInstance : TObject): Integer;
 begin
   for Result := 0 to Count - 1 do
+  begin
     if Items[Result].Instance = aInstance then 
       exit;
+  end;
   Result := -1;
 end;
 
@@ -345,7 +352,7 @@ begin
     if not Assigned(vInfo) then
     begin
       vInfo := Add(aInstance);
-      vInfo.FFreeNotifies.Add(TMethod(aProc).Code);
+      vInfo.AddFreeNotification(aProc);
     end
     else if vInfo.IndexOfProc(aProc) < 0 then begin
       

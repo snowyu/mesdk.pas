@@ -47,6 +47,7 @@ type
     function GetTitle   : WideString; stdcall;
     function GetHint    : WideString; stdcall;
     procedure ECho(const s: string);
+    procedure OutputDebug(const s: WideString);
     function Version(): string;
   end;
   {$METHODINFO OFF}
@@ -163,4 +164,10 @@ function TActiveAppHelper.Version(): string;
 begin
   Result := '1.0.0.0';
 end;
+
+procedure TActiveAppHelper.OutputDebug(const s: WideString);
+begin
+  Windows.OutputDebugStringW(PWideChar(s));
+end;
+
 end.
