@@ -88,6 +88,7 @@ uses
   {$ENDIF}
   , uMeScriptTest
   , uMeURITest
+  , uMeSysUtilsTest
   ;
 
 
