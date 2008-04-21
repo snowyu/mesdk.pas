@@ -183,8 +183,8 @@ const
   SID_IBindEventHandler =             '{63CDBCB0-C1B1-11d0-9336-00A0C90DCAA9}';
   SID_IActiveScriptStats =            '{B8DA6310-E19B-11d0-933C-00A0C90DCAA9}';
 
-  SID_ProcessDebugManager  = '{78a51822-51f4-11d0-8f20-00805f2cd064}';
-  SID_MachineDebugManager  ='{0C0A3666-30C9-11D0-8F20-00805F2CD064}';
+  SCLSID_ProcessDebugManager  = '{78a51822-51f4-11d0-8f20-00805f2cd064}';
+  SCLSID_MachineDebugManager  ='{0C0A3666-30C9-11D0-8F20-00805F2CD064}';
 
 
   CATID_ActiveScript:                 TGUID = SCATID_ActiveScript;
@@ -199,6 +199,8 @@ const
   IID_IActiveScriptError:             TGUID = SID_IActiveScriptError;
   IID_IBindEventHandler:              TGUID = SID_IBindEventHandler;
   IID_IActiveScriptStats:             TGUID = SID_IActiveScriptStats;
+  CLSID_ProcessDebugManager:            TGUID = SCLSID_ProcessDebugManager;
+  CLSID_MachineDebugManager:            TGUID = SCLSID_MachineDebugManager;
 
 // Constants used by ActiveX Scripting:
 //
