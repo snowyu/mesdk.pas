@@ -28,6 +28,7 @@ uses
   //, uMeConsts
   , uMeTypInfo
   , uMeObject
+  , uMeSyncObjs
   , uMeInjector
   ;
 
@@ -72,6 +73,9 @@ type
   //the objects need watch to FreeNotification
   TFreeNotificationObjects = class(TList)
   protected
+    {$IFDEF THREADSAFE_SUPPORT}
+    FLock: PMeCriticalSection;
+    {$ENDIF}
     FFreeInstanceInjector: TMeInjector;
     FFreeInstance: PProcedure;
 
@@ -80,6 +84,9 @@ type
     procedure Notify(Ptr: Pointer; Action: TListNotification); override;
     function GetItem(const Index: Integer): PFreeNotificationInfo;
   public
+    {$IFDEF THREADSAFE_SUPPORT}
+    constructor Create;
+    {$ENDIF}
     destructor Destroy; override;
     function Add(const aInstance : TObject): PFreeNotificationInfo;
     function FindByInstance(const aInstance : TObject): PFreeNotificationInfo;
@@ -151,12 +158,14 @@ var
     Proc: TFreeNotifyProc Absolute ProcMethod;
 begin
   if Assigned(FFreeNotifies) then
+  begin
     for I := 0 to FFreeNotifies.Count div 2 - 1 do
     begin
       ProcMethod.Code := FFreeNotifies.List[I * 2];
       ProcMethod.Data := FFreeNotifies.List[I * 2 + 1];
       Proc(Instance);
     end;
+  end;
 end;
 
 procedure TFreeNotificationInfo.RemoveFreeNotification(const aProc : TFreeNotifyProc);
@@ -201,9 +210,19 @@ begin
 end;
 
 { TFreeNotificationObjects }
+{$IFDEF THREADSAFE_SUPPORT}
+constructor TFreeNotificationObjects.Create;
+begin
+  inherited;
+  New(FLock, Create);
+end;
+{$ENDIF}
 destructor TFreeNotificationObjects.Destroy;
 begin
   FFreeInstanceInjector.Enabled := False;
+  {$IFDEF THREADSAFE_SUPPORT}
+  FLock.Free;
+  {$ENDIF}
   inherited;
 end;
 
@@ -211,13 +230,16 @@ procedure DoObjectFreeInstance(aSelf: TObject);
 var
   vInfo: PFreeNotificationInfo;
 begin
-  with GFreeNotificationObjects do
+  with FFreeNotificationObjects do
   begin
-    vInfo := FindByInstance(aSelf);
-    if Assigned(vInfo) then
+    if FFreeNotificationObjects <> aSelf then
     begin
-      vInfo.NotifyObjectFree();
-      Remove(vInfo);
+      vInfo := FindByInstance(aSelf);
+      if Assigned(vInfo) then
+      begin
+        vInfo.NotifyObjectFree();
+        Remove(vInfo);
+      end;
     end;
     FFreeInstance(aSelf);
   end;
@@ -256,22 +278,40 @@ begin
   Result := FindByinstance(aInstance);
   if not Assigned(Result) then
   begin
+    {$IFDEF THREADSAFE_SUPPORT}
+    FLock.Enter;
+    try
+    {$ENDIF}
     New(Result);
     Result.Instance := aInstance;
     New(Result.FFreeNotifies, Create);
     Inject(aInstance);
     //Result.Owner := Self;
     inherited Add(Result);
+    {$IFDEF THREADSAFE_SUPPORT}
+    finally
+      FLock.Leave;
+    end;
+    {$ENDIF}
   end;
 end;
 
 function TFreeNotificationObjects.IndexOfInstance(const aInstance : TObject): Integer;
 begin
+  {$IFDEF THREADSAFE_SUPPORT}
+  FLock.Enter;
+  try
+  {$ENDIF}
   for Result := 0 to Count - 1 do
   begin
     if Items[Result].Instance = aInstance then 
       exit;
   end;
+  {$IFDEF THREADSAFE_SUPPORT}
+  finally
+    FLock.Leave;
+  end;
+  {$ENDIF}
   Result := -1;
 end;
 

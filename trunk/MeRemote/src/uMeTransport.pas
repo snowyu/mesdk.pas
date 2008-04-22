@@ -5,6 +5,12 @@
    @author  Riceball LEE(riceballl@hotmail.com)
    @version $Revision: 1.00 $
 
+HTTP Method   CRUD Action   Description
+POST          CREATE        Create a new resource
+GET           RETRIEVE      Retrieve a representation of a resource
+PUT           UPDATE        Update a resource
+DELETE        DELETE        Delete a resource  
+
 
   License:
     * The contents of this file are released under a dual \license, and
@@ -40,9 +46,22 @@ uses
 
 type
   //how to convert the params to stream?
+  {
+  http://host/cat/aMethod?param=xx
+  i will use REST protocol to do?
+  }
+  TMeReceivedDataEvent = procedure (const Sender: TObject; const aReply: TStream) of object;
+  //abstract Transport class
   TMeTransport = class()
+  protected
+    //for Async method.
+    FOnReceived: TMeReceivedDataEvent;
   public
-    function SendData(const aStream: TStream): TStream;
+    //send the aRequest, received the aReply.
+    procedure Send(const aRequest: TStream; const aReply: TStream);virtual;abstract;
+    procedure SendAsyn(const aRequest: TStream);virtual;abstract;
+
+    property OnReceived: TMeReceivedDataEvent read FOnReceived write FOnReceived;
   end;
 
 implementation
