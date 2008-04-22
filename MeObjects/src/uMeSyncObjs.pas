@@ -437,4 +437,17 @@ begin
     RaiseLastOSError;
 end;
 
+initialization
+  {$IFDEF MeRTTI_SUPPORT}
+  SetMeVirtualMethod(TypeOf(TMeSynchroObject), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeHandleObject), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeEvent), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeMutex), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeCriticalSection), ovtVmtClassName, nil);
+  {$ENDIF}
+  SetMeVirtualMethod(TypeOf(TMeSynchroObject), ovtVmtParent, TypeOf(TMeDynamicObject));
+  SetMeVirtualMethod(TypeOf(TMeHandleObject), ovtVmtParent, TypeOf(TMeSynchroObject));
+  SetMeVirtualMethod(TypeOf(TMeEvent), ovtVmtParent, TypeOf(TMeHandleObject));
+  SetMeVirtualMethod(TypeOf(TMeMutex), ovtVmtParent, TypeOf(TMeHandleObject));
+  SetMeVirtualMethod(TypeOf(TMeCriticalSection), ovtVmtParent, TypeOf(TMeSynchroObject));
 end.
