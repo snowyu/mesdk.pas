@@ -138,7 +138,7 @@ type
   TMeClass = ^TMeVMT;
 
   PMeVMT = ^TMeVMT;
-  TMeVMT = record
+  TMeVMT = object
     Init: Pointer;
     Destroy: Pointer;
     ParentClass: TMeClass;
@@ -808,6 +808,8 @@ asm
         { ->    EAX     Pointer to our class    }
         {       EDX     Pointer to aParentClass }
         { <-    AL      Boolean result          }
+        TEST    EAX,EAX
+        JE      @@exit
 @@loop:
         CMP     EAX,EDX
         JE      @@success
