@@ -9,6 +9,7 @@ uses
   ActiveX
   , uMeSystem
   , uAXScript
+  , uAXScriptDebug
   , uAXScriptInf
   , uAXScriptObj
   ;
@@ -61,6 +62,12 @@ end;
 
 //}
 
+procedure DoScriptErrorDebug(Self: TObject; const Sender: TObject; const aErrorDebug: IActiveScriptErrorDebug;
+                var aEnterDebugger : BOOL;var aCallOnScriptErrorWhenContinuing : BOOL);
+begin
+  writeln('ScriptErrorDebug');
+end;
+
 procedure DoScriptError(Self: TObject; Sender : TObject; Line, Pos : integer; ASrc : string; ADescription : string);
 begin
   Writeln('Script(', Line, ',', Pos, ') Error:', ADescription);
@@ -79,7 +86,7 @@ var
   vObj: IDispatch;
   //FEngine: IActiveScript;
   //FParser: IActiveScriptParse;
-  FSite: TAXScriptSite;//IActiveScriptSite;
+  FSite: TAXScriptSiteDebug;//IActiveScriptSite;
   oldCW: Word;
   vDLL: HModule = 0;
   vScript: string;
@@ -92,13 +99,16 @@ begin
 
   //try
   CoInitialize(nil);
-  FSite := TAXScriptSite.Create;
+  FSite := TAXScriptSiteDebug.Create;
   try
     FSite.ScriptLanguage := ParamStr(1);
     writeln('Lang=',FSite.ScriptLanguage);
     vObj := TActiveAppHelper.Create;
     FSite.AddNamedItem('WScript', vObj);
     FSite.OnError := TAXScriptErrorEvent(ToMethod(@DoScriptError));
+    FSite.OnErrorDebug := TAXErrorDebugEvent(ToMethod(@DoScriptErrorDebug));
+    FSite.AppName := 'My AX Scripter';
+    FSite.BreakOnStart := True;
 
     with TStringList.Create do
     try
@@ -114,7 +124,8 @@ begin
     end;
     //Writeln(vScript);
     try
-    FSite.Execute(vScript);
+      FSite.Execute(vScript);
+      ReadLn;
     except
       on e: exception do
         Writeln(e.className, ' ', e.message);
