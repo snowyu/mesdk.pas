@@ -183,6 +183,9 @@ const
   SID_IBindEventHandler =             '{63CDBCB0-C1B1-11d0-9336-00A0C90DCAA9}';
   SID_IActiveScriptStats =            '{B8DA6310-E19B-11d0-933C-00A0C90DCAA9}';
 
+  SID_ProcessDebugManager  =          '{51973C2f-CB0C-11d0-B5C9-00A0244A0E7A}';
+  SID_MachineDebugManager  =          '{51973C2c-CB0C-11d0-B5C9-00A0244A0E7A}';
+
   SCLSID_ProcessDebugManager  = '{78a51822-51f4-11d0-8f20-00805f2cd064}';
   SCLSID_MachineDebugManager  ='{0C0A3666-30C9-11D0-8F20-00805F2CD064}';
 
@@ -833,8 +836,8 @@ When called like this, the script engine will call IActiveScriptSite::GetItemInf
 
     // Once a script block has been defined, this method allows the
     // associate range and script engine to be retrieved.
-    function GetScriptBlockInfo(const dwSourceContext : DWORD;out ppasd : IActiveScript;
-                                out piCharPos : ULONG;out pcChars : ULONG) : HRESULT; stdcall;
+    function GetScriptBlockInfo(const dwSourceContext : DWORD;var ppasd : IActiveScript;
+                                var piCharPos : ULONG;var pcChars : ULONG) : HRESULT; stdcall;
 
     // Allows the host to create a new debug document context
     function CreateDebugDocumentContext(const iCharPos, cChars : ULONG;

@@ -96,34 +96,188 @@ unit uAXScriptDebug;
 interface
 
 uses
-  Windows, SysUtils, ActiveX
+  Windows, SysUtils, ActiveX, ComObj
   , uAXScriptInf
   , uAXScript
   ;
 
 type
+  TAXErrorDebugEvent = procedure(const Sender: TObject; const aErrorDebug: IActiveScriptErrorDebug;
+                var aEnterDebugger : BOOL;var aCallOnScriptErrorWhenContinuing : BOOL) of object;
+
   TAXScriptSiteDebug = class(TAXScriptSite, IActiveScriptSiteDebug)
   protected
     FProcessDebugManager: IProcessDebugManager;
     FDebugApp: IDebugApplication;
+    FDebugDocHelper: IDebugDocumentHelper;
     FAppCookie: DWORD;
-    FAppName: string;
+    FAppName: WideString;
+    FCanDebugError: Boolean;
+    FBreakOnStart: Boolean;
+    FOnErrorDebug: TAXErrorDebugEvent;
+
+    procedure SetAppName(const Value: WideString);
 
     procedure InitDebugApplication;
+    procedure iExecute(const aCode: WideString);override;
+    procedure CreateScriptEngine(const Language: string);override;
+
+    {IActiveScriptSiteDebug Interface}
+    function GetDocumentContextFromPosition(const dwSourceContext : DWORD;
+          const uCharacterOffset: ULONG; const uNumChars : ULONG;
+          out ppsc : IDebugDocumentContext) : HRESULT; stdcall;
+
+    function GetApplication(out ppda : IDebugApplication) : HRESULT; stdcall;
+    function GetRootApplicationNode(out ppdanRoot : IDebugApplicationNode) : HRESULT; stdcall;
+    function OnScriptErrorDebug(const pErrorDebug : IActiveScriptErrorDebug;
+                out pfEnterDebugger : BOOL;out pfCallOnScriptErrorWhenContinuing : BOOL) : HRESULT; stdcall;
   public
+    constructor Create({$IFDEF UseComp}aOwner: TComponent = nil{$ENDIF}); override;
+
+    property AppName: WideString read FAppName write SetAppName;
+    property CanDebugError: Boolean read FCanDebugError write FCanDebugError default true;
+    property BreakOnStart: Boolean read FBreakOnStart write FBreakOnStart;
+    property OnErrorDebug: TAXErrorDebugEvent read FOnErrorDebug write FOnErrorDebug;
   end;
 
 implementation
 
-procedure TAXScriptSiteDebug.InitDebugApplication;
+{ TAXScriptSiteDebug }
+constructor TAXScriptSiteDebug.Create;
 begin
-  CoCreateInstance(CLSID_ProcessDebugManager, nil,
+  inherited;
+  FCanDebugError := True;
+end;
+
+procedure TAXScriptSiteDebug.CreateScriptEngine(const Language: string);
+begin
+  InitDebugApplication;
+  inherited;
+end;
+
+procedure TAXScriptSiteDebug.iExecute(const aCode: WideString);
+var
+  hr: HRESULT;
+  dw: Longword;
+begin
+  hr := FDebugDocHelper.AddUnicodeText(PWideChar(aCode));
+  OleCheck(hr);
+
+  hr := FDebugDocHelper.DefineScriptBlock(0, Length(aCode), FEngine, False, dw);
+  OleCheck(hr);
+
+  inherited;
+  if FBreakOnStart then
+  begin
+    //startup the debugger session
+    hr := FDebugDocHelper.BringDocumentToTop();
+    if hr <> S_OK then 
+      raise Exception.Create('Can not startup the debugger session');
+    //OleCheck(hr);
+
+    hr := FDebugApp.CauseBreak();
+    if hr <> S_OK then 
+      raise Exception.Create('Can not CauseBreak');
+    //OleCheck(hr);
+  end;
+end;
+
+procedure TAXScriptSiteDebug.InitDebugApplication;
+var
+  hr: HRESULT;
+begin
+  hr := CoCreateInstance(CLSID_ProcessDebugManager, nil,
         CLSCTX_INPROC_SERVER or CLSCTX_INPROC_HANDLER
         or CLSCTX_LOCAL_SERVER, IProcessDebugManager, FProcessDebugManager);
+  OleCheck(hr);
 
-  FProcessDebugManager.CreateApplication(FDebugApp);
-  FDebugApp.SetName(FAppName);
-  FProcessDebugManager.AddApplication(FDebugApp, FAppCookie);
+  hr := FProcessDebugManager.CreateApplication(FDebugApp);
+  OleCheck(hr);
+
+  hr := FDebugApp.SetName(PWideChar(FAppName));
+  OleCheck(hr);
+
+  hr := FProcessDebugManager.AddApplication(FDebugApp, FAppCookie);
+  OleCheck(hr);
+
+  hr := FProcessDebugManager.CreateDebugDocumentHelper(nil, FDebugDocHelper);
+  OleCheck(hr);
+
+  hr := FDebugDocHelper.Init(FDebugApp, PWideChar(AppName), 'Scripted Current Text', TEXT_DOC_ATTR_READONLY);
+  OleCheck(hr);
+
+  hr := FDebugDocHelper.Attach(nil);
+  OleCheck(hr);
+
+  hr := FDebugDocHelper.SetDocumentAttr(TEXT_DOC_ATTR_READONLY);
+  OleCheck(hr);
 end;
+
+// Used by the language engine to delegate IDebugCodeContext::GetSourceContext. 
+function TAXScriptSiteDebug.GetDocumentContextFromPosition(const dwSourceContext : DWORD;
+      const uCharacterOffset: ULONG; const uNumChars : ULONG;
+      out ppsc : IDebugDocumentContext) : HRESULT;
+var
+  vStartPos: LongWord;
+begin
+  vStartPos := 0;
+  if Assigned(FDebugDocHelper) then
+  begin
+    Result := FDebugDocHelper.GetScriptBlockInfo(dwSourceContext, IActiveScript(vStartPos), vStartPos, vStartPos);
+    if Result = S_OK then
+      Result := FDebugDocHelper.CreateDebugDocumentContext(vStartPos + uCharacterOffset, uNumChars, ppsc);
+  end
+  else
+    Result := E_NOTIMPL;
+end;
+
+
+// Returns the debug application object associated with this script site. Provides 
+// a means for a smart host to define what application object each script belongs to. 
+// Script engines should attempt to call this method to get their containing application 
+// and resort to IProcessDebugManager::GetDefaultApplication if this fails. 
+function TAXScriptSiteDebug.GetApplication(out ppda : IDebugApplication) : HRESULT; 
+begin
+  {if Assigned(FDebugApp) then
+  begin
+    FDebugApp.AddRef();
+  end; //}
+
+  ppda := FDebugApp;
+
+	Result := S_OK;
+end;
+
+// Gets the application node under which script documents should be added 
+// can return NULL if script documents should be top-level. 
+function TAXScriptSiteDebug.GetRootApplicationNode(out ppdanRoot : IDebugApplicationNode) : HRESULT; 
+begin
+  if Assigned(FDebugDocHelper) then
+    Result := FDebugDocHelper.GetDebugApplicationNode(ppdanRoot)
+  else
+    Result := E_NOTIMPL;
+end;
+
+function TAXScriptSiteDebug.OnScriptErrorDebug(const pErrorDebug : IActiveScriptErrorDebug;
+            out pfEnterDebugger : BOOL;out pfCallOnScriptErrorWhenContinuing : BOOL) : HRESULT; 
+begin
+  pfEnterDebugger := FCanDebugError;
+  if Assigned(FOnErrorDebug) Then
+    FOnErrorDebug(Self, pErrorDebug, pfEnterDebugger, pfCallOnScriptErrorWhenContinuing);
+  Result := S_OK;
+end;
+
+procedure TAXScriptSiteDebug.SetAppName(const Value: WideString);
+begin
+  if Value <> FAppName Then
+  begin
+    if Assigned(FDebugApp) then
+    begin
+      OleCheck(FDebugApp.SetName(PWideChar(Value)));
+    end;
+    FAppName := Value;
+  end;
+end;
+
 
 end.
