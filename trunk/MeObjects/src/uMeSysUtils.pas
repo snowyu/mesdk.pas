@@ -51,8 +51,9 @@ implementation
 
 type
   {
-  this very simplest version to implement the FreeNotify On object.Free.
+  this very simplest to implement the FreeNotify On object.Free.
   it inject the TObject.FreeInstance method and check it here!!
+  the good way should be inject the virtual method on the proper class, not on the TObject!
   }
   TFreeNotificationObjects = class;
   PFreeNotificationInfo = ^ TFreeNotificationInfo;
