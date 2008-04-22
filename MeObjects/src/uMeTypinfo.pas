@@ -136,11 +136,11 @@ type
 
   //Delphi (since version 7) supports extended RTTI on the methods of a class - by compiling the class with $METHODINFO ON defined. This RTTI includes the signature information of the public and published methods. Delphi uses this to implement scripting of Delphi code in the WebSnap framework - see ObjAuto and friends for the details.
   TParamLocation = (plUnknown=-1, plEAX=0, plEDX=1, plECX=2, plStack1=3, plStackN=$FFFF);
-  TParamFlag =  (pfVar, pfConst, pfArray, pfAddress, pfReference, pfOut, pfResult);
-  TParamFlags = set of TParamFlag;
+  TMethodParamFlag =  (mpfVar, mpfConst, mpfArray, mpfAddress, mpfReference, mpfOut, mpfResult);
+  TMethodParamFlags = set of TMethodParamFlag;
   PMethodParam = ^TMethodParam;
   TMethodParam = record
-    Flags: TParamFlags;
+    Flags: TMethodParamFlags;
     ParamName: string;
     TypeName: string;
     TypeInfo: PTypeInfo;
@@ -1611,7 +1611,7 @@ function GetMethodSignature(Event: PPropInfo): TMethodSignature;
         Parameters: array[0..1023] of Char
        {Parameters: array[1..ParamCount] of
           record
-            Flags: TParamFlags;
+            Flags: TMethodParamFlags;
             ParamName: ShortString;
             TypeName: ShortString;
           end;
@@ -1619,7 +1619,7 @@ function GetMethodSignature(Event: PPropInfo): TMethodSignature;
 type
   PParamListRecord = ^TParamListRecord;
   TParamListRecord = packed record 
-    Flags: TParamFlags;
+    Flags: TMethodParamFlags;
     ParamName: {packed} ShortString; // Really string[Length(ParamName)]
     TypeName:  {packed} ShortString; // Really string[Length(TypeName)]
   end;
@@ -1658,7 +1658,7 @@ type
   end;
   PParamInfo = ^TParamInfo;
   TParamInfo = packed record
-    Flags: TParamFlags;
+    Flags: TMethodParamFlags;
     ParamType: PPTypeInfo;
     Access: Word;
     Name: ShortString;
@@ -1740,7 +1740,7 @@ begin
       begin
         MethodParam := @MethodInfo.Parameters[j];
         MethodParam.Flags      := ParameterRTTI.Flags;
-        if pfResult in MethodParam.Flags 
+        if mpfResult in MethodParam.Flags 
         then MethodParam.ParamName  := 'Result'
         else MethodParam.ParamName  := ParameterRTTI.Name;
         MethodParam.TypeInfo   := Dereference(ParameterRTTI.ParamType);

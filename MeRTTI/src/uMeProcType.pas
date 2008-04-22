@@ -30,7 +30,7 @@ uses
   , uMeConsts
   , uMeSystem
   , uMeObject
-  , uMeTypInfo
+  //, uMeTypInfo
   , uMeTypes
   ;
 
