@@ -49,7 +49,7 @@ ResourceString
   SErrBreakpointEnd = '. Error message: ';
 
 type
-  TAXScriptErrorEvent = procedure(Sender : TObject; Line, Pos : integer; ASrc : string; ADescription : string) of object;
+  TAXScriptErrorEvent = procedure(Sender : TObject; Line, Pos, Cookie : integer; ASrc : string; ADescription : string) of object;
 
   { TUnknownObject }
 
@@ -93,11 +93,13 @@ type
     FEngine: IActiveScript;
     FParser: IActiveScriptParse;
     FScriptLanguage : string;
-    procedure CreateScriptEngine(const Language: string);
+    procedure CreateScriptEngine(const Language: string);virtual;
     procedure SetScriptLanguage(const Value: string);
     function GetScriptState: SCRIPTSTATE;
     procedure SetScriptState(const Value: SCRIPTSTATE);
+    procedure InitGlobalObjects(const aEngine: IActiveScript);
   protected
+    procedure iExecute(const aCode: WideString);virtual;
     { IActiveScriptSite }
     function  GetLCID(out plcid: LongWord): HResult; stdcall;
     function GetItemInfo(
@@ -117,7 +119,7 @@ type
     function Release: Integer;
     function Compile(const aCode: WideString): HResult;
     function RunExpression(const ACode : Widestring) : string;
-    procedure  Execute(const ACode : WideString);
+    procedure  Execute(const aCode : WideString);
     procedure CloseScriptEngine;
     procedure AddNamedItem(AName : string; AIntf : IUnknown);
 
@@ -343,8 +345,7 @@ begin
   hr := FParser.InitNew();
   OLECHECK(hr);
 
-  for I := 0 to FGlobalObjects.NamedItemCount - 1 do
-    FEngine.AddNamedItem(PWideChar(WideString(FGlobalObjects.NamedItemName[I])), SCRIPTITEM_ISVISIBLE or SCRIPTITEM_GLOBALMEMBERS);
+  InitGlobalObjects(FEngine);
 
   {
   //!! the tamarin egine has no GetScriptDispatch interface!
@@ -354,6 +355,13 @@ begin
   FDisp := Disp; //}
 end;
 
+procedure TAXScriptSite.InitGlobalObjects(const aEngine: IActiveScript);
+var
+  I: Integer;
+begin
+  for I := 0 to FGlobalObjects.NamedItemCount - 1 do
+    aEngine.AddNamedItem(PWideChar(WideString(FGlobalObjects.NamedItemName[I])), SCRIPTITEM_ISVISIBLE or SCRIPTITEM_GLOBALMEMBERS);
+end;
 
 procedure TAXScriptSite.CloseScriptEngine;
 begin
@@ -374,8 +382,8 @@ begin
     SCRIPTTEXT_ISEXPRESSION, AResult, ExcepInfo) = S_OK
     then
       Result := AResult
-        else
-          Result := '';
+    else
+      Result := '';
 end;
 
 function TAXScriptSite.Compile(const aCode: WideString): HResult;
@@ -388,7 +396,7 @@ begin
   Result := FParser.ParseScriptText(PWideChar(ACode), nil, nil, nil, 0, 0, SCRIPTTEXT_DELAYEXECUTION, vResult, ExcepInfo);
 end;
 
-procedure TAXScriptSite.Execute(const ACode: Widestring);
+procedure TAXScriptSite.iExecute(const aCode: WideString);
 var
   vName: Widestring;
   vResult: OleVariant;
@@ -396,23 +404,15 @@ var
   vScript: IActiveScript;
   Disp: IDispatch;
 begin
+  FParser.ParseScriptText(PWideChar(ACode), nil, nil, nil, 0, 0, SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_ISVISIBLE or SCRIPTTEXT_DELAYEXECUTION, vResult, ExcepInfo);
+end;
+
+procedure TAXScriptSite.Execute(const aCode: WideString);
+begin
   if not Assigned(FEngine) then
     CreateScriptEngine(FScriptLanguage);
-  //FEngine.SetScriptState(SCRIPTSTATE_INITIALIZED);
-  //writeln('1ScriptState=',GetScriptState);
-  vName := 'Main';
-  //OLECHECK(FParser.AddScriptlet(PWideChar(vName), PWideChar(ACode), PWideChar(vName), nil, nil, '', 0, 0, SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_ISVISIBLE, vName, ExcepInfo));
-  FParser.ParseScriptText(PWideChar(ACode), nil, nil, nil, 0, 0, SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_ISVISIBLE or SCRIPTTEXT_DELAYEXECUTION, vResult, ExcepInfo);
-  //writeln('2ScriptState=',GetScriptState,' vName=');
-  //FParser.ParseScriptText('__Main__', nil, nil, nil, 0, 0, 0, vResult, ExcepInfo);
-  //FParser.ParseScriptText(nil, nil, nil, nil, 0, 0, SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_DELAYEXECUTION, vResult, ExcepInfo);
-  FEngine.SetScriptState(SCRIPTSTATE_CONNECTED);
-  //writeln('3ScriptState=',GetScriptState,' vName=');
-  //vName := nil;
-  //FParser.ParseScriptText(PWideChar(ACode), nil, nil, nil, 0, 0, SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_ISVISIBLE or SCRIPTTEXT_DELAYEXECUTION, vResult, ExcepInfo);
-  //OLECHECK(FParser.AddScriptlet(nil, PWideChar(ACode), PWideChar(vName), nil, '', '', 0, 0, SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_ISVISIBLE, vName, ExcepInfo));
-
-  //OleCheck(FEngine.GetScriptDispatch(nil, Disp));
+  iExecute(aCode);
+  OleCheck(FEngine.SetScriptState(SCRIPTSTATE_CONNECTED));
 end;
 
 function TAXScriptSite.GetScriptState: SCRIPTSTATE;
@@ -494,12 +494,12 @@ begin
       pScriptError.GetSourceLineText(SourceLineW);
       SourceLine := SourceLineW;
       if Assigned(FOnError) then
-        FOnError(Self, LineNo, CharNo, SourceLine, Desc);
+        FOnError(Self, LineNo, CharNo, wCookie, SourceLine, Desc);
     end;
 end;
 
 function TAXScriptSite.OnScriptTerminate(var pvarResult: OleVariant;
-  var pexcepinfo: EXCEPINFO): HResult;
+  var pExcepInfo: EXCEPINFO): HResult;
 begin
   Result := S_OK;
 end;
