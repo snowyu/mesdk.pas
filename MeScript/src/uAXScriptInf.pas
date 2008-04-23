@@ -202,6 +202,9 @@ const
   IID_IActiveScriptError:             TGUID = SID_IActiveScriptError;
   IID_IBindEventHandler:              TGUID = SID_IBindEventHandler;
   IID_IActiveScriptStats:             TGUID = SID_IActiveScriptStats;
+  IID_ProcessDebugManager:            TGUID = SID_ProcessDebugManager;
+  IID_MachineDebugManager:            TGUID = SID_MachineDebugManager;
+
   CLSID_ProcessDebugManager:            TGUID = SCLSID_ProcessDebugManager;
   CLSID_MachineDebugManager:            TGUID = SCLSID_MachineDebugManager;
 
