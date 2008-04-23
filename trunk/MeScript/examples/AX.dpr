@@ -105,10 +105,13 @@ begin
     writeln('Lang=',FSite.ScriptLanguage);
     vObj := TActiveAppHelper.Create;
     FSite.AddNamedItem('WScript', vObj);
+    FSite.CanDebug := True;
     FSite.OnError := TAXScriptErrorEvent(ToMethod(@DoScriptError));
     FSite.OnErrorDebug := TAXErrorDebugEvent(ToMethod(@DoScriptErrorDebug));
     FSite.AppName := 'My AX Scripter';
-    FSite.BreakOnStart := True;
+    //FSite.Compile('a = 4;WScript.Echo(a)');
+    //writeln('ssss');
+    //FSite.BreakOnStart := True;
 
     with TStringList.Create do
     try
