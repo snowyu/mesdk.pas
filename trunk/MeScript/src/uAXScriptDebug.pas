@@ -1,5 +1,4 @@
 
-
 { Summary: the AX Script Debug
 
 
@@ -133,12 +132,17 @@ type
                 out pfEnterDebugger : BOOL;out pfCallOnScriptErrorWhenContinuing : BOOL) : HRESULT; stdcall;
   public
     constructor Create({$IFDEF UseComp}aOwner: TComponent = nil{$ENDIF}); override;
+    procedure OpenDebugger;
 
     property AppName: WideString read FAppName write SetAppName;
     property CanDebugError: Boolean read FCanDebugError write FCanDebugError default true;
     property BreakOnStart: Boolean read FBreakOnStart write FBreakOnStart;
     property OnErrorDebug: TAXErrorDebugEvent read FOnErrorDebug write FOnErrorDebug;
   end;
+
+resourcestring
+  rsErrorOpenDebuggerFailed = 'Failed to start debugger session';
+  rsErrorCauseBreak = 'Can not CauseBreak';
 
 implementation
 
@@ -172,12 +176,12 @@ begin
     //startup the debugger session
     hr := FDebugDocHelper.BringDocumentToTop();
     if hr <> S_OK then 
-      raise Exception.Create('Can not startup the debugger session');
+      raise Exception.CreateRes(@rsErrorOpenDebuggerFailed);
     //OleCheck(hr);
 
     hr := FDebugApp.CauseBreak();
     if hr <> S_OK then 
-      raise Exception.Create('Can not CauseBreak');
+      raise Exception.CreateRes(@rsErrorCauseBreak);
     //OleCheck(hr);
   end;
 end;
@@ -265,6 +269,13 @@ begin
   if Assigned(FOnErrorDebug) Then
     FOnErrorDebug(Self, pErrorDebug, pfEnterDebugger, pfCallOnScriptErrorWhenContinuing);
   Result := S_OK;
+end;
+
+procedure TAXScriptSiteDebug.OpenDebugger;
+begin
+  if Assigned(FDebugApp) Then
+    if FDebugApp.StartDebugSession() <> S_OK then
+      Raise Exception.CreateRes(@rsErrorOpenDebuggerFailed);
 end;
 
 procedure TAXScriptSiteDebug.SetAppName(const Value: WideString);
