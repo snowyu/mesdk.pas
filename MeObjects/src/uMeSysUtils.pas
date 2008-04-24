@@ -304,7 +304,7 @@ begin
   {$ENDIF}
   for Result := 0 to Count - 1 do
   begin
-    if Items[Result].Instance = aInstance then 
+    if Items[Result].Instance = aInstance then
       exit;
   end;
   {$IFDEF THREADSAFE_SUPPORT}
