@@ -100,8 +100,8 @@ type
     procedure SetScriptState(const Value: SCRIPTSTATE);
     procedure InitGlobalObjects(const aEngine: IActiveScript);
   protected
-    function iParserText(const aCode: WideString): HResult;
-    procedure iExecute(const aCode: WideString);virtual;
+    function iParserText(const aCode: WideString; aFlags: LongWord; var aResult: OleVariant): HResult;virtual;
+    procedure iExecute(const aCode: WideString);
     { IActiveScriptSite }
     function  GetLCID(out plcid: LongWord): HResult; stdcall;
     function GetItemInfo(
@@ -120,7 +120,7 @@ type
     destructor Destroy; override;
     function Release: Integer;
     function Compile(const aCode: WideString): HResult;
-    function RunExpression(const ACode : Widestring) : string;
+    function RunExpression(const ACode : Widestring) : OleVariant;
     procedure  Execute(const aCode : WideString);
     procedure CloseScriptEngine;
     procedure AddNamedItem(AName : string; AIntf : IUnknown);
@@ -374,50 +374,50 @@ begin
   FEngine := nil;
 end;
 
-function TAXScriptSite.RunExpression(const ACode: WideString): string;
+function TAXScriptSite.RunExpression(const ACode: WideString): OleVariant;
 var
-  AResult: OleVariant;
-  ExcepInfo: TExcepInfo;
+  vFlags: LongWord;
 begin
   if not Assigned(FEngine) then
     CreateScriptEngine(FScriptLanguage);
-  if FParser.ParseScriptText(PWideChar(ACode), nil, nil, nil, 0, 0,
-    SCRIPTTEXT_ISEXPRESSION, AResult, ExcepInfo) = S_OK
-    then
-      Result := AResult
-    else
-      Result := '';
+
+  vFlags := SCRIPTTEXT_ISEXPRESSION;
+
+  vFlags := iParserText(ACode, vFlags, Result);
+  if  vFlags <> S_OK then
+  begin
+    VarClear(Result); //Test it by VarIsEmpty
+  end;
 end;
 
 function TAXScriptSite.Compile(const aCode: WideString): HResult;
+var
+  vResult: OleVariant;
+  vFlags: LongWord;
 begin
   if not Assigned(FEngine) then
     CreateScriptEngine(FScriptLanguage);
-  Result := iParserText(aCode)
+  vFlags := SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_DELAYEXECUTION;
+  Result := iParserText(aCode, vFlags, vResult)
 end;
 
-function TAXScriptSite.iParserText(const aCode: WideString): HResult;
+function TAXScriptSite.iParserText(const aCode: WideString; aFlags: LongWord; var aResult: OleVariant): HResult;
 var
   vResult: OleVariant;
   ExcepInfo: TExcepInfo;
-  vFlags: LongWord;
 begin
-  vFlags := SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_DELAYEXECUTION;
   if FCanDebug then 
-    vFlags := vFlags or SCRIPTTEXT_ISVISIBLE;
-  //FParser.ParseScriptText(PWideChar(ACode), nil, nil, nil, 0, 0, SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_ISVISIBLE or SCRIPTTEXT_DELAYEXECUTION, vResult, ExcepInfo);
-  Result := FParser.ParseScriptText(PWideChar(ACode), nil, nil, nil, 0, 0, vFlags, vResult, ExcepInfo);
+    aFlags := aFlags or SCRIPTTEXT_ISVISIBLE;
+  Result := FParser.ParseScriptText(PWideChar(ACode), nil, nil, nil, 0, 0, aFlags, aResult, ExcepInfo);
 end;
 
 procedure TAXScriptSite.iExecute(const aCode: WideString);
 var
-  vName: Widestring;
   vResult: OleVariant;
-  ExcepInfo: TExcepInfo;
-  vScript: IActiveScript;
-  Disp: IDispatch;
+  vFlags: LongWord;
 begin
-  iParserText(aCode);
+  vFlags := SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_DELAYEXECUTION;
+  iParserText(aCode, vFlags, vResult);
 end;
 
 procedure TAXScriptSite.Execute(const aCode: WideString);

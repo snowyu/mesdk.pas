@@ -118,7 +118,7 @@ type
     procedure SetAppName(const Value: WideString);
 
     procedure InitDebugApplication;
-    procedure iExecute(const aCode: WideString);override;
+    function iParserText(const aCode: WideString; aFlags: LongWord; var aResult: OleVariant): HResult; override;
     procedure CreateScriptEngine(const Language: string);override;
 
     {IActiveScriptSiteDebug Interface}
@@ -159,7 +159,7 @@ begin
   inherited;
 end;
 
-procedure TAXScriptSiteDebug.iExecute(const aCode: WideString);
+function TAXScriptSiteDebug.iParserText(const aCode: WideString; aFlags: LongWord; var aResult: OleVariant): HResult;
 var
   hr: HRESULT;
   dw: Longword;
@@ -167,10 +167,12 @@ begin
   hr := FDebugDocHelper.AddUnicodeText(PWideChar(aCode));
   OleCheck(hr);
 
+  //it seems that the DefineScriptBlock can execute once only!
   hr := FDebugDocHelper.DefineScriptBlock(0, Length(aCode), FEngine, False, dw);
-  OleCheck(hr);
+  //OleCheck(hr);
 
-  inherited;
+  Result := inherited iParserText(aCode, aFlags, aResult);
+
   if FBreakOnStart then
   begin
     //startup the debugger session

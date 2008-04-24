@@ -101,14 +101,21 @@ begin
   CoInitialize(nil);
   FSite := TAXScriptSiteDebug.Create;
   try
-    FSite.ScriptLanguage := ParamStr(1);
-    writeln('Lang=',FSite.ScriptLanguage);
+
     vObj := TActiveAppHelper.Create;
     FSite.AddNamedItem('WScript', vObj);
     FSite.CanDebug := True;
     FSite.OnError := TAXScriptErrorEvent(ToMethod(@DoScriptError));
     FSite.OnErrorDebug := TAXErrorDebugEvent(ToMethod(@DoScriptErrorDebug));
     FSite.AppName := 'My AX Scripter';
+    FSite.ScriptLanguage := 'javascript';
+    vScript := 'function test() {return 123}';
+    OleCheck(FSite.Compile(vScript));
+    writeln('execute test function:', vScript);
+    writeln('the result=',FSite.RunExpression('2+2;test()'));
+
+    FSite.ScriptLanguage := ParamStr(1);
+    writeln('Lang=',FSite.ScriptLanguage);
     //FSite.Compile('a = 4;WScript.Echo(a)');
     //writeln('ssss');
     //FSite.BreakOnStart := True;
