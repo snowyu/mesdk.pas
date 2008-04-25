@@ -85,8 +85,9 @@ type
     property NamedItemName[I: Integer]: string read GetNamedItemName;
   end;
 
-  TAXScriptSite = class({$IFDEF UseComp}TComponent{$ELSE}TInterfacedObject{$ENDIF}, IActiveScriptSite)
+  TAXScriptSite = class({$IFDEF UseComp}TComponent{$ELSE}TInterfacedObject{$ENDIF}, IActiveScriptSite, IActiveScriptSiteWindow)
   protected
+    FWindowHandle: HWND;
     FUseSafeSubset : boolean;
     FGlobalObjects : TAXScriptGlobalObjects;
     FOnError : TAXScriptErrorEvent;
@@ -115,6 +116,9 @@ type
     function  OnScriptError(const pScriptError: IActiveScriptError): HResult; stdcall;
     function  OnEnterScript: HResult; stdcall;
     function  OnLeaveScript: HResult; stdcall;
+    {IActiveSriptSiteWindow}
+    function GetWindow(out pHwnd: HWND): HResult; stdcall;
+    function EnableModeless(aEnable: BOOL): HResult; stdcall;
   public
     constructor Create({$IFDEF UseComp}aOwner: TComponent = nil{$ENDIF}); {$IFDEF UseComp}override;{$ELSE}virtual;{$ENDIF}
     destructor Destroy; override;
@@ -127,22 +131,13 @@ type
 
     property CanDebug: Boolean read FCanDebug write FCanDebug;
     property ScriptState: SCRIPTSTATE read GetScriptState write SetScriptState;
+    property WindowHandle: HWND read FWindowHandle write FWindowHandle;
   {$IFDEF UseComp}
   published
   {$ENDIF}
     property ScriptLanguage : string read FScriptLanguage write SetScriptLanguage;
     property OnError : TAXScriptErrorEvent read FOnError write FOnError;
     property UseSafeSubset : boolean read FUseSafeSubset write FUseSafeSubset default false;
-  end;
-
-  TAXScriptSiteWindow = class(TAXScriptSite, IActiveScriptSiteWindow)
-  protected
-    FWindowHandle: HWND;
-    {IActiveSriptSiteWindow}
-    function GetWindow(out pHwnd: HWND): HResult; stdcall;
-    function EnableModeless(aEnable: BOOL): HResult; stdcall;
-  public
-    property WindowHandle: HWND read FWindowHandle write FWindowHandle;
   end;
 
 procedure GetActiveScriptParse(List: TStrings);
@@ -266,6 +261,7 @@ begin
   FScriptLanguage := 'VBScript';
   FGlobalObjects := TAXScriptGlobalObjects.Create;
   FUseSafeSubset := false;
+  FWindowHandle := 0;
 end;
 
 destructor TAXScriptSite.Destroy;
@@ -315,7 +311,7 @@ begin
     Raise Exception.Create('no such lang');
   end;
 
-  hr := ActiveX.CoCreateInstance(ScriptCLSID, nil, CLSCTX_SERVER, IUnknown, vIntf);
+  hr := ActiveX.CoCreateInstance(ScriptCLSID, nil, CLSCTX_INPROC_SERVER, IUnknown, vIntf);
   OLECHECK(hr);
   //vIntf  := CreateComObject(ScriptCLSID);
   //vIntf :=GetActiveOleObject(Language);
@@ -538,21 +534,28 @@ begin
   if FScriptLanguage <> Value then
   begin
     FScriptLanguage := Value;
+    CloseScriptEngine;
   end;
 end;
 
-{ TAXScriptSiteWindow }
-
-function TAXScriptSiteWindow.EnableModeless(aEnable: BOOL): HResult;
+function TAXScriptSite.EnableModeless(aEnable: BOOL): HResult;
 begin
-  Result := S_OK;
+  if FWindowHandle <> 0 then
+    Result := S_OK
+  else
+    Result := E_NOTIMPL;
 end;
 
-function TAXScriptSiteWindow.GetWindow(out pHwnd: HWND): HResult;
+function TAXScriptSite.GetWindow(out pHwnd: HWND): HResult;
 begin
-    pHwnd := FWindowHandle;
+  pHwnd := FWindowHandle;
+  if FWindowHandle <> 0 then
+  begin
     Result := S_OK;
-    //Result := S_FALSE;
+  end
+  else
+    Result := E_NOTIMPL;
+  //Result := S_FALSE;
 end;
 
 

@@ -101,7 +101,6 @@ begin
   CoInitialize(nil);
   FSite := TAXScriptSiteDebug.Create;
   try
-
     vObj := TActiveAppHelper.Create;
     FSite.AddNamedItem('WScript', vObj);
     FSite.CanDebug := True;
@@ -112,7 +111,7 @@ begin
     vScript := 'function test() {return 123}';
     OleCheck(FSite.Compile(vScript));
     writeln('execute test function:', vScript);
-    writeln('the result=',FSite.RunExpression('2+2;test()'));
+    writeln('the result=',FSite.RunExpression('var i=2+2;test();'));
 
     FSite.ScriptLanguage := ParamStr(1);
     writeln('Lang=',FSite.ScriptLanguage);

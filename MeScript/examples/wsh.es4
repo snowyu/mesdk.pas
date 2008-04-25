@@ -1,7 +1,7 @@
 // This is designed to be executed by the 'Windows Scripting Host'.
 
 // The Windows Scripting Host and the executables are provided by Microsoft.
-// It is a script engine that exposes objects named 'WSH' and 'WScript' - 
+// It is a script engine that exposes objects named 'WSH' and 'WScript' -
 // this is a test of using that object.
 
 // Execute this via:
@@ -37,6 +37,26 @@ function BubbleSort(arr) {
   return arr;
  }
 
+function ES4BubbleSort(arr: Array): Array {
+  var temp: Integer;
+  var exchange:Boolean;
+  var i: Integer;
+  var j: Integer;
+  for(i = 0; i<arr.length; i++) {
+   exchange = false;
+   for(j=arr.length-2; j>=i; j--) {
+    if((arr[j+1]) < (arr[j])) {
+     temp = arr[j+1];
+     arr[j+1] = arr[j];
+     arr[j] = temp;
+     exchange = true;
+    }
+   }
+   if(!exchange) break;
+  }
+  return arr;
+ }
+
 var a = new Array(1000);
 
 function FillArray(arr)
@@ -59,34 +79,39 @@ var TotalTime = 'Total Time:' + (getTickCount()-vb) + ' ms';
 WScript.Echo(SortTime)
 WScript.Echo(TotalTime)
 
-public class Greeter 
-{	
-  /**	 * Defines the names that should receive a proper greeting.	 */		
-  public static var validNames:Array = ["Sammy", "Frank", "Dean"];				
-  /**		 * Builds a greeting string using the given name 		 */				
-  public static function sayHello (userName:String = ""):String {			
-    var greeting:String = "Hello World";		 				
+FillArray(a);
+st = getTickCount();
+b = ES4BubbleSort(a);
+SortTime = 'ES4BubbleSort ' + (getTickCount() - st) + ' ms';
+WScript.Echo(SortTime)
+
+public class Greeter
+{
+  /**	 * Defines the names that should receive a proper greeting.	 */
+  public static var validNames:Array = ["Sammy", "Frank", "Dean"];
+  /**		 * Builds a greeting string using the given name 		 */
+  public static function sayHello (userName:String = ""):String {
+    var greeting:String = "Hello World";
     if (userName == "")
-    {				
-      greeting = "Hello, please type your name and then press the enter key";			
-    }			
+    {
+      greeting = "Hello, please type your name and then press the enter key";
+    }
     else if(validName(userName))
     {
-      greeting = "Hello, " + userName + ".";			
+      greeting = "Hello, " + userName + ".";
     }
-    else {				
-      greeting = "Sorry, " + userName + ". Your name is not present in the list.";			
-    }			
-    return greeting;		
-  }				
-  /**		 * Check whether a name is in the validNames list		 */				
+    else {
+      greeting = "Sorry, " + userName + ". Your name is not present in the list.";
+    }
+    return greeting;
+  }
+  /**		 * Check whether a name is in the validNames list		 */
   public static function validName(userName:String):Boolean {
     for (var i in validNames) {
       if (validNames[i] == userName) return true;
     }
     return false;
   }
-  
 }
 
 WScript.Echo(Greeter.sayHello("Frank"))
