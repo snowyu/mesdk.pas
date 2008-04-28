@@ -150,7 +150,7 @@ attention to the man behind the curtain!
 
 unit uAXScriptInf;
 
-{$I MeSetting.inc}
+{$I Jedi.inc}
 
 interface
 

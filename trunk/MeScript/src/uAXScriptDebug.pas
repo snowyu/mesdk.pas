@@ -97,6 +97,8 @@ Then try unchecking and checking the Script option again under Tools |Options| D
 }
 unit uAXScriptDebug;
 
+{$I Jedi.inc}
+
 interface
 
 uses
