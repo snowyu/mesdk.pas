@@ -24,6 +24,8 @@
 
 unit uAXScript;
 
+{$I MeSetting.inc}
+
 interface
 
 uses

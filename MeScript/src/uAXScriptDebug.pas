@@ -74,6 +74,11 @@ main thread is stopped by the debugger. Application can't debug itself while
 its not  multi-threaded or it's not using another process like Script
 Debugger or InterDev. 
 
+Try running regsvr32 "<system_drive>\Program Files\Common Files\Microsoft Shared\VS7Debug\pdm.dll"
+and
+regsvr32 "<VS install path>\Common7\Packages\Debugger\scriptle2.dll"
+Then try unchecking and checking the Script option again under Tools |Options| Debugging|Just-in-time.
+
   License:
     * The contents of this file are released under a dual \license, and
     * you may choose to use it under either the Mozilla Public License
@@ -146,6 +151,31 @@ resourcestring
 
 implementation
 
+(*
+uses 
+  Registry;
+
+const
+  JITDebugKey = '\Software\Microsoft\Windows Script\Settings';
+  JITDebugValue = 'JITDebug';
+
+procedure EnableDebugger(const aEnabled: Boolean);
+var
+  Reg: TRegistry;
+begin
+  Reg := TRegistry.Create;
+  with Reg do
+  try
+    RootKey := HKEY_CURRENT_USER;
+    if OpenKey(JITDebugKey, true) then
+      if ReadInteger(JITDebugValue) <> Ord(aEnabled) then
+        WriteInteger (JITDebugValue, Ord(aEnabled));
+  finally
+    Free;
+  end;
+end;
+*)
+
 { TAXScriptSiteDebug }
 constructor TAXScriptSiteDebug.Create;
 begin
@@ -155,7 +185,9 @@ end;
 
 procedure TAXScriptSiteDebug.CreateScriptEngine(const Language: string);
 begin
-  InitDebugApplication;
+  //EnableDebugger(FCanDebug);
+  if FCanDebug then
+    InitDebugApplication;
   inherited;
 end;
 
@@ -164,16 +196,19 @@ var
   hr: HRESULT;
   dw: Longword;
 begin
-  hr := FDebugDocHelper.AddUnicodeText(PWideChar(aCode));
-  OleCheck(hr);
-
-  //it seems that the DefineScriptBlock can execute once only!
-  hr := FDebugDocHelper.DefineScriptBlock(0, Length(aCode), FEngine, False, dw);
-  //OleCheck(hr);
+  if FCanDebug then
+  begin
+    hr := FDebugDocHelper.AddUnicodeText(PWideChar(aCode));
+    OleCheck(hr);
+  
+    //it seems that the DefineScriptBlock can execute once only!
+    hr := FDebugDocHelper.DefineScriptBlock(0, Length(aCode), FEngine, False, dw);
+    //OleCheck(hr);
+  end;
 
   Result := inherited iParserText(aCode, aFlags, aResult);
 
-  if FBreakOnStart then
+  if FCanDebug and FBreakOnStart then
   begin
     //startup the debugger session
     hr := FDebugDocHelper.BringDocumentToTop();
@@ -251,7 +286,10 @@ begin
 
   ppda := FDebugApp;
 
-	Result := S_OK;
+  if Assigned(FDebugApp) then
+    Result := S_OK
+  else
+    Result := E_NOTIMPL;
 end;
 
 // Gets the application node under which script documents should be added 
@@ -270,7 +308,10 @@ begin
   pfEnterDebugger := FCanDebugError;
   if Assigned(FOnErrorDebug) Then
     FOnErrorDebug(Self, pErrorDebug, pfEnterDebugger, pfCallOnScriptErrorWhenContinuing);
-  Result := S_OK;
+  if FCanDebug then
+    Result := S_OK
+  else
+    Result := E_NOTIMPL;
 end;
 
 procedure TAXScriptSiteDebug.OpenDebugger;

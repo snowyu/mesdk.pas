@@ -103,7 +103,8 @@ begin
   try
     vObj := TActiveAppHelper.Create;
     FSite.AddNamedItem('WScript', vObj);
-    FSite.CanDebug := True;
+    FSite.CanDebug := (System.ParamCount >= 3) and (ParamStr(3) = '/d');
+    FSite.CanDebugError := (System.ParamCount >= 3) and (ParamStr(3) = '/d');
     FSite.OnError := TAXScriptErrorEvent(ToMethod(@DoScriptError));
     FSite.OnErrorDebug := TAXErrorDebugEvent(ToMethod(@DoScriptErrorDebug));
     FSite.AppName := 'My AX Scripter';
