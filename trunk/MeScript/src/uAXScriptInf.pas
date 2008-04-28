@@ -13,6 +13,7 @@
     * rights and limitations under the \license.
     * The Original Code is $RCSfile: uAXScriptInf.pas,v $.
     * The Initial Developers of the Original Code are Riceball LEE.
+    * Portions created by Serhiy Perevoznyk is Copyright (C) 2001-2004
     * Portions created by Riceball LEE is Copyright (C) 2007-2008
     * All rights reserved.
     * Contributor(s):
