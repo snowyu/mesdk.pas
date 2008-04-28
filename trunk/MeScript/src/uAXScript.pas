@@ -49,6 +49,8 @@ ResourceString
   SErrProcessNotAccesible='process is not accessible';
   SErrBreakpointBegin = 'Incorrect breakpoint condition: ';
   SErrBreakpointEnd = '. Error message: ';
+  rsErrorOpenDebuggerFailed = 'Failed to start debugger session';
+  rsErrorCauseBreak = 'Can not CauseBreak';
 
 type
   TAXScriptErrorEvent = procedure(Sender : TObject; Line, Pos, Cookie : integer; ASrc : string; ADescription : string) of object;
@@ -140,6 +142,45 @@ type
     property ScriptLanguage : string read FScriptLanguage write SetScriptLanguage;
     property OnError : TAXScriptErrorEvent read FOnError write FOnError;
     property UseSafeSubset : boolean read FUseSafeSubset write FUseSafeSubset default false;
+  end;
+
+  TAXErrorDebugEvent = procedure(const Sender: TObject; const aErrorDebug: IActiveScriptErrorDebug;
+                var aEnterDebugger : BOOL;var aCallOnScriptErrorWhenContinuing : BOOL) of object;
+
+  TAXScriptSiteDebug = class(TAXScriptSite, IActiveScriptSiteDebug)
+  protected
+    FProcessDebugManager: IProcessDebugManager;
+    FDebugApp: IDebugApplication;
+    FDebugDocHelper: IDebugDocumentHelper;
+    FAppCookie: DWORD;
+    FAppName: WideString;
+    FCanDebugError: Boolean;
+    FBreakOnStart: Boolean;
+    FOnErrorDebug: TAXErrorDebugEvent;
+
+    procedure SetAppName(const Value: WideString);
+
+    procedure InitDebugApplication;
+    function iParserText(const aCode: WideString; aFlags: LongWord; var aResult: OleVariant): HResult; override;
+    procedure CreateScriptEngine(const Language: string);override;
+
+    {IActiveScriptSiteDebug Interface}
+    function GetDocumentContextFromPosition(const dwSourceContext : DWORD;
+          const uCharacterOffset: ULONG; const uNumChars : ULONG;
+          out ppsc : IDebugDocumentContext) : HRESULT; stdcall;
+
+    function GetApplication(out ppda : IDebugApplication) : HRESULT; stdcall;
+    function GetRootApplicationNode(out ppdanRoot : IDebugApplicationNode) : HRESULT; stdcall;
+    function OnScriptErrorDebug(const pErrorDebug : IActiveScriptErrorDebug;
+                out pfEnterDebugger : BOOL;out pfCallOnScriptErrorWhenContinuing : BOOL) : HRESULT; stdcall;
+  public
+    constructor Create({$IFDEF UseComp}aOwner: TComponent = nil{$ENDIF}); override;
+    procedure OpenDebugger;
+
+    property AppName: WideString read FAppName write SetAppName;
+    property CanDebugError: Boolean read FCanDebugError write FCanDebugError default true;
+    property BreakOnStart: Boolean read FBreakOnStart write FBreakOnStart;
+    property OnErrorDebug: TAXErrorDebugEvent read FOnErrorDebug write FOnErrorDebug;
   end;
 
 procedure GetActiveScriptParse(List: TStrings);
@@ -560,6 +601,188 @@ begin
   //Result := S_FALSE;
 end;
 
+
+(*
+uses 
+  Registry;
+
+const
+  JITDebugKey = '\Software\Microsoft\Windows Script\Settings';
+  JITDebugValue = 'JITDebug';
+
+procedure EnableDebugger(const aEnabled: Boolean);
+var
+  Reg: TRegistry;
+begin
+  Reg := TRegistry.Create;
+  with Reg do
+  try
+    RootKey := HKEY_CURRENT_USER;
+    if OpenKey(JITDebugKey, true) then
+      if ReadInteger(JITDebugValue) <> Ord(aEnabled) then
+        WriteInteger (JITDebugValue, Ord(aEnabled));
+  finally
+    Free;
+  end;
+end;
+*)
+
+{ TAXScriptSiteDebug }
+constructor TAXScriptSiteDebug.Create;
+begin
+  inherited;
+  FCanDebugError := True;
+end;
+
+procedure TAXScriptSiteDebug.CreateScriptEngine(const Language: string);
+begin
+  //EnableDebugger(FCanDebug);
+  if FCanDebug then
+    InitDebugApplication;
+  inherited;
+end;
+
+function TAXScriptSiteDebug.iParserText(const aCode: WideString; aFlags: LongWord; var aResult: OleVariant): HResult;
+var
+  hr: HRESULT;
+  dw: Longword;
+begin
+  if FCanDebug then
+  begin
+    hr := FDebugDocHelper.AddUnicodeText(PWideChar(aCode));
+    OleCheck(hr);
+  
+    //it seems that the DefineScriptBlock can execute once only!
+    hr := FDebugDocHelper.DefineScriptBlock(0, Length(aCode), FEngine, False, dw);
+    //OleCheck(hr);
+  end;
+
+  Result := inherited iParserText(aCode, aFlags, aResult);
+
+  if FCanDebug and FBreakOnStart then
+  begin
+    //startup the debugger session
+    hr := FDebugDocHelper.BringDocumentToTop();
+    if hr <> S_OK then 
+      raise Exception.CreateRes(@rsErrorOpenDebuggerFailed);
+    //OleCheck(hr);
+
+    hr := FDebugApp.CauseBreak();
+    if hr <> S_OK then 
+      raise Exception.CreateRes(@rsErrorCauseBreak);
+    //OleCheck(hr);
+  end;
+end;
+
+procedure TAXScriptSiteDebug.InitDebugApplication;
+var
+  hr: HRESULT;
+begin
+  hr := CoCreateInstance(CLSID_ProcessDebugManager, nil,
+        CLSCTX_INPROC_SERVER or CLSCTX_INPROC_HANDLER
+        or CLSCTX_LOCAL_SERVER, IProcessDebugManager, FProcessDebugManager);
+  OleCheck(hr);
+
+  hr := FProcessDebugManager.CreateApplication(FDebugApp);
+  OleCheck(hr);
+
+  hr := FDebugApp.SetName(PWideChar(FAppName));
+  OleCheck(hr);
+
+  hr := FProcessDebugManager.AddApplication(FDebugApp, FAppCookie);
+  OleCheck(hr);
+
+  hr := FProcessDebugManager.CreateDebugDocumentHelper(nil, FDebugDocHelper);
+  OleCheck(hr);
+
+  hr := FDebugDocHelper.Init(FDebugApp, PWideChar(AppName), 'Scripted Current Text', TEXT_DOC_ATTR_READONLY);
+  OleCheck(hr);
+
+  hr := FDebugDocHelper.Attach(nil);
+  OleCheck(hr);
+
+  hr := FDebugDocHelper.SetDocumentAttr(TEXT_DOC_ATTR_READONLY);
+  OleCheck(hr);
+end;
+
+// Used by the language engine to delegate IDebugCodeContext::GetSourceContext. 
+function TAXScriptSiteDebug.GetDocumentContextFromPosition(const dwSourceContext : DWORD;
+      const uCharacterOffset: ULONG; const uNumChars : ULONG;
+      out ppsc : IDebugDocumentContext) : HRESULT;
+var
+  vStartPos: LongWord;
+begin
+  vStartPos := 0;
+  if Assigned(FDebugDocHelper) then
+  begin
+    Result := FDebugDocHelper.GetScriptBlockInfo(dwSourceContext, IActiveScript(vStartPos), vStartPos, vStartPos);
+    if Result = S_OK then
+      Result := FDebugDocHelper.CreateDebugDocumentContext(vStartPos + uCharacterOffset, uNumChars, ppsc);
+  end
+  else
+    Result := E_NOTIMPL;
+end;
+
+
+// Returns the debug application object associated with this script site. Provides 
+// a means for a smart host to define what application object each script belongs to. 
+// Script engines should attempt to call this method to get their containing application 
+// and resort to IProcessDebugManager::GetDefaultApplication if this fails. 
+function TAXScriptSiteDebug.GetApplication(out ppda : IDebugApplication) : HRESULT; 
+begin
+  {if Assigned(FDebugApp) then
+  begin
+    FDebugApp.AddRef();
+  end; //}
+
+  ppda := FDebugApp;
+
+  if Assigned(FDebugApp) then
+    Result := S_OK
+  else
+    Result := E_NOTIMPL;
+end;
+
+// Gets the application node under which script documents should be added 
+// can return NULL if script documents should be top-level. 
+function TAXScriptSiteDebug.GetRootApplicationNode(out ppdanRoot : IDebugApplicationNode) : HRESULT; 
+begin
+  if Assigned(FDebugDocHelper) then
+    Result := FDebugDocHelper.GetDebugApplicationNode(ppdanRoot)
+  else
+    Result := E_NOTIMPL;
+end;
+
+function TAXScriptSiteDebug.OnScriptErrorDebug(const pErrorDebug : IActiveScriptErrorDebug;
+            out pfEnterDebugger : BOOL;out pfCallOnScriptErrorWhenContinuing : BOOL) : HRESULT; 
+begin
+  pfEnterDebugger := FCanDebugError;
+  if Assigned(FOnErrorDebug) Then
+    FOnErrorDebug(Self, pErrorDebug, pfEnterDebugger, pfCallOnScriptErrorWhenContinuing);
+  if FCanDebug then
+    Result := S_OK
+  else
+    Result := E_NOTIMPL;
+end;
+
+procedure TAXScriptSiteDebug.OpenDebugger;
+begin
+  if Assigned(FDebugApp) Then
+    if FDebugApp.StartDebugSession() <> S_OK then
+      Raise Exception.CreateRes(@rsErrorOpenDebuggerFailed);
+end;
+
+procedure TAXScriptSiteDebug.SetAppName(const Value: WideString);
+begin
+  if Value <> FAppName Then
+  begin
+    if Assigned(FDebugApp) then
+    begin
+      OleCheck(FDebugApp.SetName(PWideChar(Value)));
+    end;
+    FAppName := Value;
+  end;
+end;
 
 { TAXScriptGlobalObjects }
 
