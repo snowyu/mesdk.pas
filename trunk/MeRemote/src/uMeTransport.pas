@@ -54,17 +54,59 @@ type
   //abstract Transport class
   TMeTransport = class()
   protected
-    //for Async method.
+    //for Async method:
+    //the default timeout
+    FTimeOut: Integer;
     FOnReceived: TMeReceivedDataEvent;
-  public
-    //send the aRequest, received the aReply.
-    procedure Send(const aRequest: TStream; const aReply: TStream);virtual;abstract;
-    procedure SendAsyn(const aRequest: TStream);virtual;abstract;
 
+    procedure iSendAsyn(const aRequest: TStream; const aReply: TStream; const aTimeOut: Integer = 0);virtual;abstract;
+    procedure iSend(const aRequest: TStream; const aReply: TStream);virtual;abstract;
+  public
+    //ProcessStream(Data, Message)?
+    //send the aRequest, received the aReply.
+    procedure Send(const aRequest: TStream; const aReply: TStream);
+    procedure SendAsyn(const aRequest: TStream; const aReply: TStream; const aTimeOut: Integer = 0);
+
+    property TimeOut: Integer read FTimeOut write FTimeOut;
     property OnReceived: TMeReceivedDataEvent read FOnReceived write FOnReceived;
   end;
 
+  PMeRemoteParam = ^ TMeRemoteParam;
+  TMeRemoteParam = record
+    //if i use the TypeId? how can be sure this typeid is unique both the server and the client?
+    //or the internal type i used id, the extented type used the string.
+    TypeName: string;
+    Value: string;
+  end;
+
+  TMeStreamFormater = class
+  protected
+    function TypeNameToId(const aTypeName: string): TypeId;
+  public
+    //convert stream to params
+    procedure ToParams(const aStream: TStream; const aParams: TMeRemoteParams);virtual;
+    //convert Params to Stream
+    procedure ToStream(const aParams: TMeRemoteParams; const aStream: TStream);virtual;
+  end;
+
 implementation
+
+procedure TMeTransport.SendAsyn(const aRequest: TStream; const aReply: TStream; aTimeOut: Integer = 0);
+begin
+  if Assigned(aRequest) and Assigned(aReply) then
+  begin
+    if aTimeOut = -1 then aTimeOut := FTimeOut;
+    iSendAsyn(aRequest, aReply, aTimeOut);
+  end;
+end;
+
+procedure TMeTransport.Send(const aRequest: TStream; const aReply: TStream);
+begin
+  if Assigned(aRequest) and Assigned(aReply) then
+  begin
+    iSend(aRequest, aReply);
+  end;
+end;
 
 initialization
 end.
