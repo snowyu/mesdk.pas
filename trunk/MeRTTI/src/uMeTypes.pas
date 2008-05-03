@@ -76,6 +76,7 @@ uses
   , uMeConsts
   , uMeSystem
   , uMeObject
+  , uMeTypInfo //the TCallingConvention
   ;
 
 const
@@ -110,7 +111,7 @@ type
    @param ccFastCall the micrsoft fastcall calling convention. use ECX,EDX first, then push Right-to-left, Routine cleanup, 
    @param ccForth is the TurboScript calling convention!
   }
-  TCallingConvention = (ccUnknown=-1, ccRegister, ccCdecl, ccPascal, ccStdCall, ccSafeCall, ccFastCall, ccForth);
+  //TCallingConvention = (ccUnknown=-1, ccRegister, ccCdecl, ccPascal, ccStdCall, ccSafeCall, ccFastCall, ccForth);
   {
   @param pdtSelf the self parameter if the procedure is method.
   }

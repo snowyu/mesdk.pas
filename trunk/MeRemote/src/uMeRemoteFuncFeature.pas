@@ -36,6 +36,8 @@ uses
   {$ENDIF MSWINDOWS}
   SysUtils, Classes
   , uMeObject
+  , uMeStream
+  , uMeSysUtils
   , uMeInterceptor
   , uMeFeature
   , uMeTransport
@@ -43,12 +45,103 @@ uses
 
 type
   TMeRemoteFuncFeature = class(TMeCustomInterceptor)
+  protected
+    FTransport: TMeTransport;
+    function AllowExecute(Sender: TObject; MethodItem: TMeInterceptedMethodItem;
+            const Params: PMeProcParams = nil): Boolean; override;
+    procedure SetTransport(const Value: TMeTransport);
+    procedure TransportFreeNotify(Instance : TObject);
   public
     class function AddTo(aProc:Pointer; const aProcName: string = '';
             aMethodParams: PTypeInfo = nil; const aTransport: TMeTransport = nil): TMeAbstractInterceptor; overload;
+    destructor Destroy; override;
+    property Transport: TMeTransport read FTransport write SetTransport;
   end;
 
 implementation
+
+class function TMeRemoteFuncFeature.AddTo(aProc:Pointer; const aProcName: string;
+         aMethodParams: PTypeInfo; const aTransport: TMeTransport): TMeAbstractInterceptor;
+begin
+  Result := inherited AddToProcedure(aProc, aProcName, aMethodParams);
+  
+  if Assigned(aTransport) then
+    Result.Transport := aTransport;
+end;
+
+destructor TMeRemoteFuncFeature.Destroy;
+begin
+  //FreeAndNil(FTransport);
+  inherited;
+end;
+
+procedure SaveParamsToStream(const aParams: PMeProcParams; const aStream: PMeStream);
+var
+  i: Integer;
+begin
+  for i := 0 to aParams.Count - 1 do
+  begin
+    PMeParam(aParams.Items[i]).SaveToStream(aStream);
+  end;
+end;
+
+procedure LoadParamsFromStream(const aParams: PMeProcParams; const aStream: PMeStream);
+var
+  i: Integer;
+begin
+  for i := 0 to aParams.Count - 1 do
+  begin
+    PMeParam(aParams.Items[i]).LoadFromStream(aStream);
+  end;
+end;
+
+function TMeRemoteFuncFeature.AllowExecute(Sender: TObject; MethodItem: TMeInterceptedMethodItem;
+            const Params: PMeProcParams): Boolean;
+var
+  vStream: PMeMemoryStream;
+  vResultStream: PMeMemoryStream;
+begin
+  Result := False; //do not execute the Original Proc.
+  if Assigned(FTransport) then
+  begin
+    New(vStream, Create);
+    New(vResultStream, Create);
+    try
+      vStream.WriteString(MethodItem.Name);
+      if Assigned(Params) then
+      begin
+        SaveParamsToStream(Params, vStream);
+      end;
+      FTransport.Send(vStream, vResultStream);
+      vResultStream.Seek(0, soBeginning);
+      if Assigned(Params) then
+        LoadParamsFromStream(Params, vResultStream);
+    finally
+      vStream.Free;
+      vResultStream.Free;
+    end;
+  end;
+end;
+
+procedure TMeRemoteFuncFeature.SetTransport(const Value: TMeTransport);
+begin
+  if FTransport <> Value then
+  begin
+    if Assigned(FTransport) then
+    begin
+      RemoveFreeNotification(FTransport, TransportFreeNotify);
+    end;
+    FTransport := Value;
+    if Assigned(FTransport) then
+      AddFreeNotification(FTransport, TransportFreeNotify);
+  end;
+end;
+
+procedure TMeRemoteFuncFeature.TransportFreeNotify(Instance : TObject);
+begin
+  if FTransport = Instance then
+    FTransport := nil;
+end;
 
 initialization
 end.

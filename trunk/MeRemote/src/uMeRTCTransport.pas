@@ -1,6 +1,6 @@
 
 
-{Summary The RTC MeTransport class.}
+{Summary The RTC Server MeTransport class.}
 {
    @author  Riceball LEE(riceballl@hotmail.com)
    @version $Revision: 1.00 $
@@ -15,15 +15,15 @@
     * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
     * implied. See the License for the specific language governing
     * rights and limitations under the \license.
-    * The Original Code is $RCSfile: uMeTransport.pas,v $.
+    * The Original Code is $RCSfile: uMeRTCServerTransport.pas,v $.
     * The Initial Developers of the Original Code are Riceball LEE.
-    * Portions created by Riceball LEE is Copyright (C) 2007-2008
+    * Portions created by Riceball LEE is Copyright (C) 2008
     * All rights reserved.
 
     * Contributor(s):
 
 }
-unit uMeRTCTransport;
+unit uMeRTCServerTransport;
 
 interface
 
@@ -36,19 +36,23 @@ uses
   SysUtils, Classes
   , uMeObject
   , uMeTransport
+  , rtcLog
+  , rtcInfo, rtcConn
+  , rtcDataSrv
   ;
 
 type
-  TMeRTCTransport = class(TMeTransport)
+  TMeRTCServerTransport = class(TMeTransport)
   protected
+    FRemoteFunctions: TList;
     procedure DataProviderCheckRequest(Sender: TRtcConnection);
     procedure DataProviderDisconnect(Sender: TRtcConnection);
     procedure DataProviderListenStart(Sender: TRtcConnection);
     procedure DataProviderListenStop(Sender: TRtcConnection);
     procedure DataProviderDataReceived(Sender: TRtcConnection);
 
-    procedure iSendAsyn(const aRequest: TStream; const aReply: TStream; const aTimeOut: Integer = 0);virtual;abstract;
-    procedure iSend(const aRequest: TStream; const aReply: TStream);virtual;abstract;
+    procedure iSendAsyn(const aRequest: PMeStream; const aReply: PMeStream; const aTimeOut: Integer = 0);override;
+    procedure iSend(const aRequest: PMeStream; const aReply: PMeStream);override;
   public
     DataProvider: TRtcDataProvider;
 
@@ -58,41 +62,62 @@ type
 
 implementation
 var
-  FMyProvider: TMyProvider;
+  FMyProvider: TMeRTCServerTransport;
 
-function GetDataProvider:TMyProvider;
+function GetRTCTransport:TMeRTCServerTransport;
 begin
   if not assigned(FMyProvider) then
-    FMyProvider:=TMyProvider.Create();
+    FMyProvider:=TMeRTCServerTransport.Create();
   Result:=FMyProvider;
 end;
 
-
-procedure TMyProvider.DataProviderListenStart(Sender: TRtcConnection);
+{ TMeRTCServerTransport }
+constructor TMeRTCServerTransport.Create();
+begin
+  inherited;
+  DataProvider := TRtcDataProvider.Create(nil);
+  with DataProvider do
   begin
+    OnListenStart := DataProviderListenStart;
+    OnListenStop := DataProviderListenStop;
+    OnCheckRequest := DataProviderCheckRequest;
+    OnDataReceived := DataProviderDataReceived;
+    OnDisconnect := DataProviderDisconnect;
+  end;
+  
+end;
+
+destructor TMeRTCServerTransport.Destroy();
+begin
+  DataProvider.Free;
+  inherited;
+end;
+
+procedure TMeRTCServerTransport.DataProviderListenStart(Sender: TRtcConnection);
+begin
   try
     FReady:=True;
     XLog('MyProvider Ready.');
   except
     on E:Exception do
       XLog('Error starting MyProvider: '+E.Message);
-    end;
   end;
+end;
 
-procedure TMyProvider.DataProviderListenStop(Sender: TRtcConnection);
-  begin
+procedure TMeRTCServerTransport.DataProviderListenStop(Sender: TRtcConnection);
+begin
   if FReady then
-    begin
+  begin
     try
     except
       on E:Exception do
         XLog('Error shuting down MyProvider: '+E.Message);
-      end;
-    FReady:=False;
     end;
+    FReady:=False;
   end;
+end;
 
-procedure TMyProvider.DataProviderCheckRequest(Sender: TRtcConnection);
+procedure TMeRTCServerTransport.DataProviderCheckRequest(Sender: TRtcConnection);
 begin
   with TRtcDataServer(Sender) do
     //use the Query property to get the query part in the url.
@@ -101,8 +126,8 @@ begin
       Accept;
 end;
 
-procedure TMyProvider.DataProviderDataReceived(Sender: TRtcConnection);
-  begin
+procedure TMeRTCServerTransport.DataProviderDataReceived(Sender: TRtcConnection);
+begin
   // start processing when complete request body was received
   with Sender as TRtcDataServer do
     if Request.Complete then
@@ -114,10 +139,10 @@ procedure TMyProvider.DataProviderDataReceived(Sender: TRtcConnection);
       else
         Write(Request.Method +' Unknown cmd:' + Request.FileName)
     end;
-  end;
+end;
 
-procedure TMyProvider.DataProviderDisconnect(Sender: TRtcConnection);
-  begin
+procedure TMeRTCServerTransport.DataProviderDisconnect(Sender: TRtcConnection);
+begin
   with TRtcDataServer(Sender) do
     begin
     if Request.DataSize>Request.DataIn then
@@ -141,29 +166,7 @@ procedure TMyProvider.DataProviderDisconnect(Sender: TRtcConnection);
            '> DISCONNECTED while sending a Result ('+IntToStr(Response.DataOut)+' of '+IntToStr(Response.DataSize)+' bytes sent).');
       end;
     end;
-  end;
-
-constructor TMyProvider.Create();
-begin
-  inherited;
-  DataProvider := TRtcDataProvider.Create(nil);
-  with DataProvider do
-  begin
-    OnListenStart := DataProviderListenStart;
-    OnListenStop := DataProviderListenStop;
-    OnCheckRequest := DataProviderCheckRequest;
-    OnDataReceived := DataProviderDataReceived;
-    OnDisconnect := DataProviderDisconnect;
-  end;
-  
 end;
-
-destructor TMyProvider.Destroy();
-begin
-  DataProvider.Free;
-  inherited;
-end;
-
 
 initialization
 finalization

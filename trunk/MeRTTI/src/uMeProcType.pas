@@ -30,7 +30,7 @@ uses
   , uMeConsts
   , uMeSystem
   , uMeObject
-  //, uMeTypInfo
+  , uMeTypInfo //the TCallingConvention
   , uMeTypes
   ;
 
@@ -101,7 +101,7 @@ type
   end;
 
   PMeParamData = ^TMeParamData; //For RTTI Cast
-  TMeParamData = record       // 函数参数的数据结构
+  TMeParamData = object       // 函数参数的数据结构
     Flags: TParamFlags;     // 参数传递规则
     ParamName: ShortString; // 参数的名称
     TypeName: ShortString;  // 参数的类型名称
@@ -195,6 +195,8 @@ type
     //you must clearValue first!!
     procedure CopyValue(const src: TMeVarRec);
     function IsByRef: Boolean;
+    procedure LoadFromStream(const aStream: PMeStream);
+    procedure SaveToStream(const aStream: PMeStream; const aStoredParamName: Boolean = False; const aStoredParamType: Boolean = False);
     //Dec the aStackPt. and push the param value to the stack.
     {Note: you MUSY be sure enough space in it.
     但是对于字符串的内存分配如何处理？算了不放在这里！
@@ -1601,6 +1603,39 @@ begin
   Result := FDataType.IsByRef;
 end;
 
+procedure TMeParam.LoadFromStream(const aStream: PMeStream);
+var
+  s: string;
+begin
+  With aStream^ do
+  begin
+    s := ReadString();
+    AsString := s;
+    s := ReadString();
+    s := ReadString();
+  end;
+end;
+
+procedure TMeParam.SaveToStream(const aStream: PMeStream; const aStoredParamName: Boolean; const aStoredParamType: Boolean);
+begin
+  With aStream^ do
+  begin
+    WriteString(AsString);
+    if aStoredParamName then
+    begin
+      WriteString(Name);
+    end
+    else
+      WriteString('');
+    if aStoredParamType and Assigned(DataType.ParamType) then
+    begin
+      WriteString(DataType.GetParamTypeName);
+    end
+    else
+      WriteString('');
+  end;
+end;
+
 { #### TMeParams #### }
 destructor TMeParams.Destroy;
 begin
@@ -1615,7 +1650,7 @@ begin
 end;
 
 {$IFDEF MeRTTI_EXT_SUPPORT}
-function TMeParams.ParamByName(const Value: String): PmeParam;
+function TMeParams.ParamByName(const Value: String): PMeParam;
 var
   i: integer;
 begin
@@ -1630,7 +1665,7 @@ end;
 
 function TMeParams.GetParamValue(const ParamName: String): Variant;
 var
-  vParam: PmeParam;
+  vParam: PMeParam;
 begin
   vParam := ParamByName(ParamName);
   if Assigned(vParam) then

@@ -18,6 +18,7 @@ uses
   TestFramework
   //uStringListEx,
   , uMeObject
+  , uMeTypInfo //the TCallingConvention
   , uMeTypes
   , uMeProcType
   , uMeTypesTest

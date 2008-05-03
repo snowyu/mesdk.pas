@@ -652,6 +652,10 @@ type
     function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; virtual;
     procedure ReadBuffer(var Buffer; Count: Longint);
     procedure WriteBuffer(const Buffer; Count: Longint);
+    function ReadString: string;
+    procedure WriteString(const Value: string);
+    function ReadInteger: Integer;
+    procedure WriteInteger(const Value: Integer);
     //the position is End Of Stream
     function EOF: Boolean;
     function CopyFrom(Source: PMeStream; Count: Int64): Int64;
@@ -2974,10 +2978,43 @@ begin
     raise EMeError.CreateRes(@SReadError);
 end;
 
+function TMeStream.ReadString: string;
+var
+  i: Integer;
+begin
+  Result := '';
+  ReadBuffer(i, SizeOf(i));
+  if i > 0 then
+  begin
+    SetLength(Result, i);
+    ReadBuffer(Result[i], i);
+  end;
+end;
+
+procedure TMeStream.WriteString(const Value: string);
+var
+  i: Integer;
+begin
+  i := Length(Value);
+  WriteBuffer(i, SizeOf(i));
+  if i > 0 then
+    WriteBuffer(Value[1], i);
+end;
+
 procedure TMeStream.WriteBuffer(const Buffer; Count: Longint);
 begin
   if (Count <> 0) and (Write(Buffer, Count) <> Count) then
     raise EMeError.CreateRes(@SWriteError);
+end;
+
+function TMeStream.ReadInteger: Integer;
+begin
+  ReadBuffer(Result, SizeOf(Result));
+end;
+
+procedure TMeStream.WriteInteger(const Value: Integer);
+begin
+  WriteBuffer(Value, SizeOf(Value));
 end;
 
 function TMeStream.CopyFrom(Source: PMeStream; Count: Int64): Int64;

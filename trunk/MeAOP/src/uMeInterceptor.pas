@@ -1650,7 +1650,9 @@ class procedure TMeAbstractInterceptor.ApplyMethodParams(aMethodItem:
 begin
   {$IFDEF MeRTTI_SUPPORT}
   if Assigned(aClass) and (aMethodParams = nil) then
+  begin
     aMethodParams := TypeInfo(TMeObjectMethod);
+  end;
 
   aMethodItem.MethodParams := RegisterProcTypeInfo(aMethodParams, aClass);
 

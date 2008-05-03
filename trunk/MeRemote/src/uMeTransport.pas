@@ -1,4 +1,6 @@
-
+{$IFNDEF MeRTTI_EXT_SUPPORT}
+  $Message Fatal 'need MeRTTI_EXT_SUPPORT'}
+{$ENDIF}
 
 {Summary Abstract MeTransport class and factory.}
 {
@@ -45,12 +47,13 @@ uses
   ;
 
 type
+  TMeTransportClass = class of TMeTransport;
   //how to convert the params to stream?
   {
   http://host/cat/aMethod?param=xx
   i will use REST protocol to do?
   }
-  TMeReceivedDataEvent = procedure (const Sender: TObject; const aReply: TStream) of object;
+  TMeReceivedDataEvent = procedure (const Sender: TObject; const aReply: PMeStream) of object;
   //abstract Transport class
   TMeTransport = class()
   protected
@@ -59,20 +62,23 @@ type
     FTimeOut: Integer;
     FOnReceived: TMeReceivedDataEvent;
 
-    procedure iSendAsyn(const aRequest: TStream; const aReply: TStream; const aTimeOut: Integer = 0);virtual;abstract;
-    procedure iSend(const aRequest: TStream; const aReply: TStream);virtual;abstract;
+    procedure iSendAsyn(const aRequest: TStream; const aReply: PMeStream; const aTimeOut: Integer = 0);virtual;abstract;
+    procedure iSend(const aRequest: TStream; const aReply: PMeStream);virtual;abstract;
   public
     //ProcessStream(Data, Message)?
     //send the aRequest, received the aReply.
-    procedure Send(const aRequest: TStream; const aReply: TStream);
-    procedure SendAsyn(const aRequest: TStream; const aReply: TStream; const aTimeOut: Integer = 0);
+    procedure Send(const aRequest: PMeStream; const aReply: PMeStream);
+    procedure SendAsyn(const aRequest: PMeStream; const aReply: PMeStream; const aTimeOut: Integer = 0);
 
     property TimeOut: Integer read FTimeOut write FTimeOut;
     property OnReceived: TMeReceivedDataEvent read FOnReceived write FOnReceived;
   end;
 
-  PMeRemoteParam = ^ TMeRemoteParam;
-  TMeRemoteParam = record
+{
+  PMeRemoteParamInfo = ^ TMeRemoteParamInfo;
+  TMeRemoteParamInfo = record
+    Index: Integer;
+    Name: string; //
     //if i use the TypeId? how can be sure this typeid is unique both the server and the client?
     //or the internal type i used id, the extented type used the string.
     TypeName: string;
@@ -88,10 +94,14 @@ type
     //convert Params to Stream
     procedure ToStream(const aParams: TMeRemoteParams; const aStream: TStream);virtual;
   end;
+//}
+
+var
+  DefaultTransportClass: TMeTransportClass = nil;
 
 implementation
 
-procedure TMeTransport.SendAsyn(const aRequest: TStream; const aReply: TStream; aTimeOut: Integer = 0);
+procedure TMeTransport.SendAsyn(const aRequest: PMeStream; const aReply: PMeStream; aTimeOut: Integer = 0);
 begin
   if Assigned(aRequest) and Assigned(aReply) then
   begin
