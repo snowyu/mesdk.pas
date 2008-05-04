@@ -40,6 +40,7 @@ uses
   , uMeSysUtils
   , uMeTypInfo
   , uMeProcType
+  , uMeRemoteUtils
   ;
 
 type
@@ -63,7 +64,6 @@ type
     property Instance: Pointer read FInstance write FInstance;
     property Name: string read FName write FName;
     property Proc: Pointer read FProc;
-    property RemoteFunction: PMeProcParams read FRemoteFunction write FRemoteFunction;
   end;
 
   PMeRemmoteFunctions = ^ TMeRemmoteFunctions;
@@ -74,6 +74,9 @@ type
     destructor Destroy;virtual; //override
     procedure Register(const aMethod: TMethod; const aName: string; aProcParams: PTypeInfo = nil);
     function IndexOf(const aMethod: TMethod): Integer;
+    function IndexOfName(const aName: string): Integer;
+    function IsValid(const aName: string; const aMethod: TMethod): Boolean;
+    function Execute(const aName: string; const aIn, aOut: PMeStream): Integer;
 
     property Items[const Index: Integer]: PMeRemmoteFunction read GetItem;
   end;
@@ -104,6 +107,20 @@ begin
   inherited;
 end;
 
+function TMeRemmoteFunctions.Execute(const aName: string; const aIn, aOut: PMeStream): Integer;
+var
+  vItem: PMeRemmoteFunction;
+begin
+  Result := IndexOfName(aName);
+  if Result >= 0 then
+  begin
+    vItem := List[Result];
+    LoadParamsFromStream(vItem, aIn);
+    vItem.Execute;
+    SaveParamsToStream(vItem, aOut);
+  end;
+end;
+
 function TMeRemmoteFunctions.GetItem(const Index: Integer): PMeRemmoteFunction;
 begin
   Result := inherited Get(Index);
@@ -122,18 +139,50 @@ begin
   Result := -1;
 end;
 
+function TMeRemmoteFunctions.IndexOfName(const aName: string): Integer;
+var
+  vItem: PMeRemmoteFunction;
+begin
+  for Result := 0 to Count - 1 do
+  begin
+    vItem := List[Result];
+    if (vItem.FName = aName) then
+      exit;
+  end;
+  Result := -1;
+end;
+
+function TMeRemmoteFunctions.IsValid(const aName: string; const aMethod: TMethod): Boolean;
+var
+  vItem: PMeRemmoteFunction;
+begin
+  Result :=  (aName <> '') and Assigned(aMethod.Code);
+  if Result then
+  for Integer(Result) := 0 to Count - 1 do
+  begin
+    vItem := List[Integer(Result)];
+    if (vItem.FName = aName) or ((vItem.FInstance = aMethod.Data) and (vItem.FProc = aMethod.Code)) then
+    begin
+      Result := False;
+      exit;
+    end;
+  end;
+  Result := True;
+end;
+
 procedure TMeRemmoteFunctions.Register(const aMethod: TMethod; const aName: string; aProcParams: PTypeInfo);
 var
   vFunc: PMeRemmoteFunction;  
 begin
-  if IndexOf(aMethod) < 0 then
+  if IsValid(aName, aMethod) then
   begin
     New(vFunc, Create);
     if Assigned(aMethod.Data) and not Assigned(aProcParams) then
-      aProcParams := TypeInfo(TMeObjectMethod)
+      aProcParams := TypeInfo(TMeObjectMethod);
     vFunc.InitFromType(aProcParams);
     vFunc.FInstance := aMethod.Data;
     vFunc.FProc := aMethod.Code;
+    vFunc.FName := aName;
     Add(vFunc);
   end;
 end;
@@ -142,7 +191,7 @@ initialization
   SetMeVirtualMethod(TypeOf(TMeRemmoteFunction), ovtVmtParent, TypeOf(TMeProcParams));
   SetMeVirtualMethod(TypeOf(TMeRemmoteFunctions), ovtVmtParent, TypeOf(TMeList));
   {$IFDEF MeRTTI_SUPPORT}
-  SetMeVirtualMethod(TypeOf(TMeProcParams), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeRemmoteFunction), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeRemmoteFunctions), ovtVmtClassName, nil);
   {$ENDIF}
 
