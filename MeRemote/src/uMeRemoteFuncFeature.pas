@@ -1,6 +1,6 @@
 
 
-{Summary MeRemote Function Invoker.}
+{Summary MeRemote Function Client Invoker.}
 {
    @author  Riceball LEE(riceballl@hotmail.com)
    @version $Revision: 1.00 $
@@ -41,6 +41,7 @@ uses
   , uMeInterceptor
   , uMeFeature
   , uMeTransport
+  , uMeRemoteUtils
   ;
 
 type
@@ -73,26 +74,6 @@ destructor TMeRemoteFuncFeature.Destroy;
 begin
   //FreeAndNil(FTransport);
   inherited;
-end;
-
-procedure SaveParamsToStream(const aParams: PMeProcParams; const aStream: PMeStream);
-var
-  i: Integer;
-begin
-  for i := 0 to aParams.Count - 1 do
-  begin
-    PMeParam(aParams.Items[i]).SaveToStream(aStream);
-  end;
-end;
-
-procedure LoadParamsFromStream(const aParams: PMeProcParams; const aStream: PMeStream);
-var
-  i: Integer;
-begin
-  for i := 0 to aParams.Count - 1 do
-  begin
-    PMeParam(aParams.Items[i]).LoadFromStream(aStream);
-  end;
 end;
 
 function TMeRemoteFuncFeature.AllowExecute(Sender: TObject; MethodItem: TMeInterceptedMethodItem;
