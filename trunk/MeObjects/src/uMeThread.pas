@@ -145,7 +145,7 @@ type
   an idle state }
 var
   WakeMainThread: TMeNotifyEvent = nil;
-{$IF Defined(MSWINDOWS)}
+{$IFDEF MSWINDOWS}
 { SyncEvent is an Event handle that is signaled every time a thread wishes to
   synchronize with the main thread or is terminating.  This handle us suitable
   for use with WaitForMultipleObjects.  When this object is signaled,
@@ -154,7 +154,8 @@ var
   Synchronize to return.
 }
   SyncEvent: THandle;
-{$ELSEIF Defined(LINUX)}
+{$ENDIF}
+{$IFDEF LINUX}
 { SyncEvent is a set of file descriptors representing a pipe.  The ReadDes field
   is suitable for use within a select or poll call.  When this file descriptor
   is signaled, a background thread wishes to synchronize with the main thread
@@ -164,7 +165,7 @@ var
   as that may cause a background thread to hang waiting for Synchronize to return.
 }
   SyncEvent: TPipeDescriptors;
-{$IFEND}
+{$ENDIF}
 
 implementation
 
@@ -196,76 +197,82 @@ var
 procedure InitThreadSynchronization;
 begin
   InitializeCriticalSection(ThreadLock);
-{$IF Defined(MSWINDOWS)}
+{$IFDEF MSWINDOWS}
   SyncEvent := CreateEvent(nil, True, False, '');
   if SyncEvent = 0 then
     RaiseLastOSError;
-{$ELSEIF Defined(LINUX)}
+{$ENDIF}
+{$IFDEF LINUX}
   if pipe(SyncEvent) < 0 then
     RaiseLastOSError;
-{$IFEND}
+{$ENDIF}
 end;
 
 procedure DoneThreadSynchronization;
 begin
   DeleteCriticalSection(ThreadLock);
-{$IF Defined(MSWINDOWS)}
+{$IFDEF MSWINDOWS}
   CloseHandle(SyncEvent);
-{$ELSEIF Defined(LINUX)}
+{$ENDIF}
+{$IFDEF LINUX}
   __close(SyncEvent.ReadDes);
   __close(SyncEvent.WriteDes);
-{$IFEND}
+{$ENDIF}
 end;
 
 procedure ResetSyncEvent;
-{$IF Defined(LINUX)}
+{$IFDEF LINUX}
 var
   nRead: Integer;
   Dummy: Byte;
-{$IFEND}
+{$ENDIF}
 begin
-{$IF Defined(MSWINDOWS)}
+{$IFDEF MSWINDOWS}
   ResetEvent(SyncEvent);
-{$ELSEIF Defined(LINUX)}
+{$ENDIF}
+{$IFDEF LINUX}
   if (ioctl(SyncEvent.ReadDes, FIONREAD, @nRead) = 0) and (nRead > 0) then
     __read(SyncEvent.ReadDes, Dummy, SizeOf(Dummy));
-{$IFEND}
+{$ENDIF}
 end;
 
 procedure WaitForSyncEvent(Timeout: Integer);
-{$IF Defined(LINUX)}
+{$IFDEF LINUX}
 var
   EventFds: TFDSet;
   Tm: TTimeVal;
-{$IFEND}
+{$ENDIF}
 begin
-{$IF Defined(MSWINDOWS)}
+{$IFDEF MSWINDOWS}
   if WaitForSingleObject(SyncEvent, Timeout) = WAIT_OBJECT_0 then
     ResetSyncEvent;
-{$ELSEIF Defined(LINUX)}
+{$ENDIF}
+{$IFDEF LINUX}
   FD_ZERO(EventFds);
   FD_SET(SyncEvent.ReadDes, EventFds);
   Tm.tv_sec := Timeout div 1000;
   Tm.tv_usec := (Timeout mod 1000) * 1000;
   if select(SyncEvent.ReadDes + 1, @EventFds, nil, nil, @Tm) > 0 then
     ResetSyncEvent;
-{$IFEND}
+{$ENDIF}
 end;
 
 procedure SignalSyncEvent;
-{$IF Defined(LINUX)}
+{$IFDEF LINUX}
 const
   Dummy: Byte = 0;
 var
   nRead: Integer;
-{$IFEND}
+{$ENDIF}
 begin
-{$IF Defined(MSWINDOWS)}
+{$IFDEF MSWINDOWS}
   SetEvent(SyncEvent);
-{$ELSEIF Defined(LINUX)}
+{$ENDIF}
+
+{$IFDEF LINUX}
   if (ioctl(SyncEvent.ReadDes, FIONREAD, @nRead) = 0) and (nRead = 0) then
     __write(SyncEvent.WriteDes, Dummy, SizeOf(Dummy));
-{$IFEND}
+{$ENDIF}
 end;
 
 procedure AddThread;
