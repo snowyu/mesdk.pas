@@ -89,6 +89,7 @@ uses
   , uMeScriptTest
   , uMeURITest
   , uMeSysUtilsTest
+  , uMeThreadTest
   ;
 
 
