@@ -17,6 +17,7 @@ uses
   SysUtils,
   TypInfo,
   IniFiles,
+  //Dialogs,
   TestFramework
   , uMeObject
   , uMeStrUtils
@@ -52,9 +53,21 @@ var
 
 
 procedure TMeT.Execute;
+var
+  S: string;
 begin
   while (InterlockedIncrement(FCount) > 0) and not Terminated do
     Sleep(100);
+  S := 'Hallo, I''m executed in the main thread:';
+  Assert(GetCurrentThreadId <> MainThreadId);
+  EnterMainThread;
+  try
+    Assert(GetCurrentThreadId = MainThreadId);
+    //Writeln(S, GetCurrentThreadId = MainThreadId);
+  finally
+    LeaveMainThread;
+  end;
+  Assert(GetCurrentThreadId <> MainThreadId);
 end;
 
 { TTest_MeCustomThread }
@@ -78,11 +91,11 @@ var
 begin
   FThread.Priority := tpTimeCritical;
   FThread.Resume;
-  Sleep(100);
+  Sleep(50);
   I := -1;
   I := InterlockedExchange(FCount, I);
   //FThread.Terminate;
-  CheckEquals(2, I, ' the count is error.');
+  CheckEquals(1, I, ' the count is error.');
 end;
 
 Initialization
