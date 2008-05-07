@@ -17,9 +17,12 @@
     * The Original Code is $RCSfile: uMeThread.pas,v $.
     * The Initial Developers of the Original Code are Riceball LEE.
     * Portions created by Riceball LEE is Copyright (C) 2007-2008
+    * Portions created by Andreas Hausladen are Copyright (C) 2006-2008 Andreas Hausladen.
+    * Portions created by Indy Pit Crew are Copyright (C) 1993-2005, Chad Z. Hower and the Indy Pit Crew
     * All rights reserved.
 
     * Contributor(s):
+      Andreas Hausladen
 }
 
 unit uMeThread;
@@ -43,8 +46,20 @@ uses
   , uMeSyncObjs
   ;
 
+resourcestring
+  RsAsyncCallNotFinished = 'The asynchronous call is not finished yet';
+  RsLeaveMainThreadNestedError = 'Unpaired call to AsyncCalls.LeaveMainThread()';
+  RsLeaveMainThreadThreadError = 'AsyncCalls.LeaveMainThread() was called outside of the main thread';
+  RsThreadTerminateAndWaitFor  = 'Cannot call TerminateAndWaitFor on FreeAndTerminate threads';
+
+const
+  cWaitAllThreadsTerminatedCount = 1 * 60 * 1000;
+  cWaitAllThreadsTerminatedStep  = 250;
+
 type
   PMeCustomThread = ^ TMeCustomThread;
+  PMeThread = ^ TMeThread;
+  PMeYarn = ^ TMeYarn;
 
   TMeCustomThreadMethod = procedure of object;
 {$IFDEF MSWINDOWS}
@@ -101,7 +116,7 @@ type
     procedure DoTerminate; virtual;
     procedure Execute; virtual; abstract;
     procedure Queue(AMethod: TMeCustomThreadMethod); overload;
-    procedure Synchronize(AMethod: TMeCustomThreadMethod); overload;
+    procedure Synchronize(const aMethod: TMeCustomThreadMethod); overload;
     property ReturnValue: Integer read FReturnValue write FReturnValue;
     property Terminated: Boolean read FTerminated;
     procedure Init; virtual; //override
@@ -139,6 +154,92 @@ type
     property OnTerminate: TMeNotifyEvent read FOnTerminate write FOnTerminate;
   end;
 
+  { Summary: the abstract task object }
+  TMeTask = object(TMeDynamicObject)
+  protected
+    FBeforeRunDone: Boolean;
+
+    procedure AfterRun; virtual;
+    procedure BeforeRun; virtual;
+    function Run: Boolean; virtual; abstract;
+    procedure HandleException(const aException: Exception); virtual;
+  public
+    // The Do's are separate so we can add events later if necessary without
+    // needing the inherited calls to perform them, as well as allowing
+    // us to keep the real runs as protected
+    procedure DoAfterRun;
+    procedure DoBeforeRun;
+    function DoRun: Boolean;
+    procedure DoException(const aException: Exception);
+    // BeforeRunDone property to allow flexibility in alternative schedulers
+    // it will be set to true before executing the DoBeforeRun.
+    property BeforeRunDone: Boolean read FBeforeRunDone;
+  end;
+
+  TMeYarn = object(TMeDynamicObject)
+  end;
+
+  TMeNotifyThreadEvent = procedure(aThread: PMeThread) of object;
+  TMeExceptionThreadEvent = procedure(aThread: PMeThread; aException: Exception) of object;
+  TMeThreadStopMode = (smTerminate, smSuspend);
+  TMeThreadOptions = set of (itoStopped, itoReqCleanup, itoDataOwner, itoTag);
+  {
+    Define: Thread Task; Thread Yarn
+    the thread control the life-time of the Yarn Object !
+    One thread can run a task again and again until stop.
+      a task: beforeRun, Run, afterRun Cleanup
+      you can change task after Cleanup.
+    One thread can run different task one by one.
+  }
+  TMeThread = object(TMeCustomThread)
+  protected
+    FLock: PMeCriticalSection;
+    FYarn: PMeYarn;
+    FLoop: Boolean;
+    FStopMode: TMeThreadStopMode;
+    FOptions: TMeThreadOptions;
+    //FTerminatingException: String;
+    //FTerminatingExceptionClass: TClass;
+    FOnStopped: TMeNotifyThreadEvent;
+    FOnException: TMeExceptionThreadEvent;
+    
+    procedure AfterRun; virtual; //3* not abstract - otherwise it is required
+    procedure AfterExecute; virtual;//5 not abstract - otherwise it is required
+    procedure BeforeExecute; virtual;//1 not abstract - otherwise it is required
+    procedure BeforeRun; virtual; //2* not abstract - otherwise it is required
+    procedure Cleanup; virtual;//4*
+    procedure DoException(AException: Exception); virtual;
+    procedure DoStopped; virtual;
+    procedure Execute; virtual; //override
+    function GetStopped: Boolean;
+    function HandleRunException(AException: Exception): Boolean; virtual;
+    procedure Run; virtual; abstract;
+    class procedure WaitAllThreadsTerminated(AMSec: Integer = cWaitAllThreadsTerminatedCount);
+  public
+    constructor Create(aCreateSuspended: Boolean = True;
+     aLoop: Boolean = True); 
+    destructor Destroy; virtual;
+    procedure Start; virtual;
+    procedure Stop; virtual;
+    procedure Synchronize(const Method: TMeCustomThreadMethod); overload;
+    procedure Terminate; virtual;
+    procedure TerminateAndWaitFor; virtual;
+
+    //Represents the thread or fiber for the scheduler of the thread.
+    //it will be free when the thread free.
+    property Yarn: PMeYarn read FYarn write FYarn;
+    property Loop: Boolean read FLoop write FLoop;
+    property ReturnValue;
+    property StopMode: TMeThreadStopMode read FStopMode write FStopMode;
+    property Stopped: Boolean read GetStopped;
+    property Terminated;
+    property OnStopped: TMeNotifyThreadEvent read FOnStopped write FOnStopped;
+  end;
+
+  TMeThreadPool = object(TMeList)
+  end;
+
+
 { Assign a method to WakeMainThread in order to properly force an event into
   the GUI thread's queue.  This will make sure that non-GUI threads can quickly
   synchronize with the GUI thread even if no events are being processed due to
@@ -166,6 +267,46 @@ var
 }
   SyncEvent: TPipeDescriptors;
 {$ENDIF}
+
+
+{
+   EnterMainThread/LeaveMainThread can be used to temporary switch to the
+   main thread. The code that should be synchonized (blocking) has to be put
+   into a try/finally block and the LeaveMainThread() function must be called
+   from the finally block. A missing try/finally will lead to an access violation.
+   
+   * All local variables can be used. (EBP points to the thread's stack while
+     ESP points the the main thread's stack)
+   * Unhandled exceptions are passed to the surrounding thread.
+   * The integrated Debugger is not able to follow the execution flow. You have
+     to use break points instead of "Step over/in".
+   * Nested calls to EnterMainThread/LeaveMainThread are ignored. But they must
+     strictly follow the try/finally structure.
+
+   Example:
+
+     procedure MyThreadProc;
+     var
+       S: string;
+     begin
+       Assert(GetCurrentThreadId <> MainThreadId);
+       S := 'Hallo, I''m executed in the main thread';
+
+       EnterMainThread;
+       try
+         Assert(GetCurrentThreadId = MainThreadId);
+         ShowMessage(S);
+       finally
+         LeaveMainThread;
+       end;
+
+       Assert(GetCurrentThreadId <> MainThreadId);
+     end;
+
+    @author  Andreas Hausladen
+}
+procedure EnterMainThread;
+procedure LeaveMainThread;
 
 implementation
 
@@ -667,11 +808,11 @@ begin
   end;
 end;
 
-procedure TMeCustomThread.Synchronize(AMethod: TMeCustomThreadMethod);
+procedure TMeCustomThread.Synchronize(const aMethod: TMeCustomThreadMethod);
 begin
   FSynchronize.FThread := @Self;
   FSynchronize.FSynchronizeException := nil;
-  FSynchronize.FMethod := AMethod;
+  FSynchronize.FMethod := aMethod;
   Synchronize(@FSynchronize);
 end;
 
@@ -804,6 +945,551 @@ begin
 end;
 {$ENDIF}
 
+{ TMeTask }
+procedure TMeTask.AfterRun;
+begin
+end;
+
+procedure TMeTask.BeforeRun;
+begin
+end;
+
+procedure TMeTask.HandleException(const aException: Exception);
+begin
+end;
+
+procedure TMeTask.DoAfterRun;
+begin
+  AfterRun;
+end;
+
+procedure TMeTask.DoBeforeRun;
+begin
+  FBeforeRunDone := True;
+  BeforeRun;
+end;
+
+function TMeTask.DoRun: Boolean;
+begin
+  Result := Run;
+end;
+
+procedure TMeTask.DoException(const aException: Exception);
+begin
+  HandleException(aException);
+end;
+
+{ TMeThread }
+class procedure TMeThread.WaitAllThreadsTerminated(AMSec: Integer);
+begin
+  while AMSec > 0 do 
+  begin
+    if ThreadCount = 0 then 
+    begin
+      Break;
+    end;
+    Sleep(cWaitAllThreadsTerminatedStep);
+    AMSec := AMSec - cWaitAllThreadsTerminatedStep;
+  end;
+end;
+
+procedure TMeThread.TerminateAndWaitFor;
+begin
+  if FreeOnTerminate then 
+  begin
+    raise EMeError.Create(RsThreadTerminateAndWaitFor);
+  end;
+  Terminate;
+  Start; //resume
+  WaitFor;
+end;
+
+procedure TMeThread.BeforeRun;
+begin
+end;
+
+procedure TMeThread.AfterRun;
+begin
+end;
+
+procedure TMeThread.BeforeExecute;
+begin
+end;
+
+procedure TMeThread.AfterExecute;
+begin
+end;
+
+procedure TMeThread.Execute;
+begin
+  try
+    BeforeExecute;
+    try
+      while not Terminated do 
+      begin
+        if Stopped then 
+        begin
+          DoStopped;
+          // It is possible that either in the DoStopped or from another thread,
+          // the thread is restarted, in which case we dont want to restop it.
+          if Stopped then 
+          begin // DONE: if terminated?
+            if Terminated then 
+            begin
+              Break;
+            end;
+            Suspend; // Thread manager will revive us
+            if Terminated then 
+            begin
+              Break;
+            end;
+          end;
+        end;
+
+        Include(FOptions, itoReqCleanup);
+        try
+          try
+            BeforeRun;
+            try
+              if Loop then 
+              begin
+                while not Stopped do 
+                begin
+                  try
+                    Run;
+                  except
+                    on E: Exception do 
+                    begin
+                      if not HandleRunException(E) then 
+                      begin
+                        Terminate;
+                        raise;
+                      end;
+                    end;
+                  end;
+                end;
+              end 
+              else begin
+                try
+                  Run;
+                except
+                  on E: Exception do 
+                  begin
+                    if not HandleRunException(E) then 
+                    begin
+                      Terminate;
+                      raise;
+                    end;
+                  end;
+                end; //try-except
+              end;
+            finally
+              AfterRun;
+            end;
+          except
+            Terminate;
+            raise;
+          end;
+        finally
+          Cleanup;
+        end;
+      end;
+    finally
+      AfterExecute;
+    end;
+  except
+    on E: Exception do 
+    begin
+      //FTerminatingExceptionClass := E.ClassType;
+      //FTerminatingException := E.Message;
+      DoException(E);
+      Terminate;
+    end;
+  end;
+end;
+
+constructor TMeThread.Create(aCreateSuspended: Boolean; aLoop: Boolean);
+begin
+  {$IFDEF DOTNET}
+  inherited Create(True);
+  {$ENDIF}
+  //FOptions := [itoDataOwner];
+  if aCreateSuspended then 
+  begin
+    Include(FOptions, itoStopped);
+  end;
+  New(FLock, Create);
+  Loop := aLoop;
+  //
+  {$IFDEF DOTNET}
+  if not aCreateSuspended then 
+  begin
+    Resume;
+  end;
+  {$ELSE}
+  //
+  // Most things BEFORE inherited - inherited creates the actual thread and if
+  // not suspended will start before we initialize
+  inherited Create(aCreateSuspended);
+    {$IFNDEF COMPILER6_UP}
+    // Delphi 6 and above raise an exception when an error occures while
+    // creating a thread (eg. not enough address space to allocate a stack)
+    // Delphi 5 and below don't do that, which results in a TMeThread
+    // instance with an invalid handle in it, therefore we raise the
+    // exceptions manually on D5 and below
+  if (ThreadID = 0) then 
+  begin
+    Raise EMeError.Create('TMeThread: invalid thread handle');;
+  end;
+    {$ENDIF}
+  {$ENDIF}
+  // Last, so we only do this if successful
+end;
+
+destructor TMeThread.Destroy;
+begin
+  FreeOnTerminate := False; //prevent destroy between Terminate & WaitFor
+  Terminate;
+  try
+    if itoReqCleanup in FOptions then 
+    begin
+      Cleanup;
+    end;
+  finally
+    // RLebeau- clean up the Yarn one more time, in case the thread was
+    // terminated after the Yarn was assigned but the thread was not
+    // re-started, so the Yarn would not be freed in Cleanup()
+    try
+      MeFreeAndNil(FYarn);
+    finally
+      // Protect FLock if thread was resumed by Start Method and we are still there.
+      // This usually happens if Exception was raised in BeforeRun for some reason
+      // And thread was terminated there before Start method is completed.
+      FLock.Enter; try
+      finally FLock.Leave; end;
+
+      MeFreeAndNil(FLock);
+    end;
+  end;
+  //FTerminatingException := '';
+  inherited Destroy; //+WaitFor!
+end;
+
+procedure TMeThread.Start;
+begin
+  FLock.Enter; try
+    if Stopped then 
+    begin
+      // Resume is also called for smTerminate as .Start can be used to initially start a
+      // thread that is created suspended
+      if Terminated then 
+      begin
+        Include(FOptions,itoStopped);
+      end 
+      else begin
+        Exclude(FOptions,itoStopped);
+      end;
+      Resume;
+      {APR: [in past] thread can be destroyed here! now Destroy wait FLock}
+    end;
+  finally FLock.Leave; end;
+end;
+
+procedure TMeThread.Stop;
+begin
+  FLock.Enter; try
+    if not Stopped then 
+    begin
+      case FStopMode of
+        smTerminate: Terminate;
+        smSuspend: {DO not suspend here. Suspend is immediate. See Execute for implementation};
+      end;
+      Include(FOptions, itoStopped);
+    end;
+  finally FLock.Leave; end;
+end;
+
+function TMeThread.GetStopped: Boolean;
+begin
+  if Assigned(FLock) then 
+  begin
+    FLock.Enter; try
+      // Suspended may be True if checking stopped from another thread
+      Result := Terminated or (itoStopped in FOptions) or Suspended;
+    finally FLock.Leave; end;
+  end 
+  else begin
+    Result := True; //user call Destroy
+  end;
+end;
+
+procedure TMeThread.DoStopped;
+begin
+  if Assigned(OnStopped) then 
+  begin
+    OnStopped(@Self);
+  end;
+end;
+
+procedure TMeThread.DoException(aException: Exception);
+begin
+  if Assigned(FOnException) then 
+  begin
+    FOnException(@Self, aException);
+  end;
+end;
+
+procedure TMeThread.Terminate;
+begin
+  //this assert can only raise if terminate is called on an already-destroyed thread
+  Assert(FLock<>nil);
+  
+  FLock.Enter; try
+    Include(FOptions, itoStopped);
+    inherited Terminate;
+  finally FLock.Leave; end;
+end;
+
+procedure TMeThread.Cleanup;
+begin
+  Exclude(FOptions, itoReqCleanup);
+  MeFreeAndNil(FYarn);
+  {if itoDataOwner in FOptions then begin
+    FreeAndNil(FData);
+  end;//}
+end;
+
+function TMeThread.HandleRunException(AException: Exception): Boolean;
+begin
+  // Default behavior: Exception is death sentence
+  Result := False;
+end;
+
+procedure TMeThread.Synchronize(const Method: TMeCustomThreadMethod);
+begin
+  inherited Synchronize(Method);
+end;
+
+{----------------------------------------------------------------------------}
+
+type
+  TMainThreadContext = record
+    MainThreadEntered: Longint;
+    MainThreadOpenBlockCount: Longint;
+
+    IntructionPointer: Pointer;
+    BasePointer: Pointer;
+    RetAddr: Pointer;
+
+    MainBasePointer: Pointer;
+    ContextRetAddr: Pointer;
+    FinallyRetAddr: Pointer;
+
+    MainRegEBX, MainRegEDI, MainRegESI: Pointer;
+    ThreadRegEBX, ThreadRegEDI, ThreadRegESI: Pointer;
+  end;
+
+var
+  MainThreadContext: TMainThreadContext;
+  MainThreadContextCritSect: TRTLCriticalSection;
+
+procedure ExecuteInMainThread(Data: TObject);
+asm
+  push ebp
+
+  mov eax, OFFSET MainThreadContext
+
+  { Backup main thread state }
+  mov edx, OFFSET @@Leave
+  mov [eax].TMainThreadContext.ContextRetAddr, edx
+  mov [eax].TMainThreadContext.MainBasePointer, ebp
+
+  { Backup main thread registers }
+  mov [eax].TMainThreadContext.MainRegEBX, ebx
+  mov [eax].TMainThreadContext.MainRegEDI, edi
+  mov [eax].TMainThreadContext.MainRegESI, esi
+
+  { Set "nested call" control }
+  mov ecx, [eax].TMainThreadContext.MainThreadOpenBlockCount
+  mov [eax].TMainThreadContext.MainThreadEntered, ecx
+  inc ecx
+  mov [eax].TMainThreadContext.MainThreadOpenBlockCount, ecx
+
+  { Switch to the thread state }
+  mov ebp, [eax].TMainThreadContext.BasePointer
+  mov edx, [eax].TMainThreadContext.IntructionPointer
+
+  { Swicth to the thread registers }
+  mov ebx, [eax].TMainThreadContext.ThreadRegEBX
+  mov edi, [eax].TMainThreadContext.ThreadRegEDI
+  mov esi, [eax].TMainThreadContext.ThreadRegESI
+
+  { Jump to the user's synchronized code }
+  jmp edx
+
+  { LeaveMainThread() will jump to this address after it has restored the main
+    thread state. }
+@@Leave:
+  pop ebp
+end;
+
+procedure LeaveMainThreadError(ErrorMode: Integer);
+begin
+  case ErrorMode of
+    0: raise Exception.Create(RsLeaveMainThreadNestedError);
+    1: raise Exception.Create(RsLeaveMainThreadThreadError);
+  end;
+end;
+
+function GetMainThreadId: LongWord;
+begin
+  Result := MainThreadId;
+end;
+
+procedure LeaveMainThread;
+asm
+  { Check if we are in the main thread }
+  call GetCurrentThreadId
+  mov ecx, eax
+  call GetMainThreadId
+  cmp eax, ecx
+  jne @@ThreadError
+
+  { "nested call" control }
+  mov eax, OFFSET MainThreadContext
+  mov ecx, [eax].TMainThreadContext.MainThreadOpenBlockCount
+  dec ecx
+  js @@NestedError
+  mov [eax].TMainThreadContext.MainThreadOpenBlockCount, ecx
+  cmp ecx, [eax].TMainThreadContext.MainThreadEntered
+  jne @@Leave
+  { Release "nested call" control }
+  mov [eax].TMainThreadContext.MainThreadEntered, -1
+
+  { Save the current registers for the return, the compiler might have
+    generated code that changed the registers in the synchronized code. }
+  mov [eax].TMainThreadContext.ThreadRegEBX, ebx
+  mov [eax].TMainThreadContext.ThreadRegEDI, edi
+  mov [eax].TMainThreadContext.ThreadRegESI, esi
+  { Restore main thread registers }
+  mov ebx, [eax].TMainThreadContext.MainRegEBX
+  mov edi, [eax].TMainThreadContext.MainRegEDI
+  mov esi, [eax].TMainThreadContext.MainRegESI
+
+  { If there is an exception the Classes.CheckSynchronize function will handle the
+    exception and thread switch for us. Will also restore the EBP regíster. }
+  call System.ExceptObject
+  or eax, eax
+  jnz @@InException
+
+  mov eax, OFFSET MainThreadContext
+  { Backup the return addresses }
+  pop edx // procedure return address
+  pop ecx // finally return address
+  mov [eax].TMainThreadContext.FinallyRetAddr, ecx
+  mov [eax].TMainThreadContext.RetAddr, edx
+
+  { Restore the main thread state }
+  mov ebp, [eax].TMainThreadContext.MainBasePointer
+  mov edx, [eax].TMainThreadContext.ContextRetAddr
+  jmp edx
+
+@@NestedError:
+  xor eax, eax
+  call LeaveMainThreadError
+@@ThreadError:
+  mov eax, 1
+  call LeaveMainThreadError
+
+@@InException:
+@@Leave:
+end;
+
+procedure EnterMainThread;
+asm
+  { There is nothing to do if we are already in the main thread }
+  call GetCurrentThreadId
+  mov ecx, eax
+  call GetMainThreadId
+  cmp eax, ecx
+  je @@InMainThread
+
+  { Enter critical section => implicit waiting queue }
+  mov eax, OFFSET MainThreadContextCritSect
+  push eax
+  call EnterCriticalSection
+
+  { Take the return address from the stack to "clean" the stack }
+  pop edx
+
+  { Backup the current thread state }
+  mov eax, OFFSET MainThreadContext
+  mov [eax].TMainThreadContext.MainThreadEntered, ecx
+  mov [eax].TMainThreadContext.IntructionPointer, edx
+  mov [eax].TMainThreadContext.BasePointer, ebp
+  { Backup the current thread registers }
+  mov [eax].TMainThreadContext.ThreadRegEBX, ebx
+  mov [eax].TMainThreadContext.ThreadRegEDI, edi
+  mov [eax].TMainThreadContext.ThreadRegESI, esi
+
+  { Begin try/finally }
+@@Try:
+  xor eax, eax
+  push ebp
+  push OFFSET @@HandleFinally
+  push dword ptr fs:[eax]
+  mov fs:[eax], esp
+
+  { Call Synchronize(nil, TMethod(ExecuteInMainThread)) }
+  //xor eax, eax // ClassType isn't used in StaticSynchronize/Synchronize
+  xor edx, edx
+  push edx
+  mov ecx, OFFSET ExecuteInMainThread
+  push ecx
+  call TMeCustomThread.StaticSynchronize
+
+  { Clean up try/finally }
+  xor eax,eax
+  pop edx
+  pop ecx
+  pop ecx
+  mov fs:[eax], edx
+
+  { Restore thread state }
+  mov eax, OFFSET MainThreadContext
+  mov ebp, [eax].TMainThreadContext.BasePointer
+  mov ecx, [eax].TMainThreadContext.FinallyRetAddr
+  mov edx, [eax].TMainThreadContext.RetAddr
+
+  push ecx  // put finally return address back to the stack
+  push edx  // put return address back to the stack
+
+  { End try/finally }
+@@Finally:
+  { Restore thread registers } 
+  mov eax, OFFSET MainThreadContext
+  mov ebx, [eax].TMainThreadContext.ThreadRegEBX
+  mov edi, [eax].TMainThreadContext.ThreadRegEDI
+  mov esi, [eax].TMainThreadContext.ThreadRegESI
+
+  { Leave critical section }
+  mov eax, OFFSET MainThreadContextCritSect
+  push eax
+  call LeaveCriticalSection
+  ret
+@@HandleFinally:
+  jmp System.@HandleFinally
+  jmp @@Finally
+@@LeaveFinally:
+  ret
+
+@@InMainThread:
+  { Adjust "nested call" control.
+    Threadsafe because we are in the main thread and only the main thread
+    manipulates MainThreadOpenBlockCount }
+  inc [MainThreadContext].TMainThreadContext.MainThreadOpenBlockCount
+end;
+
 initialization
   {$IFDEF MeRTTI_SUPPORT}
   SetMeVirtualMethod(TypeOf(TMeCustomThread), ovtVmtClassName, nil);
@@ -811,7 +1497,14 @@ initialization
   SetMeVirtualMethod(TypeOf(TMeCustomThread), ovtVmtParent, TypeOf(TMeDynamicObject));
 
   InitThreadSynchronization;
+
+  MainThreadContext.MainThreadEntered := -1;
+  InitializeCriticalSection(MainThreadContextCritSect);
+
+
 finalization
+  DeleteCriticalSection(MainThreadContextCritSect);
+
   MeFreeAndNil(SyncList);
   DoneThreadSynchronization;
   //writeln('ThreadCount=',ThreadCount);
