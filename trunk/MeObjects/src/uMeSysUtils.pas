@@ -33,6 +33,25 @@ uses
   ;
 
 type
+  PMeThreadSafeList = ^ TMeThreadSafeList;
+
+  TMeThreadSafeList = object(TMeDynamicObject)
+  protected
+    FList: PMeList;
+    FLock: PMeCriticalSection;
+    FDuplicates: TDuplicates;
+
+    procedure Init; virtual; //override
+  public
+    destructor Destroy; virtual;
+    procedure Add(const Item: Pointer);
+    procedure Clear;
+    function  LockList: PMeList;
+    procedure Remove(const Item: Pointer);
+    procedure UnlockList;
+    property Duplicates: TDuplicates read FDuplicates write FDuplicates;
+  end;
+
   TFreeNotifyProc = procedure(Instance : TObject) of object;
 
 { Summary: Ensures that aProc is notified that the aInstance is going to be destroyed.}
@@ -49,6 +68,9 @@ RemoveFreeNotification removes the NotificationProc specified by the aProc param
 procedure RemoveFreeNotification(const aInstance : TObject; const aProc : TFreeNotifyProc);
 
 implementation
+
+uses
+  RTLConsts;
 
 type
   {
@@ -366,7 +388,77 @@ begin
     end;
 end;
 
+{ TMeThreadSafeList }
+procedure TMeThreadSafeList.Init;
+begin
+  inherited;
+  New(FList, Create);
+  New(FLock, Create);
+  FDuplicates := dupIgnore;
+end;
+
+destructor TMeThreadSafeList.Destroy;
+begin
+  LockList;    // Make sure nobody else is inside the list.
+  try
+    FList.Free;
+    inherited Destroy;
+  finally
+    UnlockList;
+    FLock.Free;
+  end;
+end;
+
+procedure TMeThreadSafeList.Add(const Item: Pointer);
+begin
+  LockList;
+  try
+    if (Duplicates = dupAccept) or (FList.IndexOf(Item) = -1) then
+      FList.Add(Item)
+    else if Duplicates = dupError then
+      FList.Error(@SDuplicateItem, Integer(Item));
+  finally
+    UnlockList;
+  end;
+end;
+
+procedure TMeThreadSafeList.Clear;
+begin
+  LockList;
+  try
+    FList.Clear;
+  finally
+    UnlockList;
+  end;
+end;
+
+function  TMeThreadSafeList.LockList: PMeList;
+begin
+  FLock.Enter;
+  Result := FList;
+end;
+
+procedure TMeThreadSafeList.Remove(const Item: Pointer);
+begin
+  LockList;
+  try
+    FList.Remove(Item);
+  finally
+    UnlockList;
+  end;
+end;
+
+procedure TMeThreadSafeList.UnlockList;
+begin
+  FLock.Leave;
+end;
+
 initialization
+  {$IFDEF MeRTTI_SUPPORT}
+  SetMeVirtualMethod(TypeOf(TMeThreadSafeList), ovtVmtClassName, nil);
+  {$ENDIF}
+  SetMeVirtualMethod(TypeOf(TMeThreadSafeList), ovtVmtParent, TypeOf(TMeDynamicObject));
+
 finalization
   FreeAndNil(FFreeNotificationObjects);
 end.
