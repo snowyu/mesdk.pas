@@ -26,7 +26,7 @@ uses
 
 type
   PMeT = ^TMeT;
-  TMeT = object(TMeCustomThread)
+  TMeT = object(TMeAbstractThread)
   protected
     procedure Execute;virtual;//override;
   public
@@ -34,7 +34,7 @@ type
 
   TTest_MeCustomThread = class(TTestCase)
   protected
-    FThread: PMeCustomThread;
+    FThread: PMeAbstractThread;
 
     procedure Setup;override;
     procedure TearDown;override;

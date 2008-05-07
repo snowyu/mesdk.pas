@@ -44,6 +44,7 @@ uses
   , uMeObject
   , uMeSystem
   , uMeSyncObjs
+  , uMeSysUtils
   ;
 
 resourcestring
@@ -51,16 +52,17 @@ resourcestring
   RsLeaveMainThreadNestedError = 'Unpaired call to AsyncCalls.LeaveMainThread()';
   RsLeaveMainThreadThreadError = 'AsyncCalls.LeaveMainThread() was called outside of the main thread';
   RsThreadTerminateAndWaitFor  = 'Cannot call TerminateAndWaitFor on FreeAndTerminate threads';
+  RsInvalidThreadHandleError = 'TMeCustomThread: invalid thread handle';
 
 const
   cWaitAllThreadsTerminatedCount = 1 * 60 * 1000;
   cWaitAllThreadsTerminatedStep  = 250;
 
 type
+  PMeAbstractThread = ^ TMeAbstractThread;
   PMeCustomThread = ^ TMeCustomThread;
-  PMeThread = ^ TMeThread;
   PMeYarn = ^ TMeYarn;
-  PMeThreadWithTask = ^ TMeThreadWithTask;
+  PMeThread = ^ TMeThread;
   PMeTask = ^ TMeTask;
 
   TMeCustomThreadMethod = procedure of object;
@@ -71,13 +73,13 @@ type
 
   PSynchronizeRecord = ^TSynchronizeRecord;
   TSynchronizeRecord = record
-    FThread: PMeCustomThread;
+    FThread: PMeAbstractThread;
     FMethod: TMeCustomThreadMethod;
     FSynchronizeException: TObject;
   end;
 
   { used to instead of the Borland Thread Class }
-  TMeCustomThread = object(TMeDynamicObject)
+  TMeAbstractThread = object(TMeDynamicObject)
   protected
 {$IFDEF MSWINDOWS}
     FHandle: THandle;
@@ -129,11 +131,11 @@ type
     procedure Suspend;
     procedure Terminate;
     function WaitFor: LongWord;
-    class procedure Queue(AThread: PMeCustomThread; AMethod: TMeCustomThreadMethod); overload;
-    class procedure RemoveQueuedEvents(AThread: PMeCustomThread; AMethod: TMeCustomThreadMethod);
-    class procedure StaticQueue(AThread: PMeCustomThread; AMethod: TMeCustomThreadMethod);
-    class procedure Synchronize(AThread: PMeCustomThread; AMethod: TMeCustomThreadMethod); overload;
-    class procedure StaticSynchronize(AThread: PMeCustomThread; AMethod: TMeCustomThreadMethod);
+    class procedure Queue(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod); overload;
+    class procedure RemoveQueuedEvents(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
+    class procedure StaticQueue(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
+    class procedure Synchronize(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod); overload;
+    class procedure StaticSynchronize(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
     property FatalException: TObject read FFatalException;
     property FreeOnTerminate: Boolean read FFreeOnTerminate write FFreeOnTerminate;
 {$IFDEF MSWINDOWS}
@@ -157,12 +159,22 @@ type
   end;
 
   { Summary: the abstract task object }
+  {
+    you must override the following methods to implement your own task:
+      function Run: Boolean; virtual;abstract;
+      procedure AfterRun; virtual; <optional>
+      procedure BeforeRun; virtual;<optional>
+      procedure HandleException(const aException: Exception); virtual;<optional>
+  }
   TMeTask = object(TMeDynamicObject)
   protected
     FBeforeRunDone: Boolean;
 
+    { Summary: after the task exectution. }
     procedure AfterRun; virtual;
+    { Summary: before the task exectution. }
     procedure BeforeRun; virtual;
+    { Summary: the task exectution. }
     function Run: Boolean; virtual; abstract;
     procedure HandleException(const aException: Exception); virtual;
   public
@@ -174,29 +186,44 @@ type
     function DoRun: Boolean;
     procedure DoException(const aException: Exception);
     // BeforeRunDone property to allow flexibility in alternative schedulers
-    // it will be set to true before executing the DoBeforeRun.
+    // it will be set to true before executing the BeforeRun.
     property BeforeRunDone: Boolean read FBeforeRunDone;
   end;
 
   TMeYarn = object(TMeDynamicObject)
   protected
+    //FThread: PMeCustomThread;
     //generate the VMT for the object
     class function ParentClassAddress: TMeClass;virtual;abstract; //override
   end;
 
-  TMeNotifyThreadEvent = procedure(aThread: PMeThread) of object;
-  TMeExceptionThreadEvent = procedure(aThread: PMeThread; aException: Exception) of object;
+  TMeThreadYarn = object(TMeDynamicObject)
+  protected
+    FThread: PMeCustomThread;
+  end;
+
+  TMeScheduler = object(TMeDynamicObject)
+  protected
+    FActiveYarns: PMeThreadSafeList;
+  end;
+
+  TMeNotifyThreadEvent = procedure(aThread: PMeCustomThread) of object;
+  TMeExceptionThreadEvent = procedure(aThread: PMeCustomThread; aException: Exception) of object;
   TMeThreadStopMode = (smTerminate, smSuspend);
   TMeThreadOptions = set of (itoStopped, itoReqCleanup, itoDataOwner, itoTag);
+
   {
-    Define: Thread Task; Thread Yarn
-    the thread control the life-time of the Yarn Object !
+    the thread default is looped and suspended.
+    when the task is done the Yarn will be free automaticly.
+
+    Define: Thread Task
+            Thread Yarn (but must separate the task and scheduler. though the task can be schedule task.)
     One thread can run a task again and again until stop.
       a task: beforeRun, Run, afterRun Cleanup
       you can change task after Cleanup.
     One thread can run different task one by one.
   }
-  TMeThread = object(TMeCustomThread)
+  TMeCustomThread = object(TMeAbstractThread)
   protected
     FLock: PMeCriticalSection;
     FYarn: PMeYarn;
@@ -221,8 +248,7 @@ type
     procedure Run; virtual; abstract;
     class procedure WaitAllThreadsTerminated(AMSec: Integer = cWaitAllThreadsTerminatedCount);
   public
-    constructor Create(aCreateSuspended: Boolean = True;
-     aLoop: Boolean = True); 
+    constructor Create(const aCreateSuspended: Boolean = True; const aLoop: Boolean = True); 
     destructor Destroy; virtual;
     procedure Start; virtual;
     procedure Stop; virtual;
@@ -241,10 +267,22 @@ type
     property OnStopped: TMeNotifyThreadEvent read FOnStopped write FOnStopped;
   end;
 
-  TMeThreadWithTask = object(TMeThread)
+  { Summary : the thread with task supported. }
+  {
+    Define: Thread Task
+    the task can be schedule task.
+    One thread can run a task again and again until stop.
+      a task: beforeRun, Run, afterRun Cleanup
+      you can change task after Cleanup.
+    One thread can run different task one by one.
+    
+    aThread := NewThreadTask(myTask);
+    aThread.
+  }
+  TMeThread = object(TMeCustomThread)
   protected
     FTask: PMeTask;
-    //
+
     procedure AfterRun; virtual; //override;
     procedure BeforeRun; virtual; //override;
     procedure Run; virtual; //override;
@@ -255,7 +293,7 @@ type
     // And a bit crazy to create a non looped task
     constructor Create(aTask: PMeTask = nil); reintroduce;
     destructor Destroy; virtual; //override;
-    //
+
     // Must be writeable because tasks are often created after thread or
     // thread is pooled
     property Task: PMeTask read FTask write FTask;
@@ -334,6 +372,8 @@ var
 procedure EnterMainThread;
 procedure LeaveMainThread;
 
+function NewThreadTask(const aTask: PMeTask): PMeThread;
+
 implementation
 
 {$IFDEF MSWINDOWS}
@@ -360,6 +400,11 @@ var
   SyncList: PMeList = nil;
   ThreadLock: TRTLCriticalSection;
   ThreadCount: Integer;
+
+function NewThreadTask(const aTask: PMeTask): PMeThread;
+begin
+  New(Result, Create(aTask));
+end;
 
 procedure InitThreadSynchronization;
 begin
@@ -510,7 +555,7 @@ begin
   end;
 end;
 
-function ThreadProc(Thread: PMeCustomThread): Integer;
+function ThreadProc(Thread: PMeAbstractThread): Integer;
 var
   FreeThread: Boolean;
 begin
@@ -536,7 +581,7 @@ begin
 {$ENDIF}
 {$IFDEF LINUX}
     // Directly call pthread_exit since EndThread will detach the thread causing
-    // the pthread_join in TMeCustomThread.WaitFor to fail.  Also, make sure the EndThreadProc
+    // the pthread_join in TMeAbstractThread.WaitFor to fail.  Also, make sure the EndThreadProc
     // is called just like EndThread would do. EndThreadProc should not return
     // and call pthread_exit itself.
     if Assigned(EndThreadProc) then
@@ -546,7 +591,7 @@ begin
   end;
 end;
 
-procedure TMeCustomThread.Init;
+procedure TMeAbstractThread.Init;
 {$IFDEF LINUX}
 var
   ErrCode: Integer;
@@ -567,7 +612,7 @@ begin
 {$ENDIF}
 end;
 
-constructor TMeCustomThread.Create(const CreateSuspended: Boolean);
+constructor TMeAbstractThread.Create(const CreateSuspended: Boolean);
 begin
   inherited Create;
   FCreateSuspended := CreateSuspended;
@@ -575,7 +620,7 @@ begin
     Resume;
 end;
 
-destructor TMeCustomThread.Destroy;
+destructor TMeAbstractThread.Destroy;
 begin
   if (FThreadID <> 0) and not FFinished then
   begin
@@ -599,24 +644,24 @@ begin
   RemoveThread;
 end;
 
-procedure TMeCustomThread.CheckThreadError(ErrCode: Integer);
+procedure TMeAbstractThread.CheckThreadError(ErrCode: Integer);
 begin
   if ErrCode <> 0 then
     raise EMeError.CreateResFmt(@SThreadError, [SysErrorMessage(ErrCode), ErrCode]);
 end;
 
-procedure TMeCustomThread.CheckThreadError(Success: Boolean);
+procedure TMeAbstractThread.CheckThreadError(Success: Boolean);
 begin
   if not Success then
     CheckThreadError(GetLastError);
 end;
 
-procedure TMeCustomThread.CallOnTerminate;
+procedure TMeAbstractThread.CallOnTerminate;
 begin
   if Assigned(FOnTerminate) then FOnTerminate(@Self);
 end;
 
-procedure TMeCustomThread.DoTerminate;
+procedure TMeAbstractThread.DoTerminate;
 begin
   if Assigned(FOnTerminate) then Synchronize(CallOnTerminate);
 end;
@@ -628,7 +673,7 @@ const
     THREAD_PRIORITY_NORMAL, THREAD_PRIORITY_ABOVE_NORMAL,
     THREAD_PRIORITY_HIGHEST, THREAD_PRIORITY_TIME_CRITICAL);
 
-function TMeCustomThread.GetPriority: TMeThreadPriority;
+function TMeAbstractThread.GetPriority: TMeThreadPriority;
 var
   P: Integer;
   I: TMeThreadPriority;
@@ -640,13 +685,13 @@ begin
     if Priorities[I] = P then Result := I;
 end;
 
-procedure TMeCustomThread.SetPriority(Value: TMeThreadPriority);
+procedure TMeAbstractThread.SetPriority(Value: TMeThreadPriority);
 begin
   CheckThreadError(SetThreadPriority(FHandle, Priorities[Value]));
 end;
 {$ENDIF}
 {$IFDEF LINUX}
-function TMeCustomThread.GetPriority: Integer;
+function TMeAbstractThread.GetPriority: Integer;
 var
   P: Integer;
   J: TSchedParam;
@@ -670,7 +715,7 @@ end;
 {
   Note that to fully utilize Linux Scheduling, see SetPolicy.
 }
-procedure TMeCustomThread.SetPriority(Value: Integer);
+procedure TMeAbstractThread.SetPriority(Value: Integer);
 var
   P: TSchedParam;
 begin
@@ -681,7 +726,7 @@ begin
   end;
 end;
 
-function TMeCustomThread.GetPolicy: Integer;
+function TMeAbstractThread.GetPolicy: Integer;
 var
   J: TSchedParam;
 begin
@@ -693,7 +738,7 @@ end;
   be used as well.  See SetPriority for the relationship between these
   methods.
 }
-procedure TMeCustomThread.SetPolicy(Value: Integer);
+procedure TMeAbstractThread.SetPolicy(Value: Integer);
 var
   P: TSchedParam;
 begin
@@ -705,7 +750,7 @@ begin
 end;
 {$ENDIF}
 
-procedure TMeCustomThread.Queue(AMethod: TMeCustomThreadMethod);
+procedure TMeAbstractThread.Queue(AMethod: TMeCustomThreadMethod);
 var
   LSynchronize: PSynchronizeRecord;
 begin
@@ -721,7 +766,7 @@ begin
   end;
 end;
 
-class procedure TMeCustomThread.Queue(AThread: PMeCustomThread; AMethod: TMeCustomThreadMethod);
+class procedure TMeAbstractThread.Queue(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
 var
   LSynchronize: PSynchronizeRecord;
 begin
@@ -742,7 +787,7 @@ begin
   end;
 end;
 
-class procedure TMeCustomThread.RemoveQueuedEvents(AThread: PMeCustomThread; AMethod: TMeCustomThreadMethod);
+class procedure TMeAbstractThread.RemoveQueuedEvents(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
 var
   I: Integer;
   SyncProc: PSyncProc;
@@ -768,12 +813,12 @@ begin
   end;
 end;
 
-class procedure TMeCustomThread.StaticQueue(AThread: PMeCustomThread; AMethod: TMeCustomThreadMethod);
+class procedure TMeAbstractThread.StaticQueue(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
 begin
   Queue(AThread, AMethod);
 end;
 
-class procedure TMeCustomThread.Synchronize(ASyncRec: PSynchronizeRecord; QueueEvent: Boolean = False);
+class procedure TMeAbstractThread.Synchronize(ASyncRec: PSynchronizeRecord; QueueEvent: Boolean = False);
 var
   SyncProc: TSyncProc;
   SyncProcPtr: PSyncProc;
@@ -834,7 +879,7 @@ begin
   end;
 end;
 
-procedure TMeCustomThread.Synchronize(const aMethod: TMeCustomThreadMethod);
+procedure TMeAbstractThread.Synchronize(const aMethod: TMeCustomThreadMethod);
 begin
   FSynchronize.FThread := @Self;
   FSynchronize.FSynchronizeException := nil;
@@ -842,7 +887,7 @@ begin
   Synchronize(@FSynchronize);
 end;
 
-class procedure TMeCustomThread.Synchronize(AThread: PMeCustomThread; AMethod: TMeCustomThreadMethod);
+class procedure TMeAbstractThread.Synchronize(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
 var
   SyncRec: TSynchronizeRecord;
 begin
@@ -853,16 +898,16 @@ begin
     SyncRec.FThread := nil;
     SyncRec.FSynchronizeException := nil;
     SyncRec.FMethod := AMethod;
-    TMeCustomThread.Synchronize(@SyncRec);
+    TMeAbstractThread.Synchronize(@SyncRec);
   end;
 end;
 
-class procedure TMeCustomThread.StaticSynchronize(AThread: PMeCustomThread; AMethod: TMeCustomThreadMethod);
+class procedure TMeAbstractThread.StaticSynchronize(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
 begin
   Synchronize(AThread, AMethod);
 end;
 
-procedure TMeCustomThread.SetSuspended(Value: Boolean);
+procedure TMeAbstractThread.SetSuspended(Value: Boolean);
 begin
   if Value <> FSuspended then
     if Value then
@@ -871,7 +916,7 @@ begin
       Resume;
 end;
 
-procedure TMeCustomThread.Suspend;
+procedure TMeAbstractThread.Suspend;
 var
   OldSuspend: Boolean;
 begin
@@ -891,7 +936,7 @@ begin
 end;
 
 {$IFDEF MSWINDOWS}
-procedure TMeCustomThread.Resume;
+procedure TMeAbstractThread.Resume;
 var
   SuspendCount: Integer;
 begin
@@ -913,7 +958,7 @@ end;
   behaviour. If and when it fully complies with the POSIX standard then suspend
   and resume won't work.
 }
-procedure TMeCustomThread.Resume;
+procedure TMeAbstractThread.Resume;
 begin
   if not FInitialSuspendDone then
   begin
@@ -925,12 +970,12 @@ begin
 end;
 {$ENDIF}
 
-procedure TMeCustomThread.Terminate;
+procedure TMeAbstractThread.Terminate;
 begin
   FTerminated := True;
 end;
 
-function TMeCustomThread.WaitFor: LongWord;
+function TMeAbstractThread.WaitFor: LongWord;
 {$IFDEF MSWINDOWS}
 var
   H: array[0..1] of THandle;
@@ -1005,8 +1050,8 @@ begin
   HandleException(aException);
 end;
 
-{ TMeThread }
-class procedure TMeThread.WaitAllThreadsTerminated(AMSec: Integer);
+{ TMeCustomThread }
+class procedure TMeCustomThread.WaitAllThreadsTerminated(AMSec: Integer);
 begin
   while AMSec > 0 do 
   begin
@@ -1019,7 +1064,7 @@ begin
   end;
 end;
 
-procedure TMeThread.TerminateAndWaitFor;
+procedure TMeCustomThread.TerminateAndWaitFor;
 begin
   if FreeOnTerminate then 
   begin
@@ -1030,23 +1075,23 @@ begin
   WaitFor;
 end;
 
-procedure TMeThread.BeforeRun;
+procedure TMeCustomThread.BeforeRun;
 begin
 end;
 
-procedure TMeThread.AfterRun;
+procedure TMeCustomThread.AfterRun;
 begin
 end;
 
-procedure TMeThread.BeforeExecute;
+procedure TMeCustomThread.BeforeExecute;
 begin
 end;
 
-procedure TMeThread.AfterExecute;
+procedure TMeCustomThread.AfterExecute;
 begin
 end;
 
-procedure TMeThread.Execute;
+procedure TMeCustomThread.Execute;
 begin
   try
     BeforeExecute;
@@ -1134,7 +1179,7 @@ begin
   end;
 end;
 
-constructor TMeThread.Create(aCreateSuspended: Boolean; aLoop: Boolean);
+constructor TMeCustomThread.Create(const aCreateSuspended: Boolean; const aLoop: Boolean);
 begin
   {$IFDEF DOTNET}
   inherited Create(True);
@@ -1160,19 +1205,19 @@ begin
     {$IFNDEF COMPILER6_UP}
     // Delphi 6 and above raise an exception when an error occures while
     // creating a thread (eg. not enough address space to allocate a stack)
-    // Delphi 5 and below don't do that, which results in a TMeThread
+    // Delphi 5 and below don't do that, which results in a TMeCustomThread
     // instance with an invalid handle in it, therefore we raise the
     // exceptions manually on D5 and below
   if (ThreadID = 0) then 
   begin
-    Raise EMeError.Create('TMeThread: invalid thread handle');;
+    Raise EMeError.Create('TMeCustomThread: invalid thread handle');
   end;
     {$ENDIF}
   {$ENDIF}
   // Last, so we only do this if successful
 end;
 
-destructor TMeThread.Destroy;
+destructor TMeCustomThread.Destroy;
 begin
   FreeOnTerminate := False; //prevent destroy between Terminate & WaitFor
   Terminate;
@@ -1201,7 +1246,7 @@ begin
   inherited Destroy; //+WaitFor!
 end;
 
-procedure TMeThread.Start;
+procedure TMeCustomThread.Start;
 begin
   FLock.Enter; try
     if Stopped then 
@@ -1221,7 +1266,7 @@ begin
   finally FLock.Leave; end;
 end;
 
-procedure TMeThread.Stop;
+procedure TMeCustomThread.Stop;
 begin
   FLock.Enter; try
     if not Stopped then 
@@ -1235,7 +1280,7 @@ begin
   finally FLock.Leave; end;
 end;
 
-function TMeThread.GetStopped: Boolean;
+function TMeCustomThread.GetStopped: Boolean;
 begin
   if Assigned(FLock) then 
   begin
@@ -1249,7 +1294,7 @@ begin
   end;
 end;
 
-procedure TMeThread.DoStopped;
+procedure TMeCustomThread.DoStopped;
 begin
   if Assigned(OnStopped) then 
   begin
@@ -1257,7 +1302,7 @@ begin
   end;
 end;
 
-procedure TMeThread.DoException(const aException: Exception);
+procedure TMeCustomThread.DoException(const aException: Exception);
 begin
   if Assigned(FOnException) then 
   begin
@@ -1265,7 +1310,7 @@ begin
   end;
 end;
 
-procedure TMeThread.Terminate;
+procedure TMeCustomThread.Terminate;
 begin
   //this assert can only raise if terminate is called on an already-destroyed thread
   Assert(FLock<>nil);
@@ -1276,7 +1321,7 @@ begin
   finally FLock.Leave; end;
 end;
 
-procedure TMeThread.Cleanup;
+procedure TMeCustomThread.Cleanup;
 begin
   Exclude(FOptions, itoReqCleanup);
   MeFreeAndNil(FYarn);
@@ -1285,50 +1330,50 @@ begin
   end;//}
 end;
 
-function TMeThread.HandleRunException(AException: Exception): Boolean;
+function TMeCustomThread.HandleRunException(AException: Exception): Boolean;
 begin
   // Default behavior: Exception is death sentence
   Result := False;
 end;
 
-procedure TMeThread.Synchronize(const Method: TMeCustomThreadMethod);
+procedure TMeCustomThread.Synchronize(const Method: TMeCustomThreadMethod);
 begin
   inherited Synchronize(Method);
 end;
 
-{ TMeThreadWithTask }
+{ TMeThread }
 
-procedure TMeThreadWithTask.AfterRun;
+procedure TMeThread.AfterRun;
 begin
   FTask.DoAfterRun;
   inherited AfterRun;
 end;
 
-procedure TMeThreadWithTask.BeforeRun;
+procedure TMeThread.BeforeRun;
 begin
   inherited BeforeRun;
   FTask.DoBeforeRun;
 end;
 
-procedure TMeThreadWithTask.DoException(const aException: Exception);
+procedure TMeThread.DoException(const aException: Exception);
 begin
   inherited DoException(aException);
   FTask.DoException(aException);
 end;
 
-constructor TMeThreadWithTask.Create(aTask: PMeTask);
+constructor TMeThread.Create(aTask: PMeTask);
 begin
   inherited Create(True, True);
   FTask := aTask;
 end;
 
-destructor TMeThreadWithTask.Destroy;
+destructor TMeThread.Destroy;
 begin
   MeFreeAndNil(FTask);
   inherited Destroy;
 end;
 
-procedure TMeThreadWithTask.Run;
+procedure TMeThread.Run;
 begin
   if not FTask.DoRun then begin
     Stop;
@@ -1511,7 +1556,7 @@ asm
   push edx
   mov ecx, OFFSET ExecuteInMainThread
   push ecx
-  call TMeCustomThread.StaticSynchronize
+  call TMeAbstractThread.StaticSynchronize
 
   { Clean up try/finally }
   xor eax,eax
@@ -1557,15 +1602,15 @@ end;
 
 initialization
   {$IFDEF MeRTTI_SUPPORT}
+  SetMeVirtualMethod(TypeOf(TMeAbstractThread), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeCustomThread), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeThread), ovtVmtClassName, nil);
-  SetMeVirtualMethod(TypeOf(TMeThreadWithTask), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeTask), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeYarn), ovtVmtClassName, nil);
   {$ENDIF}
-  SetMeVirtualMethod(TypeOf(TMeCustomThread), ovtVmtParent, TypeOf(TMeDynamicObject));
+  SetMeVirtualMethod(TypeOf(TMeAbstractThread), ovtVmtParent, TypeOf(TMeDynamicObject));
+  SetMeVirtualMethod(TypeOf(TMeCustomThread), ovtVmtParent, TypeOf(TMeAbstractThread));
   SetMeVirtualMethod(TypeOf(TMeThread), ovtVmtParent, TypeOf(TMeCustomThread));
-  SetMeVirtualMethod(TypeOf(TMeThreadWithTask), ovtVmtParent, TypeOf(TMeThread));
   SetMeVirtualMethod(TypeOf(TMeTask), ovtVmtParent, TypeOf(TMeDynamicObject));
   SetMeVirtualMethod(TypeOf(TMeYarn), ovtVmtParent, TypeOf(TMeDynamicObject));
 
