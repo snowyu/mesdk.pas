@@ -60,6 +60,8 @@ type
   PMeCustomThread = ^ TMeCustomThread;
   PMeThread = ^ TMeThread;
   PMeYarn = ^ TMeYarn;
+  PMeThreadWithTask = ^ TMeThreadWithTask;
+  PMeTask = ^ TMeTask;
 
   TMeCustomThreadMethod = procedure of object;
 {$IFDEF MSWINDOWS}
@@ -177,6 +179,9 @@ type
   end;
 
   TMeYarn = object(TMeDynamicObject)
+  protected
+    //generate the VMT for the object
+    class function ParentClassAddress: TMeClass;virtual;abstract; //override
   end;
 
   TMeNotifyThreadEvent = procedure(aThread: PMeThread) of object;
@@ -208,7 +213,7 @@ type
     procedure BeforeExecute; virtual;//1 not abstract - otherwise it is required
     procedure BeforeRun; virtual; //2* not abstract - otherwise it is required
     procedure Cleanup; virtual;//4*
-    procedure DoException(AException: Exception); virtual;
+    procedure DoException(const aException: Exception); virtual;
     procedure DoStopped; virtual;
     procedure Execute; virtual; //override
     function GetStopped: Boolean;
@@ -236,7 +241,28 @@ type
     property OnStopped: TMeNotifyThreadEvent read FOnStopped write FOnStopped;
   end;
 
+  TMeThreadWithTask = object(TMeThread)
+  protected
+    FTask: PMeTask;
+    //
+    procedure AfterRun; virtual; //override;
+    procedure BeforeRun; virtual; //override;
+    procedure Run; virtual; //override;
+    procedure DoException(const aException: Exception); virtual; //override;
+  public
+    // Defaults because
+    // Must always create suspended so task can be set
+    // And a bit crazy to create a non looped task
+    constructor Create(aTask: PMeTask = nil); reintroduce;
+    destructor Destroy; virtual; //override;
+    //
+    // Must be writeable because tasks are often created after thread or
+    // thread is pooled
+    property Task: PMeTask read FTask write FTask;
+  end;
+
   TMeThreadPool = object(TMeList)
+  
   end;
 
 
@@ -1066,8 +1092,8 @@ begin
                         raise;
                       end;
                     end;
-                  end;
-                end;
+                  end; //try-except
+                end; //while
               end 
               else begin
                 try
@@ -1231,7 +1257,7 @@ begin
   end;
 end;
 
-procedure TMeThread.DoException(aException: Exception);
+procedure TMeThread.DoException(const aException: Exception);
 begin
   if Assigned(FOnException) then 
   begin
@@ -1268,6 +1294,45 @@ end;
 procedure TMeThread.Synchronize(const Method: TMeCustomThreadMethod);
 begin
   inherited Synchronize(Method);
+end;
+
+{ TMeThreadWithTask }
+
+procedure TMeThreadWithTask.AfterRun;
+begin
+  FTask.DoAfterRun;
+  inherited AfterRun;
+end;
+
+procedure TMeThreadWithTask.BeforeRun;
+begin
+  inherited BeforeRun;
+  FTask.DoBeforeRun;
+end;
+
+procedure TMeThreadWithTask.DoException(const aException: Exception);
+begin
+  inherited DoException(aException);
+  FTask.DoException(aException);
+end;
+
+constructor TMeThreadWithTask.Create(aTask: PMeTask);
+begin
+  inherited Create(True, True);
+  FTask := aTask;
+end;
+
+destructor TMeThreadWithTask.Destroy;
+begin
+  MeFreeAndNil(FTask);
+  inherited Destroy;
+end;
+
+procedure TMeThreadWithTask.Run;
+begin
+  if not FTask.DoRun then begin
+    Stop;
+  end;
 end;
 
 {----------------------------------------------------------------------------}
@@ -1493,8 +1558,16 @@ end;
 initialization
   {$IFDEF MeRTTI_SUPPORT}
   SetMeVirtualMethod(TypeOf(TMeCustomThread), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeThread), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeThreadWithTask), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeTask), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeYarn), ovtVmtClassName, nil);
   {$ENDIF}
   SetMeVirtualMethod(TypeOf(TMeCustomThread), ovtVmtParent, TypeOf(TMeDynamicObject));
+  SetMeVirtualMethod(TypeOf(TMeThread), ovtVmtParent, TypeOf(TMeCustomThread));
+  SetMeVirtualMethod(TypeOf(TMeThreadWithTask), ovtVmtParent, TypeOf(TMeThread));
+  SetMeVirtualMethod(TypeOf(TMeTask), ovtVmtParent, TypeOf(TMeDynamicObject));
+  SetMeVirtualMethod(TypeOf(TMeYarn), ovtVmtParent, TypeOf(TMeDynamicObject));
 
   InitThreadSynchronization;
 
