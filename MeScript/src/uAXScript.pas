@@ -407,10 +407,13 @@ end;
 
 procedure TAXScriptSite.CloseScriptEngine;
 begin
-  FParser := nil;
-  //FEngine.Close: it will call TAXScriptSite._Release
-  //if FEngine <> nil then FEngine.Close;
-  FEngine := nil;
+  try
+    //FEngine.Close: it will call TAXScriptSite._Release
+    if FEngine <> nil then FEngine.Close;
+  finally
+    FParser := nil;
+    FEngine := nil;
+  end;
 end;
 
 function TAXScriptSite.RunExpression(const ACode: WideString): OleVariant;
@@ -436,7 +439,8 @@ var
 begin
   if not Assigned(FEngine) then
     CreateScriptEngine(FScriptLanguage);
-  vFlags := SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_DELAYEXECUTION;
+  //vFlags := SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_DELAYEXECUTION; //this will memory size reise.
+  vFlags := 0;
   Result := iParserText(aCode, vFlags, vResult)
 end;
 
@@ -455,7 +459,8 @@ var
   vResult: OleVariant;
   vFlags: LongWord;
 begin
-  vFlags := SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_DELAYEXECUTION;
+  //vFlags := SCRIPTTEXT_ISPERSISTENT or SCRIPTTEXT_DELAYEXECUTION;
+  vFlags := 0;
   iParserText(aCode, vFlags, vResult);
 end;
 
