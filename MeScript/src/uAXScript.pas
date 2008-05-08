@@ -419,13 +419,17 @@ end;
 function TAXScriptSite.RunExpression(const ACode: WideString): OleVariant;
 var
   vFlags: LongWord;
+  vCanDebug: Boolean;
 begin
   if not Assigned(FEngine) then
     CreateScriptEngine(FScriptLanguage);
 
   vFlags := SCRIPTTEXT_ISEXPRESSION;
 
+  vCanDebug := FCanDebug;
+  FCanDebug := False;
   vFlags := iParserText(ACode, vFlags, Result);
+  FCanDebug := vCanDebug;
   if  vFlags <> S_OK then
   begin
     VarClear(Result); //Test it by VarIsEmpty
