@@ -41,7 +41,34 @@ type
 
   public
   published
-    procedure Test_Run;
+    procedure Test_Run;virtual;
+  end;
+
+  PMyTask = ^ TMyTask;
+  TMyTask = object(TMeTask)
+  protected
+    Id: Integer;
+    Count: Integer;
+    procedure AfterRun; virtual;
+    function Run: Boolean; virtual;
+  end;
+
+  TTest_MeThread = class(TTest_MeCustomThread)
+    procedure Setup;override;
+  published
+    procedure Test_Run;override;
+  end;
+
+  TTest_MeThreadMgr = class(TTestCase)
+  protected
+    FThreadMgr: PMeThread;
+
+    procedure Setup;override;
+    procedure TearDown;override;
+
+  public
+  published
+    procedure Test_Run;virtual;
   end;
 
 implementation
@@ -49,14 +76,54 @@ implementation
 
 var
   AppPath: string;
-  FCount: Integer = 0;
+  GCount: Integer = 0;
 
+
+function TMyTask.Run: Boolean;
+begin
+  Result := InterlockedIncrement(Count) > 0;
+  Sleep(100);
+end;
+
+procedure TMyTask.AfterRun;
+begin
+  EnterMainThread;
+  try
+    if Count > 0 then Writeln(Id, ':', Count);
+  finally
+    LeaveMainThread;
+  end;
+end;
+
+{ TTest_MeThread }
+procedure TTest_MeThread.Setup;
+var
+  vTask: PMyTask;
+begin
+  New(vTask, Create);
+  FThread := New(PMeThread, Create(vTask));
+end;
+
+procedure TTest_MeThread.Test_Run;
+var
+  I: Integer;
+  vTask: PMyTask;
+begin
+  FThread.Priority := tpTimeCritical;
+  vTask := PMyTask(PMeThread(FThread).Task);
+  PMeThread(FThread).Start;
+  Sleep(50);
+  I := -1;
+  I := InterlockedExchange(vTask.Count, I);
+  CheckEquals(1, I, ' the count is error.');
+  PMeThread(FThread).TerminateAndWaitFor;
+end;
 
 procedure TMeT.Execute;
 var
   S: string;
 begin
-  while (InterlockedIncrement(FCount) > 0) and not Terminated do
+  while (InterlockedIncrement(GCount) > 0) and not Terminated do
     Sleep(100);
   S := 'Hallo, I''m executed in the main thread:';
   Assert(GetCurrentThreadId <> MainThreadId);
@@ -93,9 +160,40 @@ begin
   FThread.Resume;
   Sleep(50);
   I := -1;
-  I := InterlockedExchange(FCount, I);
+  I := InterlockedExchange(GCount, I);
   //FThread.Terminate;
   CheckEquals(1, I, ' the count is error.');
+end;
+
+{ TTest_MeThreadMgr }
+procedure TTest_MeThreadMgr.Setup;
+begin
+  FThreadMgr := New(PMeThread, Create(New(PMeThreadMgr, Create)));
+end;
+
+procedure TTest_MeThreadMgr.TearDown;
+begin
+  MeFreeAndNil(FThreadMgr);
+end;
+
+procedure TTest_MeThreadMgr.Test_Run();
+var
+  i : Integer;
+  vTask: PMyTask;
+  vMgr: PMeThreadMgr;
+begin
+  vMgr := PMeThreadMgr(FThreadMgr.Task);
+  FThreadMgr.Start;
+  for i := 1 to 3 do
+  begin
+    New(vTask, Create);
+    vTask.Id := i;
+    vTask.Count := i;
+    vMgr.AddTask(vTask);
+  end;
+  Writeln('Assert');
+  Sleep(5000);
+  FThreadMgr.TerminateAndWaitFor;
 end;
 
 Initialization
@@ -104,6 +202,8 @@ Initialization
   RegisterTests('MeThread suites',
                 [
                  TTest_MeCustomThread.Suite
+                 , TTest_MeThread.Suite
+                 , TTest_MeThreadMgr.Suite
                  //, TTest_MeCustomThread.Suite
                 ]);//}
 finalization

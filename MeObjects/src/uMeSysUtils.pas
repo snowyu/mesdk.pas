@@ -47,9 +47,14 @@ type
     procedure Add(const Item: Pointer);
     procedure Clear;
     function  LockList: PMeList;
+    function Count: Integer;
+    function Last: Pointer;
+    function Popup: Pointer;
+    function Get(const Index: Integer): Pointer;
     procedure Remove(const Item: Pointer);
     procedure UnlockList;
     property Duplicates: TDuplicates read FDuplicates write FDuplicates;
+    property List: PMeList read FList;
   end;
 
   TFreeNotifyProc = procedure(Instance : TObject) of object;
@@ -432,10 +437,50 @@ begin
   end;
 end;
 
+function TMeThreadSafeList.Count: Integer;
+begin
+  LockList;
+  try
+    Result := FList.Count;
+  finally
+    UnlockList;
+  end;
+end;
+
+function TMeThreadSafeList.Get(const Index: Integer): Pointer;
+begin
+  with LockList^ do
+  try
+    Result := FList.List[Index];
+  finally
+    UnlockList;
+  end;
+end;
+
 function  TMeThreadSafeList.LockList: PMeList;
 begin
   FLock.Enter;
   Result := FList;
+end;
+
+function TMeThreadSafeList.Last: Pointer;
+begin
+  with LockList^ do
+  try
+    Result := FList.Last;
+  finally
+    UnlockList;
+  end;
+end;
+
+function TMeThreadSafeList.Popup: Pointer;
+begin
+  with LockList^ do
+  try
+    Result := FList.Popup;
+  finally
+    UnlockList;
+  end;
 end;
 
 procedure TMeThreadSafeList.Remove(const Item: Pointer);
