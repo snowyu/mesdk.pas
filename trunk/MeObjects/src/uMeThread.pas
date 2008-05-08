@@ -207,7 +207,7 @@ type
     FActiveYarns: PMeThreadSafeList;
   end;
 
-  TMeNotifyThreadEvent = procedure(aThread: PMeCustomThread) of object;
+  TMeNotifyThreadEvent = procedure(const aThread: PMeCustomThread) of object;
   TMeExceptionThreadEvent = procedure(aThread: PMeCustomThread; aException: Exception) of object;
   TMeThreadStopMode = (smTerminate, smSuspend);
   TMeThreadOptions = set of (itoStopped, itoReqCleanup, itoDataOwner, itoTag);
@@ -221,6 +221,7 @@ type
     One thread can run a task again and again until stop.
       a task: beforeRun, Run, afterRun Cleanup
       you can change task after Cleanup.
+    the FYarn will be free when Cleanup.
     One thread can run different task one by one.
   }
   TMeCustomThread = object(TMeAbstractThread)
@@ -270,14 +271,19 @@ type
   { Summary : the thread with task supported. }
   {
     Define: Thread Task
-    the task can be schedule task.
+    the task can be schedule task. the task can be destroyed when thread free.
     One thread can run a task again and again until stop.
       a task: beforeRun, Run, afterRun Cleanup
       you can change task after Cleanup.
     One thread can run different task one by one.
+    Thread.Terminate: Terminate the thread. the thread can not be re-used.
+    thread.Stop: if the StopMode is smSuspend then it can be re-used.
+                 it always be sure the AfterRun can be executed.
+
     
     aThread := NewThreadTask(myTask);
-    aThread.
+    aThread.Start;
+    
   }
   TMeThread = object(TMeCustomThread)
   protected
@@ -299,8 +305,41 @@ type
     property Task: PMeTask read FTask write FTask;
   end;
 
-  TMeThreadPool = object(TMeList)
-  
+  PMeThreadMgr = ^ TMeThreadMgr;
+
+  {
+    the task will be free automatic.
+  }
+  TMeThreadMgr = object(TMeTask)
+  protected
+    //the todo task Queue.
+    FTaskQueue: PMeThreadSafeList;
+    //the idle thread list
+    FThreadPool: PMeThreadSafeList;
+    //the current active threads.
+    FActiveThreads: PMeThreadSafeList;
+    FMaxThreads: Integer;
+
+    //some task is done, free the task, the thread is idle.
+    procedure DoThreadStopped(const aThread: PMeCustomThread);
+    //some thread is unuse-able, free it.
+    procedure DoThreadTerminate(const Sender: PMeDynamicObject);
+
+    procedure Init; virtual; //override
+    procedure AfterRun; virtual; //override
+    procedure BeforeRun; virtual; //override
+    {
+      Check ThreadPool.Count > 0
+        Check TaskQueue.Count > 0
+          Fetch a Task from TaskQueue
+            Fetch a thread from pool and Run the task
+    }
+    function Run: Boolean; virtual; //override
+    //procedure HandleException(const aException: Exception); virtual;
+  public
+    destructor Destroy; virtual; //override;
+    function AddTask(const aTask: PMeTask): Boolean;
+
   end;
 
 
@@ -973,6 +1012,7 @@ end;
 procedure TMeAbstractThread.Terminate;
 begin
   FTerminated := True;
+  //writeln('TMeAbstractThread.Terminate');
 end;
 
 function TMeAbstractThread.WaitFor: LongWord;
@@ -1098,7 +1138,7 @@ begin
     try
       while not Terminated do 
       begin
-        if Stopped then 
+        if Stopped then
         begin
           DoStopped;
           // It is possible that either in the DoStopped or from another thread,
@@ -1129,9 +1169,9 @@ begin
                   try
                     Run;
                   except
-                    on E: Exception do 
+                    on E: Exception do
                     begin
-                      if not HandleRunException(E) then 
+                      if not HandleRunException(E) then
                       begin
                         Terminate;
                         raise;
@@ -1164,7 +1204,7 @@ begin
         finally
           Cleanup;
         end;
-      end;
+      end; //while not Terminated
     finally
       AfterExecute;
     end;
@@ -1378,6 +1418,165 @@ begin
   if not FTask.DoRun then begin
     Stop;
   end;
+end;
+
+{ TMeThreadMgr }
+procedure TMeThreadMgr.Init;
+begin
+  inherited;
+  New(FTaskQueue, Create);
+  New(FThreadPool, Create);
+  New(FActiveThreads, Create);
+end;
+
+destructor TMeThreadMgr.Destroy;
+begin
+  FTaskQueue.Free;
+  FThreadPool.Free;
+  FActiveThreads.Free;
+  inherited;
+end;
+
+//!!Bug: DoThreadStopped event never be triggered!!
+procedure TMeThreadMgr.DoThreadStopped(const aThread: PMeCustomThread);
+begin
+  EnterMainThread;
+  try
+  writeln('DoThreadStopped', FActiveThreads.Count);
+  finally
+    LeaveMainThread;
+  end;
+  if Assigned(aThread) then
+  begin
+    MeFreeAndNil(PMeThread(aThread).FTask);
+    FActiveThreads.Remove(aThread);
+    FThreadPool.Add(aThread);
+  end;
+end;
+
+procedure TMeThreadMgr.DoThreadTerminate(const Sender: PMeDynamicObject);
+begin
+  EnterMainThread;
+  try
+  writeln('DoThreadTerminate:', FActiveThreads.Count);
+  writeln('DoThreadTerminateP:', FThreadPool.Count);
+  finally
+    LeaveMainThread;
+  end;
+  if Assigned(Sender) then
+  begin
+    FActiveThreads.Remove(Sender);
+    FThreadPool.Remove(Sender);
+    Sender.Free;
+  end;
+end;
+
+procedure TMeThreadMgr.AfterRun;
+var
+  v: PMeThread;
+begin
+  EnterMainThread;
+  try
+  writeln('TMeThreadMgr.AfterRun');
+  finally
+    LeaveMainThread;
+  end;
+  while FActiveThreads.Count > 0 do
+  begin
+    v:= PMeThread(FActiveThreads.Popup);
+    v.Stop;
+    Sleep(50);
+  end;
+
+  while FThreadPool.Count > 0 do
+  begin
+    v:= PMeThread(FThreadPool.Popup);
+    //!!WaitFor??dead lock>?>
+    v.TerminateAndWaitFor;
+  end;
+
+  EnterMainThread;
+  try
+  writeln('___TMeThreadMgr.AfterRun');
+  finally
+    LeaveMainThread;
+  end;
+end;
+
+procedure TMeThreadMgr.BeforeRun;
+var
+  vThread: PMeThread;
+begin
+  if FMaxThreads > 0 then
+  with FThreadPool.LockList^ do
+  try
+    while Count < FMaxThreads do
+    begin
+      New(vThread, Create(nil));
+      vThread.OnTerminate := DoThreadTerminate;
+      vThread.OnStopped := DoThreadStopped;
+      Add(vThread);
+    end;
+  finally
+    FThreadPool.UnlockList;
+  end;
+end;
+
+function TMeThreadMgr.Run: Boolean;
+var
+  vThread: PMeThread;
+  vTask: PMeTask;
+begin
+  vThread := nil;
+  vTask := nil;
+  Result := True;
+  with FTaskQueue.LockList^ do
+  try
+    if Count > 0 then
+    begin
+      vTask := Popup;
+    end
+    else
+      exit;
+  finally
+    FTaskQueue.UnlockList;
+  end;
+
+  if Assigned(vTask) then
+  with FThreadPool.LockList^ do
+  try
+    vThread := Popup;
+    if Assigned(vThread) then
+      vThread.Task := vTask
+    else if (FMaxThreads <= 0) or (Count < FMaxThreads) then
+    begin
+      New(vThread, Create(vTask));
+      vThread.OnTerminate := DoThreadTerminate;
+      vThread.OnStopped := DoThreadStopped;
+    end;
+  finally
+    FThreadPool.UnlockList;
+  end;
+  if Assigned(vThread) then
+  begin
+    FActiveThreads.Add(vThread);
+    vThread.Start;
+  end;
+  Sleep(50);
+end;
+
+function TMeThreadMgr.AddTask(const aTask: PMeTask): Boolean;
+begin
+  with FTaskQueue.LockList^ do
+  try
+    Result := IndexOf(aTask) < 0;
+    if Result then
+    begin
+      Add(aTask);
+    end;
+  finally
+    FTaskQueue.UnlockList;
+  end; 
 end;
 
 {----------------------------------------------------------------------------}

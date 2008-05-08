@@ -130,7 +130,7 @@ type
   PMeDynamicObject = ^ TMeDynamicObject;
 
   TMeObjectMethod = procedure of object;
-  TMeNotifyEvent = procedure(Sender: PMeDynamicObject) of object;
+  TMeNotifyEvent = procedure(const Sender: PMeDynamicObject) of object;
   PPointerList = ^TPointerList;
   TPointerList = array[0..MaxListSize - 1] of Pointer;
   TDuplicates = (dupIgnore, dupAccept, dupError);
