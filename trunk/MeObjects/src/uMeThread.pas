@@ -32,6 +32,9 @@ interface
 {$I MeSetting.inc}
 
 uses
+  {$IFDEF DEBUG}
+    DbugIntf,
+  {$ENDIF}
 {$IFDEF MSWINDOWS}
   Windows,
   Messages,
@@ -229,6 +232,7 @@ type
     FLock: PMeCriticalSection;
     FYarn: PMeYarn;
     FLoop: Boolean;
+    FName: string;
     FStopMode: TMeThreadStopMode;
     FOptions: TMeThreadOptions;
     //FTerminatingException: String;
@@ -261,6 +265,7 @@ type
     //it will be free when the thread free.
     property Yarn: PMeYarn read FYarn write FYarn;
     property Loop: Boolean read FLoop write FLoop;
+    property Name: string read FName write FName;
     property ReturnValue;
     property StopMode: TMeThreadStopMode read FStopMode write FStopMode;
     property Stopped: Boolean read GetStopped;
@@ -320,6 +325,7 @@ type
     FActiveThreads: PMeThreadSafeList;
     FMaxThreads: Integer;
 
+    function CreateThread(const aTask: PMeTask): PMeThread;
     //some task is done, free the task, the thread is idle.
     procedure DoThreadStopped(const aThread: PMeCustomThread);
     //some thread is unuse-able, free it.
@@ -339,6 +345,8 @@ type
   public
     destructor Destroy; virtual; //override;
     function AddTask(const aTask: PMeTask): Boolean;
+
+    property TaskQueue: PMeThreadSafeList read FTaskQueue;
 
   end;
 
@@ -407,9 +415,10 @@ var
      end;
 
     @author  Andreas Hausladen
+NOTE: It seems bugs in it!!!
 }
-procedure EnterMainThread;
-procedure LeaveMainThread;
+//procedure EnterMainThread;
+//procedure LeaveMainThread;
 
 function NewThreadTask(const aTask: PMeTask): PMeThread;
 
@@ -1012,7 +1021,10 @@ end;
 procedure TMeAbstractThread.Terminate;
 begin
   FTerminated := True;
-  //writeln('TMeAbstractThread.Terminate');
+ {$IFDEF DEBUG}
+  SendDebug('TMeAbstractThread.Terminate');
+ {$ENDIF}
+
 end;
 
 function TMeAbstractThread.WaitFor: LongWord;
@@ -1255,6 +1267,7 @@ begin
     {$ENDIF}
   {$ENDIF}
   // Last, so we only do this if successful
+  FName := 'Thread' + IntToStr(ThreadCount);
 end;
 
 destructor TMeCustomThread.Destroy;
@@ -1273,6 +1286,7 @@ begin
     try
       MeFreeAndNil(FYarn);
     finally
+      FName := '';
       // Protect FLock if thread was resumed by Start Method and we are still there.
       // This usually happens if Exception was raised in BeforeRun for some reason
       // And thread was terminated there before Start method is completed.
@@ -1336,6 +1350,10 @@ end;
 
 procedure TMeCustomThread.DoStopped;
 begin
+ {$IFDEF DEBUG}
+  SendDebug(FName + ' DoStopped');
+ {$ENDIF}
+
   if Assigned(OnStopped) then 
   begin
     OnStopped(@Self);
@@ -1385,18 +1403,32 @@ end;
 
 procedure TMeThread.AfterRun;
 begin
+ {$IFDEF DEBUG}
+  if Assigned(FTask) then
+    SendDebug(FName + ' AfterRun')
+  else
+    SendDebug('Failed AfterRun');
+ {$ENDIF}
   FTask.DoAfterRun;
   inherited AfterRun;
 end;
 
 procedure TMeThread.BeforeRun;
 begin
+ {$IFDEF DEBUG}
+    SendDebug(FName + ' BeforeRun');
+ {$ENDIF}
+
   inherited BeforeRun;
   FTask.DoBeforeRun;
 end;
 
 procedure TMeThread.DoException(const aException: Exception);
 begin
+ {$IFDEF DEBUG}
+    SendDebug(FName+' Exception:'+aException.ClassName + ' Msg:'+aException.Message);
+ {$ENDIF}
+
   inherited DoException(aException);
   FTask.DoException(aException);
 end;
@@ -1409,6 +1441,10 @@ end;
 
 destructor TMeThread.Destroy;
 begin
+ {$IFDEF DEBUG}
+    SendDebug('Destroy...');
+    SendDebug('    '+FName);
+ {$ENDIF}
   MeFreeAndNil(FTask);
   inherited Destroy;
 end;
@@ -1440,14 +1476,12 @@ end;
 //!!Bug: DoThreadStopped event never be triggered!!
 procedure TMeThreadMgr.DoThreadStopped(const aThread: PMeCustomThread);
 begin
-  EnterMainThread;
-  try
-  writeln('DoThreadStopped', FActiveThreads.Count);
-  finally
-    LeaveMainThread;
-  end;
   if Assigned(aThread) then
   begin
+ {$IFDEF DEBUG}
+    SendDebug(PMeThread(aThread).FName+ ' DoThreadStopped, A='+IntToStr(FActiveThreads.Count));
+ {$ENDIF}
+
     MeFreeAndNil(PMeThread(aThread).FTask);
     FActiveThreads.Remove(aThread);
     FThreadPool.Add(aThread);
@@ -1456,18 +1490,21 @@ end;
 
 procedure TMeThreadMgr.DoThreadTerminate(const Sender: PMeDynamicObject);
 begin
-  EnterMainThread;
-  try
-  writeln('DoThreadTerminate:', FActiveThreads.Count);
-  writeln('DoThreadTerminateP:', FThreadPool.Count);
-  finally
-    LeaveMainThread;
-  end;
+ {$IFDEF DEBUG}
+    SendDebug('DoThreadTerminate');
+ {$ENDIF}
   if Assigned(Sender) then
-  begin
+  with FThreadPool.LockList^ do
+  try
+ {$IFDEF DEBUG}
+    SendDebug(PMeThread(Sender).Name + ' DoThreadTerminate A:' + IntToStr(FActiveThreads.Count)+ ' P:'+ IntToStr(Count));
+ {$ENDIF}
+
     FActiveThreads.Remove(Sender);
-    FThreadPool.Remove(Sender);
+    Remove(Sender);
     Sender.Free;
+  finally
+    FThreadPool.UnlockList;
   end;
 end;
 
@@ -1475,32 +1512,38 @@ procedure TMeThreadMgr.AfterRun;
 var
   v: PMeThread;
 begin
-  EnterMainThread;
-  try
-  writeln('TMeThreadMgr.AfterRun');
-  finally
-    LeaveMainThread;
-  end;
   while FActiveThreads.Count > 0 do
   begin
     v:= PMeThread(FActiveThreads.Popup);
     v.Stop;
+    {$IFDEF DEBUG}
+    SendDebug(v.Name+'.Stopped= '+IntToStr(Integer(v.GetStopped)));
+    {$ENDIF}
     Sleep(50);
+    //while not v.Stopped do //use this will raise Exception !!!
+      //Sleep(10);
   end;
 
+ {$IFDEF DEBUG}
+    SendDebug('END___TMeThreadMgr.AfterRun.ACT');
+ {$ENDIF}
   while FThreadPool.Count > 0 do
   begin
     v:= PMeThread(FThreadPool.Popup);
     //!!WaitFor??dead lock>?>
+    //It seems the v.TerminateAndWaitFor and DoThreadTerminate make a dead lock.
+    v.OnTerminate := nil;
+    //v.FreeOnTerminate := True;
+    //v.Terminate;
+    //v.Resume;
+    //v.WaitFor;
     v.TerminateAndWaitFor;
+    v.Free;
   end;
 
-  EnterMainThread;
-  try
-  writeln('___TMeThreadMgr.AfterRun');
-  finally
-    LeaveMainThread;
-  end;
+ {$IFDEF DEBUG}
+    SendDebug('End___TMeThreadMgr.AfterRun');
+ {$ENDIF}
 end;
 
 procedure TMeThreadMgr.BeforeRun;
@@ -1512,14 +1555,21 @@ begin
   try
     while Count < FMaxThreads do
     begin
-      New(vThread, Create(nil));
-      vThread.OnTerminate := DoThreadTerminate;
-      vThread.OnStopped := DoThreadStopped;
+      vThread := CreateThread(nil);
       Add(vThread);
     end;
   finally
     FThreadPool.UnlockList;
   end;
+end;
+
+function TMeThreadMgr.CreateThread(const aTask: PMeTask): PMeThread;
+begin
+  New(Result, Create(aTask));
+  Result.OnTerminate := DoThreadTerminate;
+  Result.OnStopped := DoThreadStopped;
+  Result.StopMode := smSuspend;
+  //Result.Name := 'Thr' + IntToStr(ThreadCount);
 end;
 
 function TMeThreadMgr.Run: Boolean;
@@ -1550,9 +1600,7 @@ begin
       vThread.Task := vTask
     else if (FMaxThreads <= 0) or (Count < FMaxThreads) then
     begin
-      New(vThread, Create(vTask));
-      vThread.OnTerminate := DoThreadTerminate;
-      vThread.OnStopped := DoThreadStopped;
+      vThread := CreateThread(vTask);
     end;
   finally
     FThreadPool.UnlockList;
@@ -1580,7 +1628,7 @@ begin
 end;
 
 {----------------------------------------------------------------------------}
-
+(*
 type
   TMainThreadContext = record
     MainThreadEntered: Longint;
@@ -1798,7 +1846,7 @@ asm
     manipulates MainThreadOpenBlockCount }
   inc [MainThreadContext].TMainThreadContext.MainThreadOpenBlockCount
 end;
-
+*)
 initialization
   {$IFDEF MeRTTI_SUPPORT}
   SetMeVirtualMethod(TypeOf(TMeAbstractThread), ovtVmtClassName, nil);
@@ -1815,14 +1863,16 @@ initialization
 
   InitThreadSynchronization;
 
-  MainThreadContext.MainThreadEntered := -1;
-  InitializeCriticalSection(MainThreadContextCritSect);
+  //MainThreadContext.MainThreadEntered := -1;
+  //InitializeCriticalSection(MainThreadContextCritSect);
 
 
 finalization
-  DeleteCriticalSection(MainThreadContextCritSect);
+  //DeleteCriticalSection(MainThreadContextCritSect);
 
   MeFreeAndNil(SyncList);
   DoneThreadSynchronization;
-  //writeln('ThreadCount=',ThreadCount);
+  {$IFDEF DEBUG}
+  SendDebug('ThreadCount='+IntToStr(ThreadCount));
+  {$ENDIF}
 end.
