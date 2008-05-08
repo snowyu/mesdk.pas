@@ -98,7 +98,12 @@ begin
   Set8087CW(Default8087CW);
 
   //try
-  CoInitialize(nil);
+  if (CoInitFlags = -1) and (IsMultiThread) then
+    CoInitFlags := COINIT_MULITITHREADED;
+  if (CoInitFlags <> -1) and Assigned(ComObj.CoInitializeEx) then
+    ComObj.CoInitializeEx(nil, CoInitFlags)
+  else
+    CoInitialize(nil);
   FSite := TAXScriptSiteDebug.Create;
   try
     vObj := TActiveAppHelper.Create;
