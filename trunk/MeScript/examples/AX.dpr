@@ -9,7 +9,7 @@ uses
   ActiveX
   , uMeSystem
   , uAXScript
-  , uAXScriptDebug
+  //, uAXScriptDebug
   , uAXScriptInf
   , uAXScriptObj
   ;
@@ -99,7 +99,7 @@ begin
 
   //try
   if (CoInitFlags = -1) and (IsMultiThread) then
-    CoInitFlags := COINIT_MULITITHREADED;
+    CoInitFlags := COINIT_MULTITHREADED;
   if (CoInitFlags <> -1) and Assigned(ComObj.CoInitializeEx) then
     ComObj.CoInitializeEx(nil, CoInitFlags)
   else
