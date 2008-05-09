@@ -22,7 +22,9 @@
     * All rights reserved.
 
     * Contributor(s):
+      Riceball LEE
       Andreas Hausladen
+      Chad Z. Hower and the Indy Pit Crew
 }
 
 unit uMeThread;
@@ -60,6 +62,7 @@ resourcestring
 const
   cWaitAllThreadsTerminatedCount = 1 * 60 * 1000;
   cWaitAllThreadsTerminatedStep  = 250;
+  cThreadTerminateTimeoutError   = - WAIT_TIMEOUT;
 
 type
   PMeAbstractThread = ^ TMeAbstractThread;
@@ -135,7 +138,7 @@ type
     procedure Resume;
     procedure Suspend;
     procedure Terminate;
-    function WaitFor: LongWord;
+    function WaitFor(const aTimeout: LongWord = INFINITE): LongWord;
     class procedure Queue(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod); overload;
     class procedure RemoveQueuedEvents(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
     class procedure StaticQueue(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
@@ -213,6 +216,7 @@ type
   end;
 
   TMeNotifyThreadEvent = procedure(const aThread: PMeCustomThread) of object;
+  //if aException is nil then means the thread terminate time out! it will be killed by another manager. you can free mem first here.
   TMeExceptionThreadEvent = procedure(const aThread: PMeCustomThread; const aException: Exception) of object;
   TMeThreadStopMode = (smTerminate, smSuspend);
   TMeThreadOptions = set of (itoStopped, itoReqCleanup, itoDataOwner, itoTag);
@@ -263,7 +267,7 @@ type
     procedure Stop; virtual;
     procedure Synchronize(const Method: TMeCustomThreadMethod); overload;
     procedure Terminate; virtual;
-    procedure TerminateAndWaitFor; virtual;
+    function TerminateAndWaitFor(const aTimeout: LongWord = INFINITE): LongWord; virtual;
 
     //Represents the thread or fiber for the scheduler of the thread.
     //it will be free when the thread free.
@@ -326,17 +330,17 @@ type
   
     Usage: 
      FThreadForMgr := New(PMeThread, Create(New(PMeThreadMgr, Create)));
-     FThreadForMgr.Name := 'The Thread For Mgr';
+     //FThreadForMgr.Name := 'The Thread For Mgr'; //need check the compiler directive: NamedThread!
 
     vMgr := PMeThreadMgr(FThreadForMgr.Task);
-    FThreadMgr.Start;
     for i := 1 to 3 do
     begin
       New(vTask, Create);
       vTask.Id := i;
       vTask.Count := i;
-      vMgr.Add(vTask);
+      vMgr.Add(vTask); //the task can be added after running too.
     end;
+    FThreadMgr.Start;
     Writeln('Run....');
     Sleep(3000);
     FThreadForMgr.TerminateAndWaitFor;
@@ -355,6 +359,7 @@ type
     FMaxThreads: Integer;
     FThreadPriority: TMeThreadPriority;
     FFreeTask: Boolean;
+    FTerminatingTimeout: LongWord;
 
     function CreateThread(const aTask: PMeTask): PMeThread;
     //some task is done, free the task, the thread is idle.
@@ -1073,7 +1078,7 @@ begin
 
 end;
 
-function TMeAbstractThread.WaitFor: LongWord;
+function TMeAbstractThread.WaitFor(const aTimeout: LongWord): LongWord;
 {$IFDEF MSWINDOWS}
 var
   H: array[0..1] of THandle;
@@ -1090,24 +1095,38 @@ begin
         does a SendMessage to the foreground thread }
       if WaitResult = WAIT_OBJECT_0 + 2 then
         PeekMessage(Msg, 0, 0, 0, PM_NOREMOVE);
-      WaitResult := MsgWaitForMultipleObjects(2, H, False, 1000, QS_SENDMESSAGE);
+      WaitResult := MsgWaitForMultipleObjects(2, H, False, aTimeout, QS_SENDMESSAGE);
       CheckThreadError(WaitResult <> WAIT_FAILED);
       if WaitResult = WAIT_OBJECT_0 + 1 then
         CheckSynchronize;
-    until WaitResult = WAIT_OBJECT_0;
-  end else WaitForSingleObject(H[0], INFINITE);
-  CheckThreadError(GetExitCodeThread(H[0], Result));
+    until (WaitResult = WAIT_OBJECT_0) or (WaitResult = WAIT_TIMEOUT);
+  end 
+  else 
+    WaitResult := WaitForSingleObject(H[0], aTimeout);
+  if WaitResult <> WAIT_TIMEOUT then
+    CheckThreadError(GetExitCodeThread(H[0], Result))
+  else
+    Result := WaitResult;
 end;
 {$ENDIF}
 {$IFDEF LINUX}
 var
+  vEndTick: LongWord;
   X: Pointer;
   ID: Cardinal;
 begin
   ID := FThreadID;
   if GetCurrentThreadID = MainThreadID then
-    while not FFinished do
+  begin
+    vEndTick := GetTickCount + aTimeout;
+    while not FFinished and ((aTimeout = INFINITE) or (vEndTick > GetTickCount)) do
       CheckSynchronize(1000);
+    if not FFinished and (aTimeout <> INFINITE) and (vEndTick <= GetTickCount) then
+    begin
+      Result := WAIT_TIMEOUT;
+      Exit;
+    end;
+  end;
   FThreadID := 0;
   X := @Result;
   CheckThreadError(pthread_join(ID, X));
@@ -1235,7 +1254,7 @@ begin
   inherited Destroy; //+WaitFor!
 end;
 
-procedure TMeCustomThread.TerminateAndWaitFor;
+function TMeCustomThread.TerminateAndWaitFor(const aTimeout: LongWord): LongWord;
 begin
   if FreeOnTerminate then 
   begin
@@ -1243,7 +1262,7 @@ begin
   end;
   Terminate;
   Start; //resume
-  WaitFor;
+  Result := WaitFor(aTimeout);
 end;
 
 procedure TMeCustomThread.BeforeRun;
@@ -1494,7 +1513,10 @@ end;
 procedure TMeThread.DoException(const aException: Exception);
 begin
  {$IFDEF DEBUG}
-    SendDebug({$IFDEF NamedThread}FName+{$ENDIF}' Exception:'+aException.ClassName + ' Msg:'+aException.Message);
+    if Assigned(aException) then
+      SendDebug({$IFDEF NamedThread}FName+{$ENDIF}' Exception:'+aException.ClassName + ' Msg:'+aException.Message)
+    else
+      SendDebug({$IFDEF NamedThread}FName+{$ENDIF}' Exception: Thread Terminate Timeout Error!');
  {$ENDIF}
 
   inherited DoException(aException);
@@ -1517,6 +1539,7 @@ begin
   New(FTaskQueue, Create);
   New(FThreadPool, Create);
   New(FActiveThreads, Create);
+  FTerminatingTimeout := INFINITE;
 end;
 
 destructor TMeThreadMgrTask.Destroy;
@@ -1609,12 +1632,24 @@ begin
     v:= PMeThread(FThreadPool.Popup);
     //!!WaitFor??dead lock>?>
     //It seems the v.TerminateAndWaitFor and DoThreadTerminate make a dead lock.
-    v.OnTerminate := nil;
+    //v.OnTerminate := nil;
+    v.Priority := tpHighest;
     //v.FreeOnTerminate := True;
     //v.Terminate;
     //v.Resume;
     //v.WaitFor;
-    v.TerminateAndWaitFor;
+    if v.TerminateAndWaitFor(FTerminatingTimeout) = WAIT_TIMEOUT then
+    begin
+      //Kill thread.
+      //Note: the after run will be skip, so if some memory free in AfterRun!! so notify the thread via DoException.
+      v.DoException(nil);
+      {$IFDEF MSWINDOWS}
+      TerminateThread(v.Handle, LongWord(cThreadTerminateTimeoutError));
+      {$ENDIF}
+      {$IFDEF LINUX}
+      pthread_cancel(v.FThreadID);
+      {$ENDIF}
+    end;
     v.Free;
   end;
 
