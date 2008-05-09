@@ -175,7 +175,9 @@ procedure TTest_MeThreadMgr.SetUp;
 begin
   //FThreadMgr := New(PMeThread, Create(New(PMeThreadMgrTask, Create)));
   FThreadMgr := New(PMeThreadMgr, Create);
+  {$IFDEF NamedThread}
   FThreadMgr.Name := 'ThreadMgr';
+  {$ENDIF}
 end;
 
 procedure TTest_MeThreadMgr.TearDown;
