@@ -234,7 +234,9 @@ type
     FLock: PMeCriticalSection;
     FYarn: PMeYarn;
     FLoop: Boolean;
+    {$IFDEF NamedThread}
     FName: string;
+    {$ENDIF}
     FStopMode: TMeThreadStopMode;
     FOptions: TMeThreadOptions;
     //FTerminatingException: String;
@@ -267,7 +269,9 @@ type
     //it will be free when the thread free.
     property Yarn: PMeYarn read FYarn write FYarn;
     property Loop: Boolean read FLoop write FLoop;
+    {$IFDEF NamedThread}
     property Name: string read FName write FName;
+    {$ENDIF}
     property ReturnValue;
     property StopMode: TMeThreadStopMode read FStopMode write FStopMode;
     property Stopped: Boolean read GetStopped;
@@ -1158,6 +1162,79 @@ begin
   end;
 end;
 
+constructor TMeCustomThread.Create(const aCreateSuspended: Boolean; const aLoop: Boolean);
+begin
+  {$IFDEF DOTNET}
+  inherited Create(True);
+  {$ENDIF}
+  //FOptions := [itoDataOwner];
+  if aCreateSuspended then 
+  begin
+    Include(FOptions, itoStopped);
+  end;
+  New(FLock, Create);
+  Loop := aLoop;
+  //
+  {$IFDEF DOTNET}
+  if not aCreateSuspended then 
+  begin
+    Resume;
+  end;
+  {$ELSE}
+  //
+  // Most things BEFORE inherited - inherited creates the actual thread and if
+  // not suspended will start before we initialize
+  inherited Create(aCreateSuspended);
+    {$IFNDEF COMPILER6_UP}
+    // Delphi 6 and above raise an exception when an error occures while
+    // creating a thread (eg. not enough address space to allocate a stack)
+    // Delphi 5 and below don't do that, which results in a TMeCustomThread
+    // instance with an invalid handle in it, therefore we raise the
+    // exceptions manually on D5 and below
+  if (ThreadID = 0) then 
+  begin
+    Raise EMeError.Create(RsInvalidThreadHandleError);
+  end;
+    {$ENDIF}
+  {$ENDIF}
+  // Last, so we only do this if successful
+  {$IFDEF NamedThread}
+  FName := 'Thread' + IntToStr(ThreadCount);
+  {$ENDIF}
+end;
+
+destructor TMeCustomThread.Destroy;
+begin
+  FreeOnTerminate := False; //prevent destroy between Terminate & WaitFor
+  Terminate;
+  try
+    if itoReqCleanup in FOptions then 
+    begin
+      Cleanup;
+    end;
+  finally
+    // RLebeau- clean up the Yarn one more time, in case the thread was
+    // terminated after the Yarn was assigned but the thread was not
+    // re-started, so the Yarn would not be freed in Cleanup()
+    try
+      MeFreeAndNil(FYarn);
+    finally
+      {$IFDEF NamedThread}
+      FName := '';
+      {$ENDIF}
+      // Protect FLock if thread was resumed by Start Method and we are still there.
+      // This usually happens if Exception was raised in BeforeRun for some reason
+      // And thread was terminated there before Start method is completed.
+      FLock.Enter; try
+      finally FLock.Leave; end;
+
+      MeFreeAndNil(FLock);
+    end;
+  end;
+  //FTerminatingException := '';
+  inherited Destroy; //+WaitFor!
+end;
+
 procedure TMeCustomThread.TerminateAndWaitFor;
 begin
   if FreeOnTerminate then 
@@ -1273,75 +1350,6 @@ begin
   end;
 end;
 
-constructor TMeCustomThread.Create(const aCreateSuspended: Boolean; const aLoop: Boolean);
-begin
-  {$IFDEF DOTNET}
-  inherited Create(True);
-  {$ENDIF}
-  //FOptions := [itoDataOwner];
-  if aCreateSuspended then 
-  begin
-    Include(FOptions, itoStopped);
-  end;
-  New(FLock, Create);
-  Loop := aLoop;
-  //
-  {$IFDEF DOTNET}
-  if not aCreateSuspended then 
-  begin
-    Resume;
-  end;
-  {$ELSE}
-  //
-  // Most things BEFORE inherited - inherited creates the actual thread and if
-  // not suspended will start before we initialize
-  inherited Create(aCreateSuspended);
-    {$IFNDEF COMPILER6_UP}
-    // Delphi 6 and above raise an exception when an error occures while
-    // creating a thread (eg. not enough address space to allocate a stack)
-    // Delphi 5 and below don't do that, which results in a TMeCustomThread
-    // instance with an invalid handle in it, therefore we raise the
-    // exceptions manually on D5 and below
-  if (ThreadID = 0) then 
-  begin
-    Raise EMeError.Create(RsInvalidThreadHandleError);
-  end;
-    {$ENDIF}
-  {$ENDIF}
-  // Last, so we only do this if successful
-  FName := 'Thread' + IntToStr(ThreadCount);
-end;
-
-destructor TMeCustomThread.Destroy;
-begin
-  FreeOnTerminate := False; //prevent destroy between Terminate & WaitFor
-  Terminate;
-  try
-    if itoReqCleanup in FOptions then 
-    begin
-      Cleanup;
-    end;
-  finally
-    // RLebeau- clean up the Yarn one more time, in case the thread was
-    // terminated after the Yarn was assigned but the thread was not
-    // re-started, so the Yarn would not be freed in Cleanup()
-    try
-      MeFreeAndNil(FYarn);
-    finally
-      FName := '';
-      // Protect FLock if thread was resumed by Start Method and we are still there.
-      // This usually happens if Exception was raised in BeforeRun for some reason
-      // And thread was terminated there before Start method is completed.
-      FLock.Enter; try
-      finally FLock.Leave; end;
-
-      MeFreeAndNil(FLock);
-    end;
-  end;
-  //FTerminatingException := '';
-  inherited Destroy; //+WaitFor!
-end;
-
 procedure TMeCustomThread.Start;
 begin
   FLock.Enter; try
@@ -1393,7 +1401,7 @@ end;
 procedure TMeCustomThread.DoStopped;
 begin
  {$IFDEF DEBUG}
-  SendDebug(FName + ' DoStopped');
+  SendDebug({$IFDEF NamedThread}FName +{$ENDIF} ' DoStopped');
  {$ENDIF}
 
   if Assigned(OnStopped) then 
@@ -1453,7 +1461,9 @@ destructor TMeThread.Destroy;
 begin
  {$IFDEF DEBUG}
     SendDebug('Destroy...');
+    {$IFDEF NamedThread}
     SendDebug('    '+FName);
+    {$ENDIF}
  {$ENDIF}
   MeFreeAndNil(FTask);
   inherited Destroy;
@@ -1463,7 +1473,7 @@ procedure TMeThread.AfterRun;
 begin
  {$IFDEF DEBUG}
   if Assigned(FTask) then
-    SendDebug(FName + ' AfterRun')
+    SendDebug({$IFDEF NamedThread}FName + {$ENDIF}' AfterRun')
   else
     SendDebug('Failed AfterRun');
  {$ENDIF}
@@ -1474,7 +1484,7 @@ end;
 procedure TMeThread.BeforeRun;
 begin
  {$IFDEF DEBUG}
-    SendDebug(FName + ' BeforeRun');
+    SendDebug({$IFDEF NamedThread}FName +{$ENDIF} ' BeforeRun');
  {$ENDIF}
 
   inherited BeforeRun;
@@ -1484,7 +1494,7 @@ end;
 procedure TMeThread.DoException(const aException: Exception);
 begin
  {$IFDEF DEBUG}
-    SendDebug(FName+' Exception:'+aException.ClassName + ' Msg:'+aException.Message);
+    SendDebug({$IFDEF NamedThread}FName+{$ENDIF}' Exception:'+aException.ClassName + ' Msg:'+aException.Message);
  {$ENDIF}
 
   inherited DoException(aException);
@@ -1541,7 +1551,7 @@ begin
   if Assigned(aThread) then
   begin
  {$IFDEF DEBUG}
-    SendDebug(PMeThread(aThread).FName+ ' DoThreadStopped, A='+IntToStr(FActiveThreads.Count));
+    SendDebug({$IFDEF NamedThread}PMeThread(aThread).FName+{$ENDIF} ' DoThreadStopped, A='+IntToStr(FActiveThreads.Count));
  {$ENDIF}
 
     if FFreeTask then
@@ -1584,7 +1594,7 @@ begin
     v:= PMeThread(FActiveThreads.Popup);
     v.Stop;
     {$IFDEF DEBUG}
-    SendDebug(v.Name+'.Stopped= '+IntToStr(Integer(v.GetStopped)));
+    SendDebug({$IFDEF NamedThread}v.FName+{$ENDIF}'.Stopped= '+IntToStr(Integer(v.GetStopped)));
     {$ENDIF}
     Sleep(50);
     //while not v.Stopped do //use this will raise Exception !!!

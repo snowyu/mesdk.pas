@@ -18,6 +18,7 @@
 
 {.$DEFINE YieldClass_Supports} //use the delphi class type instead.
 {$DEFINE THREADSAFE_SUPPORT}
+{$DEFINE NamedThread}
 
 {Include Common setting File}
 {$I Setting.inc}
