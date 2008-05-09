@@ -179,7 +179,7 @@ type
     procedure BeforeRun; virtual;
     { Summary: the task exectution. }
     function Run: Boolean; virtual; abstract;
-    procedure HandleException(const aException: Exception); virtual;
+    procedure HandleException(const Sender: PMeCustomThread; const aException: Exception); virtual;
   public
     // The Do's are separate so we can add events later if necessary without
     // needing the inherited calls to perform them, as well as allowing
@@ -187,7 +187,7 @@ type
     procedure DoAfterRun;
     procedure DoBeforeRun;
     function DoRun: Boolean;
-    procedure DoException(const aException: Exception);
+    procedure DoException(const Sender: PMeCustomThread; const aException: Exception);
     // BeforeRunDone property to allow flexibility in alternative schedulers
     // it will be set to true before executing the BeforeRun.
     property BeforeRunDone: Boolean read FBeforeRunDone;
@@ -211,7 +211,7 @@ type
   end;
 
   TMeNotifyThreadEvent = procedure(const aThread: PMeCustomThread) of object;
-  TMeExceptionThreadEvent = procedure(aThread: PMeCustomThread; aException: Exception) of object;
+  TMeExceptionThreadEvent = procedure(const aThread: PMeCustomThread; const aException: Exception) of object;
   TMeThreadStopMode = (smTerminate, smSuspend);
   TMeThreadOptions = set of (itoStopped, itoReqCleanup, itoDataOwner, itoTag);
 
@@ -270,6 +270,7 @@ type
     property StopMode: TMeThreadStopMode read FStopMode write FStopMode;
     property Stopped: Boolean read GetStopped;
     property Terminated;
+    property OnException: TMeExceptionThreadEvent read FOnException write FOnException;
     property OnStopped: TMeNotifyThreadEvent read FOnStopped write FOnStopped;
   end;
 
@@ -313,7 +314,30 @@ type
   PMeThreadMgr = ^ TMeThreadMgr;
 
   {
-    the task will be free automatic.
+    the TMeThreadMgr task uses manage the threads with pool(if set the FMaxThreads is greater than 0).
+    the task will be free automatic after done if FreeTask is true.
+    note: if the exception occur even the FreeTask is false, it will still free the task when thread free.
+    unless override the task.HandleException method and set the aThread.task := nil;
+      
+  
+    Usage: 
+     FThreadForMgr := New(PMeThread, Create(New(PMeThreadMgr, Create)));
+     FThreadForMgr.Name := 'The Thread For Mgr';
+
+    vMgr := PMeThreadMgr(FThreadForMgr.Task);
+    FThreadMgr.Start;
+    for i := 1 to 3 do
+    begin
+      New(vTask, Create);
+      vTask.Id := i;
+      vTask.Count := i;
+      vMgr.AddTask(vTask);
+    end;
+    Writeln('Run....');
+    Sleep(3000);
+    FThreadForMgr.TerminateAndWaitFor;
+    MeFreeAndNil(FThreadForMgr);
+
   }
   TMeThreadMgr = object(TMeTask)
   protected
@@ -323,13 +347,16 @@ type
     FThreadPool: PMeThreadSafeList;
     //the current active threads.
     FActiveThreads: PMeThreadSafeList;
+    //the Max Parallelization threads count limits
     FMaxThreads: Integer;
+    FThreadPriority: TMeThreadPriority;
+    FFreeTask: Boolean;
 
     function CreateThread(const aTask: PMeTask): PMeThread;
     //some task is done, free the task, the thread is idle.
     procedure DoThreadStopped(const aThread: PMeCustomThread);
-    //some thread is unuse-able, free it.
-    procedure DoThreadTerminate(const Sender: PMeDynamicObject);
+    //if thread Exception then free this thread.
+    procedure DoThreadException(const aThread: PMeCustomThread; const aException: Exception);
 
     procedure Init; virtual; //override
     procedure AfterRun; virtual; //override
@@ -346,8 +373,12 @@ type
     destructor Destroy; virtual; //override;
     function AddTask(const aTask: PMeTask): Boolean;
 
+    //FreeTask when thread done.
+    property FreeTask: Boolean read FFreeTask write FFreeTask;
     property TaskQueue: PMeThreadSafeList read FTaskQueue;
-
+    // Open the thread pool when set the FMaxThreads is greater than 0.
+    property MaxThreads: Integer read FMaxThreads write FMaxThreads;
+    property ThreadPriority: TMeThreadPriority read FThreadPriority write FThreadPriority;
   end;
 
 
@@ -415,10 +446,10 @@ var
      end;
 
     @author  Andreas Hausladen
-NOTE: It seems bugs in it!!!
+
 }
-//procedure EnterMainThread;
-//procedure LeaveMainThread;
+procedure EnterMainThread;
+procedure LeaveMainThread;
 
 function NewThreadTask(const aTask: PMeTask): PMeThread;
 
@@ -1077,7 +1108,7 @@ procedure TMeTask.BeforeRun;
 begin
 end;
 
-procedure TMeTask.HandleException(const aException: Exception);
+procedure TMeTask.HandleException(const Sender: PMeCustomThread; const aException: Exception);
 begin
 end;
 
@@ -1097,9 +1128,9 @@ begin
   Result := Run;
 end;
 
-procedure TMeTask.DoException(const aException: Exception);
+procedure TMeTask.DoException(const Sender: PMeCustomThread; const aException: Exception);
 begin
-  HandleException(aException);
+  HandleException(Sender, aException);
 end;
 
 { TMeCustomThread }
@@ -1262,7 +1293,7 @@ begin
     // exceptions manually on D5 and below
   if (ThreadID = 0) then 
   begin
-    Raise EMeError.Create('TMeCustomThread: invalid thread handle');
+    Raise EMeError.Create(RsInvalidThreadHandleError);
   end;
     {$ENDIF}
   {$ENDIF}
@@ -1430,7 +1461,7 @@ begin
  {$ENDIF}
 
   inherited DoException(aException);
-  FTask.DoException(aException);
+  FTask.DoException(@Self, aException);
 end;
 
 constructor TMeThread.Create(aTask: PMeTask);
@@ -1460,6 +1491,7 @@ end;
 procedure TMeThreadMgr.Init;
 begin
   inherited;
+  FThreadPriority := tpNormal;
   New(FTaskQueue, Create);
   New(FThreadPool, Create);
   New(FActiveThreads, Create);
@@ -1473,7 +1505,25 @@ begin
   inherited;
 end;
 
-//!!Bug: DoThreadStopped event never be triggered!!
+function TMeThreadMgr.CreateThread(const aTask: PMeTask): PMeThread;
+begin
+  New(Result, Create(aTask));
+  Result.OnStopped := DoThreadStopped;
+  Result.OnException := DoThreadException;
+  Result.StopMode := smSuspend; //must change the StopMode to Suspend, or the DoThreadStopped can not be executed.
+  if FThreadPriority <> tpNormal then
+  Result.Priority := FThreadPriority;
+  //Result.Name := 'Thr' + IntToStr(ThreadCount);
+end;
+
+procedure TMeThreadMgr.DoThreadException(const aThread: PMeCustomThread; const aException: Exception);
+begin
+  FActiveThreads.Remove(aThread);
+  //if not FFreeTask then
+    //PMeThread(aThread).Task := nil;
+  aThread.FreeOnTerminate := True;
+end;
+
 procedure TMeThreadMgr.DoThreadStopped(const aThread: PMeCustomThread);
 begin
   if Assigned(aThread) then
@@ -1482,12 +1532,16 @@ begin
     SendDebug(PMeThread(aThread).FName+ ' DoThreadStopped, A='+IntToStr(FActiveThreads.Count));
  {$ENDIF}
 
-    MeFreeAndNil(PMeThread(aThread).FTask);
+    if FFreeTask then
+      MeFreeAndNil(PMeThread(aThread).FTask)
+    else
+      PMeThread(aThread).FTask := nil;
     FActiveThreads.Remove(aThread);
     FThreadPool.Add(aThread);
   end;
 end;
 
+(*
 procedure TMeThreadMgr.DoThreadTerminate(const Sender: PMeDynamicObject);
 begin
  {$IFDEF DEBUG}
@@ -1507,6 +1561,7 @@ begin
     FThreadPool.UnlockList;
   end;
 end;
+*)
 
 procedure TMeThreadMgr.AfterRun;
 var
@@ -1561,15 +1616,6 @@ begin
   finally
     FThreadPool.UnlockList;
   end;
-end;
-
-function TMeThreadMgr.CreateThread(const aTask: PMeTask): PMeThread;
-begin
-  New(Result, Create(aTask));
-  Result.OnTerminate := DoThreadTerminate;
-  Result.OnStopped := DoThreadStopped;
-  Result.StopMode := smSuspend;
-  //Result.Name := 'Thr' + IntToStr(ThreadCount);
 end;
 
 function TMeThreadMgr.Run: Boolean;
@@ -1628,7 +1674,7 @@ begin
 end;
 
 {----------------------------------------------------------------------------}
-(*
+
 type
   TMainThreadContext = record
     MainThreadEntered: Longint;
@@ -1846,7 +1892,7 @@ asm
     manipulates MainThreadOpenBlockCount }
   inc [MainThreadContext].TMainThreadContext.MainThreadOpenBlockCount
 end;
-*)
+
 initialization
   {$IFDEF MeRTTI_SUPPORT}
   SetMeVirtualMethod(TypeOf(TMeAbstractThread), ovtVmtClassName, nil);
@@ -1863,12 +1909,12 @@ initialization
 
   InitThreadSynchronization;
 
-  //MainThreadContext.MainThreadEntered := -1;
-  //InitializeCriticalSection(MainThreadContextCritSect);
+  MainThreadContext.MainThreadEntered := -1;
+  InitializeCriticalSection(MainThreadContextCritSect);
 
 
 finalization
-  //DeleteCriticalSection(MainThreadContextCritSect);
+  DeleteCriticalSection(MainThreadContextCritSect);
 
   MeFreeAndNil(SyncList);
   DoneThreadSynchronization;

@@ -18,6 +18,7 @@ uses
   TypInfo,
   IniFiles,
   //Dialogs,
+  Forms,
   TestFramework
   , uMeObject
   , uMeStrUtils
@@ -87,14 +88,15 @@ end;
 
 procedure TMyTask.AfterRun;
 begin
-  //EnterMainThread;
-  //try
   {$IFDEF DEBUG}
-    if Count > 0 then Senddebug('Task'+IntToStr(Id)+ ':'+ IntToStr(Count));
+  if Count > 0 then Senddebug('Task'+IntToStr(Id)+ ':'+ IntToStr(Count));
+  EnterMainThread;
+  try
+    if Count > 0 then Writeln('Task'+IntToStr(Id)+ ':'+ IntToStr(Count));
+  finally
+    LeaveMainThread;
+  end;
   {$ENDIF}
-  //finally
-    //LeaveMainThread;
-  //end;
 end;
 
 { TTest_MeThread }
@@ -127,7 +129,7 @@ var
 begin
   while (InterlockedIncrement(GCount) > 0) and not Terminated do
     Sleep(100);
-  {S := 'Hallo, I''m executed in the main thread:';
+  S := 'Hallo, I''m executed in the main thread:';
   Assert(GetCurrentThreadId <> MainThreadId);
   EnterMainThread;
   try
@@ -194,10 +196,14 @@ begin
     vTask.Count := i;
     vMgr.AddTask(vTask);
   end;
-  Writeln('Run....');
+  //Writeln('Run....');
   //while vMgr.TaskQueue.Count > 0 do
     //Sleep(100);
-  Sleep(3000);
+  //Sleep(3000); //note: the MainThread is blocked now. so if u EnterMainThread then the deadlock occur.
+  i := GetTickCount + 3000;
+  while i > GetTickCount do
+    Application.ProcessMessages;
+
   FThreadMgr.TerminateAndWaitFor;
 end;
 
