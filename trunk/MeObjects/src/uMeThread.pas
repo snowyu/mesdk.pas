@@ -67,6 +67,8 @@ type
   PMeYarn = ^ TMeYarn;
   PMeThread = ^ TMeThread;
   PMeTask = ^ TMeTask;
+  PMeThreadMgrTask = ^ TMeThreadMgrTask;
+  PMeThreadMgr = ^ TMeThreadMgr;
 
   TMeCustomThreadMethod = procedure of object;
 {$IFDEF MSWINDOWS}
@@ -311,10 +313,8 @@ type
     property Task: PMeTask read FTask write FTask;
   end;
 
-  PMeThreadMgr = ^ TMeThreadMgr;
-
   {
-    the TMeThreadMgr task uses manage the threads with pool(if set the FMaxThreads is greater than 0).
+    the TMeThreadMgrTask task uses manage the threads with pool(if set the FMaxThreads is greater than 0).
     the task will be free automatic after done if FreeTask is true.
     note: if the exception occur even the FreeTask is false, it will still free the task when thread free.
     unless override the task.HandleException method and set the aThread.task := nil;
@@ -331,7 +331,7 @@ type
       New(vTask, Create);
       vTask.Id := i;
       vTask.Count := i;
-      vMgr.AddTask(vTask);
+      vMgr.Add(vTask);
     end;
     Writeln('Run....');
     Sleep(3000);
@@ -339,7 +339,7 @@ type
     MeFreeAndNil(FThreadForMgr);
 
   }
-  TMeThreadMgr = object(TMeTask)
+  TMeThreadMgrTask = object(TMeTask)
   protected
     //the todo task Queue.
     FTaskQueue: PMeThreadSafeList;
@@ -371,14 +371,25 @@ type
     //procedure HandleException(const aException: Exception); virtual;
   public
     destructor Destroy; virtual; //override;
-    function AddTask(const aTask: PMeTask): Boolean;
+    function Add(const aTask: PMeTask): Boolean;
 
     //FreeTask when thread done.
+    //the default is true.
     property FreeTask: Boolean read FFreeTask write FFreeTask;
     property TaskQueue: PMeThreadSafeList read FTaskQueue;
     // Open the thread pool when set the FMaxThreads is greater than 0.
     property MaxThreads: Integer read FMaxThreads write FMaxThreads;
     property ThreadPriority: TMeThreadPriority read FThreadPriority write FThreadPriority;
+  end;
+
+  TMeThreadMgr = object(TMeThread)
+  protected
+    function GetTask: PMeThreadMgrTask;
+    //procedure Init; virtual; //override
+  public
+    constructor Create;
+    function AddTask(const aTask: PMeTask): Boolean;
+    property Task: PMeThreadMgrTask read GetTask;
   end;
 
 
@@ -1432,6 +1443,22 @@ end;
 
 { TMeThread }
 
+constructor TMeThread.Create(aTask: PMeTask);
+begin
+  inherited Create(True, True);
+  FTask := aTask;
+end;
+
+destructor TMeThread.Destroy;
+begin
+ {$IFDEF DEBUG}
+    SendDebug('Destroy...');
+    SendDebug('    '+FName);
+ {$ENDIF}
+  MeFreeAndNil(FTask);
+  inherited Destroy;
+end;
+
 procedure TMeThread.AfterRun;
 begin
  {$IFDEF DEBUG}
@@ -1464,22 +1491,6 @@ begin
   FTask.DoException(@Self, aException);
 end;
 
-constructor TMeThread.Create(aTask: PMeTask);
-begin
-  inherited Create(True, True);
-  FTask := aTask;
-end;
-
-destructor TMeThread.Destroy;
-begin
- {$IFDEF DEBUG}
-    SendDebug('Destroy...');
-    SendDebug('    '+FName);
- {$ENDIF}
-  MeFreeAndNil(FTask);
-  inherited Destroy;
-end;
-
 procedure TMeThread.Run;
 begin
   if not FTask.DoRun then begin
@@ -1487,17 +1498,18 @@ begin
   end;
 end;
 
-{ TMeThreadMgr }
-procedure TMeThreadMgr.Init;
+{ TMeThreadMgrTask }
+procedure TMeThreadMgrTask.Init;
 begin
   inherited;
   FThreadPriority := tpNormal;
+  FFreeTask := True;
   New(FTaskQueue, Create);
   New(FThreadPool, Create);
   New(FActiveThreads, Create);
 end;
 
-destructor TMeThreadMgr.Destroy;
+destructor TMeThreadMgrTask.Destroy;
 begin
   FTaskQueue.Free;
   FThreadPool.Free;
@@ -1505,7 +1517,7 @@ begin
   inherited;
 end;
 
-function TMeThreadMgr.CreateThread(const aTask: PMeTask): PMeThread;
+function TMeThreadMgrTask.CreateThread(const aTask: PMeTask): PMeThread;
 begin
   New(Result, Create(aTask));
   Result.OnStopped := DoThreadStopped;
@@ -1516,7 +1528,7 @@ begin
   //Result.Name := 'Thr' + IntToStr(ThreadCount);
 end;
 
-procedure TMeThreadMgr.DoThreadException(const aThread: PMeCustomThread; const aException: Exception);
+procedure TMeThreadMgrTask.DoThreadException(const aThread: PMeCustomThread; const aException: Exception);
 begin
   FActiveThreads.Remove(aThread);
   //if not FFreeTask then
@@ -1524,7 +1536,7 @@ begin
   aThread.FreeOnTerminate := True;
 end;
 
-procedure TMeThreadMgr.DoThreadStopped(const aThread: PMeCustomThread);
+procedure TMeThreadMgrTask.DoThreadStopped(const aThread: PMeCustomThread);
 begin
   if Assigned(aThread) then
   begin
@@ -1542,7 +1554,7 @@ begin
 end;
 
 (*
-procedure TMeThreadMgr.DoThreadTerminate(const Sender: PMeDynamicObject);
+procedure TMeThreadMgrTask.DoThreadTerminate(const Sender: PMeDynamicObject);
 begin
  {$IFDEF DEBUG}
     SendDebug('DoThreadTerminate');
@@ -1563,7 +1575,7 @@ begin
 end;
 *)
 
-procedure TMeThreadMgr.AfterRun;
+procedure TMeThreadMgrTask.AfterRun;
 var
   v: PMeThread;
 begin
@@ -1580,7 +1592,7 @@ begin
   end;
 
  {$IFDEF DEBUG}
-    SendDebug('END___TMeThreadMgr.AfterRun.ACT');
+    SendDebug('END___TMeThreadMgrTask.AfterRun.ACT');
  {$ENDIF}
   while FThreadPool.Count > 0 do
   begin
@@ -1597,11 +1609,11 @@ begin
   end;
 
  {$IFDEF DEBUG}
-    SendDebug('End___TMeThreadMgr.AfterRun');
+    SendDebug('End___TMeThreadMgrTask.AfterRun');
  {$ENDIF}
 end;
 
-procedure TMeThreadMgr.BeforeRun;
+procedure TMeThreadMgrTask.BeforeRun;
 var
   vThread: PMeThread;
 begin
@@ -1618,7 +1630,7 @@ begin
   end;
 end;
 
-function TMeThreadMgr.Run: Boolean;
+function TMeThreadMgrTask.Run: Boolean;
 var
   vThread: PMeThread;
   vTask: PMeTask;
@@ -1659,7 +1671,7 @@ begin
   Sleep(50);
 end;
 
-function TMeThreadMgr.AddTask(const aTask: PMeTask): Boolean;
+function TMeThreadMgrTask.Add(const aTask: PMeTask): Boolean;
 begin
   with FTaskQueue.LockList^ do
   try
@@ -1671,6 +1683,23 @@ begin
   finally
     FTaskQueue.UnlockList;
   end; 
+end;
+
+{ TMeThreadMgr }
+constructor TMeThreadMgr.Create;
+begin
+  inherited Create(New(PMeThreadMgrTask, Create));
+end;
+
+function TMeThreadMgr.GetTask: PMeThreadMgrTask;
+begin
+  Result := PMeThreadMgrTask(FTask);
+end;
+
+
+function TMeThreadMgr.AddTask(const aTask: PMeTask): Boolean;
+begin
+  Result := PMeThreadMgrTask(FTask).Add(aTask);
 end;
 
 {----------------------------------------------------------------------------}
