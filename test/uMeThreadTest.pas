@@ -91,12 +91,12 @@ procedure TMyTask.AfterRun;
 begin
   {$IFDEF DEBUG}
   if Count > 0 then Senddebug('Task'+IntToStr(Id)+ ':'+ IntToStr(Count));
-  EnterMainThread;
+  {EnterMainThread;
   try
     if Count > 0 then Writeln('Task'+IntToStr(Id)+ ':'+ IntToStr(Count));
   finally
     LeaveMainThread;
-  end;
+  end;//}
   {$ENDIF}
 end;
 
@@ -204,10 +204,10 @@ begin
   //Writeln('Run....');
   //while vMgr.TaskQueue.Count > 0 do
     //Sleep(100);
-  //Sleep(3000); //note: the MainThread is blocked now. so if u EnterMainThread then the deadlock occur.
-  i := GetTickCount + 4000;
+  Sleep(3000); //note: the MainThread is blocked now. so if u EnterMainThread then the deadlock occur. it still some problem!!
+  {i := GetTickCount + 8000;
   while i > GetTickCount do
-    Application.ProcessMessages;
+    Application.ProcessMessages; //}
 
   FThreadMgr.TerminateAndWaitFor;
 end;
