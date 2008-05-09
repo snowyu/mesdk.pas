@@ -51,7 +51,7 @@ type
     function Last: Pointer;
     function Popup: Pointer;
     function Get(const Index: Integer): Pointer;
-    procedure Remove(const Item: Pointer);
+    function Remove(const Item: Pointer): Integer;
     procedure UnlockList;
     property Duplicates: TDuplicates read FDuplicates write FDuplicates;
     property List: PMeList read FList;
@@ -483,11 +483,11 @@ begin
   end;
 end;
 
-procedure TMeThreadSafeList.Remove(const Item: Pointer);
+function TMeThreadSafeList.Remove(const Item: Pointer): Integer;
 begin
   LockList;
   try
-    FList.Remove(Item);
+    Result := FList.Remove(Item);
   finally
     UnlockList;
   end;

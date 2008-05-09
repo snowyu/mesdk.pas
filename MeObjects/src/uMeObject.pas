@@ -408,7 +408,8 @@ type
     {Summary Deletes Len items starting from Index. }
     procedure DeleteRange(Index, Len: Integer);
     {Summary Removes first entry of a Value in the list. }
-    procedure Remove(Value: Pointer);
+    { return -1 means not found. }
+    function Remove(Value: Pointer): Integer;
     {Summary Returns the last item (or nil, if the list is empty). }
     function Last: Pointer;
     {Summary Swaps two items in list directly (fast, but without testing of
@@ -1835,12 +1836,11 @@ asm
 end;
 {$ENDIF PUREPASCAL}
 
-procedure TMeList.Remove(Value: Pointer);
-var I: Integer;
+function TMeList.Remove(Value: Pointer): Integer;
 begin
-  I := IndexOf(Value);
-  if I >= 0 then
-    Delete(I);
+  Result := IndexOf(Value);
+  if Result >= 0 then
+    Delete(Result);
 end;
 
 procedure TMeList.Put(Index: Integer; Value: Pointer);
