@@ -192,6 +192,7 @@ var
   //vMgr: PMeThreadMgrTask;
 begin
   //vMgr := PMeThreadMgrTask(FThreadMgr.Task);
+  FThreadMgr.Task.TerminatingTimeout := 10;
   FThreadMgr.Start;
   for i := 1 to 3 do
   begin
@@ -213,6 +214,10 @@ begin
 end;
 
 Initialization
+  {$IFDEF MeRTTI_SUPPORT}
+//  SetMeVirtualMethod(TypeOf(TMeAbstractThread), ovtVmtClassName, nil);
+  {$ENDIF}
+//  SetMeVirtualMethod(TypeOf(TMeAbstractThread), ovtVmtParent, TypeOf(TMeDynamicObject));
 
   AppPath := ExtractFilePath(ParamStr(0));
   RegisterTests('MeThread suites',

@@ -308,6 +308,7 @@ type
     procedure AfterRun; virtual; //override;
     procedure BeforeRun; virtual; //override;
     procedure Run; virtual; //override;
+    //Note: if threadTerminatingTimeout occur the aException is nil!!
     procedure DoException(const aException: Exception); virtual; //override;
   public
     // Defaults because
@@ -388,6 +389,9 @@ type
     property TaskQueue: PMeThreadSafeList read FTaskQueue;
     // Open the thread pool when set the FMaxThreads is greater than 0.
     property MaxThreads: Integer read FMaxThreads write FMaxThreads;
+    // it will force terminate threads after timeout. the default is INFINITE! 
+    // and the timeout threads will be trigger the aThread.DoException(nil).
+    property TerminatingTimeout: LongWord read FTerminatingTimeout write FTerminatingTimeout;
     property ThreadPriority: TMeThreadPriority read FThreadPriority write FThreadPriority;
   end;
 
@@ -1073,7 +1077,14 @@ procedure TMeAbstractThread.Terminate;
 begin
   FTerminated := True;
  {$IFDEF DEBUG}
-  SendDebug('TMeAbstractThread.Terminate');
+    {$IFDEF NamedThread}
+      if Self.InheritsFrom(TypeOf(TMeCustomThread)) then
+        SendDebug(TMeCustomThread(Self).FName + ' TMeAbstractThread.Terminate')
+      else
+        SendDebug('TMeAbstractThread.Terminate');
+    {$ELSE}
+    SendDebug('TMeAbstractThread.Terminate');
+    {$ENDIF}
  {$ENDIF}
 
 end;
@@ -1118,7 +1129,12 @@ begin
   ID := FThreadID;
   if GetCurrentThreadID = MainThreadID then
   begin
-    vEndTick := GetTickCount + aTimeout;
+    if aTimeout <> INFINITE then
+    try
+      vEndTick := GetTickCount + aTimeout;
+    except
+      vEndTick := GetTickCount + cWaitAllThreadsTerminatedCount;
+    end;
     while not FFinished and ((aTimeout = INFINITE) or (vEndTick > GetTickCount)) do
       CheckSynchronize(1000);
     if not FFinished and (aTimeout <> INFINITE) and (vEndTick <= GetTickCount) then
@@ -1479,10 +1495,7 @@ end;
 destructor TMeThread.Destroy;
 begin
  {$IFDEF DEBUG}
-    SendDebug('Destroy...');
-    {$IFDEF NamedThread}
-    SendDebug('    '+FName);
-    {$ENDIF}
+    SendDebug({$IFDEF NamedThread}FName+{$ENDIF} 'Destroy...');
  {$ENDIF}
   MeFreeAndNil(FTask);
   inherited Destroy;
@@ -1577,12 +1590,17 @@ begin
     SendDebug({$IFDEF NamedThread}PMeThread(aThread).FName+{$ENDIF} ' DoThreadStopped, A='+IntToStr(FActiveThreads.Count));
  {$ENDIF}
 
-    if FFreeTask then
-      MeFreeAndNil(PMeThread(aThread).FTask)
-    else
-      PMeThread(aThread).FTask := nil;
-    FActiveThreads.Remove(aThread);
-    FThreadPool.Add(aThread);
+    with FThreadPool.LockList^ do
+    try
+      if FFreeTask then
+        MeFreeAndNil(PMeThread(aThread).FTask)
+      else
+        PMeThread(aThread).FTask := nil;
+      FActiveThreads.Remove(aThread);
+      Add(aThread);
+    finally
+      FThreadPool.UnlockList;
+    end;
   end;
 end;
 
@@ -1611,21 +1629,43 @@ end;
 procedure TMeThreadMgrTask.AfterRun;
 var
   v: PMeThread;
+  c: Integer;
+  vEndTick : LongWord;
 begin
   while FActiveThreads.Count > 0 do
   begin
+    c := FThreadPool.Count;
     v:= PMeThread(FActiveThreads.Popup);
     v.Stop;
+    v.Priority := tpHighest;
     {$IFDEF DEBUG}
     SendDebug({$IFDEF NamedThread}v.FName+{$ENDIF}'.Stopped= '+IntToStr(Integer(v.GetStopped)));
     {$ENDIF}
-    Sleep(50);
+    //Sleep(50);
+    if FTerminatingTimeout <> INFINITE then
+    try
+      vEndTick := GetTickCount + FTerminatingTimeout;
+    except
+      FTerminatingTimeout := INFINITE;
+      vEndTick := 0;
+    end;
+    While ((FTerminatingTimeout = INFINITE) or (vEndTick > GetTickCount)) and (c = FThreadPool.Count)  do
+      Sleep(20);
+    
+    if c = FThreadPool.Count then
+    begin
+      //Stopped Timeout
+      FThreadPool.Add(v);
+      {$IFDEF DEBUG}
+      SendDebug({$IFDEF NamedThread}v.FName+{$ENDIF} ' ThreadStop Timeout Force to add the ThreadPool:');
+      {$ENDIF}
+    end;
     //while not v.Stopped do //use this will raise Exception !!!
       //Sleep(10);
   end;
 
  {$IFDEF DEBUG}
-    SendDebug('END___TMeThreadMgrTask.AfterRun.ACT');
+    SendDebug('END___TMeThreadMgrTask.AfterRun.StopAcitiveThreads');
  {$ENDIF}
   while FThreadPool.Count > 0 do
   begin
@@ -1633,7 +1673,6 @@ begin
     //!!WaitFor??dead lock>?>
     //It seems the v.TerminateAndWaitFor and DoThreadTerminate make a dead lock.
     //v.OnTerminate := nil;
-    v.Priority := tpHighest;
     //v.FreeOnTerminate := True;
     //v.Terminate;
     //v.Resume;
@@ -1681,7 +1720,7 @@ var
   vTask: PMeTask;
 begin
   vThread := nil;
-  vTask := nil;
+  //vTask := nil;
   Result := True;
   with FTaskQueue.LockList^ do
   try
@@ -1974,12 +2013,16 @@ initialization
   SetMeVirtualMethod(TypeOf(TMeThread), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeTask), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeYarn), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeThreadMgr), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeThreadMgrTask), ovtVmtClassName, nil);
   {$ENDIF}
   SetMeVirtualMethod(TypeOf(TMeAbstractThread), ovtVmtParent, TypeOf(TMeDynamicObject));
   SetMeVirtualMethod(TypeOf(TMeCustomThread), ovtVmtParent, TypeOf(TMeAbstractThread));
   SetMeVirtualMethod(TypeOf(TMeThread), ovtVmtParent, TypeOf(TMeCustomThread));
   SetMeVirtualMethod(TypeOf(TMeTask), ovtVmtParent, TypeOf(TMeDynamicObject));
   SetMeVirtualMethod(TypeOf(TMeYarn), ovtVmtParent, TypeOf(TMeDynamicObject));
+  SetMeVirtualMethod(TypeOf(TMeThreadMgr), ovtVmtParent, TypeOf(TMeThread));
+  SetMeVirtualMethod(TypeOf(TMeThreadMgrTask), ovtVmtParent, TypeOf(TMeTask));
 
   InitThreadSynchronization;
 

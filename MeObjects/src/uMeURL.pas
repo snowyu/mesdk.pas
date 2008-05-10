@@ -1,5 +1,5 @@
 
-{Summary the abstract Uniform/Universal Resource Locator class and factory..}
+{Summary the abstract Uniform/Universal Resource Accessor class and factory..}
 {
    @author  Riceball LEE(riceballl@hotmail.com)
    @version $Revision: 1.10 $
@@ -31,6 +31,7 @@ uses
   SysUtils,
   uMeObject
   , uMeStream
+  , uMeThread
   //, uMeURI
   ;
 
@@ -46,8 +47,8 @@ type
                               const RqType : TMeResourceSupport;
                               const Error  : TMeResourceResult) of object;
 
-  PMeResourceLocator = ^ TMeResourceLocator;
-  TMeResourceLocator = object(TMeDynamicObject)
+  PMeResourceAccessor = ^ TMeResourceAccessor;
+  TMeResourceAccessor = object(TMeDynamicObject)
   protected
     //the current protocol.
     FProtocol: string;
@@ -56,7 +57,7 @@ type
 
     procedure SetURL(const aURL: string);
 
-    //返回该 Locator 支持的操作集合
+    //返回该 Accessor 支持的操作集合
     class function Supports: TMeResourceSupports; virtual; abstract;
     //list this connection supports protocols, seperate by ";"
     //eg, http;https
@@ -70,12 +71,12 @@ type
     function iPut(const aStream: PMeStream): TMeResourceResult; virtual; abstract;
     function iDelete(): TMeResourceResult; virtual; abstract;
 
-    //测试该 Locator 是否支持 aProtocol 协议。
+    //测试该 Accessor 是否支持 aProtocol 协议。
     function CanProcessed(const aProtocol: string): Boolean;
   public
     destructor Destroy; virtual; {override}
 
-    { Summary: 首先检查该Locator是否支持该操作，如果支持才去调用 iGetHeader. }
+    { Summary: 首先检查该Accessor是否支持该操作，如果支持才去调用 iGetHeader. }
     {
       Return the ResourceInfo in aInfo: AttributeName=value
         Such as:
@@ -85,29 +86,38 @@ type
         Revision=
     }
     function GetResourceHeader(const aInfo: PMeStrings): TMeResourceResult;
-    //首先检查该Locator是否支持该操作，如果支持才去调用 iGet.
+    //首先检查该Accessor是否支持该操作，如果支持才去调用 iGet.
     function GetResource(var aStream: PMeStream): TMeResourceResult;
-    //首先检查该Locator是否支持该操作，如果支持才去调用 iPut.
+    //首先检查该Accessor是否支持该操作，如果支持才去调用 iPut.
     function PutResource(const aStream: PMeStream): TMeResourceResult;
-    //首先检查该Locator是否支持该操作，如果支持才去调用 iDelete.
+    //首先检查该Accessor是否支持该操作，如果支持才去调用 iDelete.
     function DeleteResource(): TMeResourceResult;
 
 
-    //当设置新的URL值的时候，如果协议被改变为是不被当前Locator支持的，那么改变不会成功。
+    //当设置新的URL值的时候，如果协议被改变为是不被当前Accessor支持的，那么改变不会成功。
     property URL: string read FURL write SetURL;
     property Protocol: string read FProtocol;
     property LocalBaseDir: string read FLocalBaseDir write FLocalBaseDir;
   end;
 
-  PMeResourceLocatorAsyn = ^ TMeResourceLocatorAsyn;
-  TMeResourceLocatorAsyn = object(TMeResourceLocator)
+  TMeResourceAccessorTask = object(TMeTask)
   protected
-    FTimeout: Longword;
+    procedure AfterRun; virtual; //override
+    procedure BeforeRun; virtual; //override
+    function Run: Boolean; virtual; //override
+    procedure HandleException(const aException: Exception); virtual;//override
   public
-    property Timeout: Longword read FTimeout write FTimeout;
   end;
 
-  { Summary: the abstract file resource. }
+  PMeResourceAccessorAsyn = ^ TMeResourceAccessorAsyn;
+  TMeResourceAccessorAsyn = object(TMeResourceAccessor)
+  protected
+    FTimeout: Integer;
+  public
+    property Timeout: Integer read FTimeout write FTimeout;
+  end;
+
+  { Summary: the abstract local file resource. }
   {
     the file resource MUST like this: "Protocol://[user:passwd@][/folder/../]filename:/folder/../rsource.txt"
     pack://user:pwd@/test/aFile.pak:/folder/test.txt
@@ -116,7 +126,7 @@ type
     FResourceName:  /folder/test.txt
     Note: 只支持相对目录。
   }
-  TMeCustomFileLocator = object(TMeResourceLocator)
+  TMeCustomFileAccessor = object(TMeResourceAccessor)
   protected
     FFileName: string;
     FResourceName: string;
@@ -132,31 +142,31 @@ type
     property FileName: string read GetFileName;
   end;
 
-{ the registered resource Locator classes }
-function GResourceLocatorClasses: PMeList;
+{ the registered resource Accessor classes }
+function GResourceAccessorClasses: PMeList;
 
 
-{ Summary: find the index of the protocol class in the GResourceLocatorClasses, if not found return -1}
+{ Summary: find the index of the protocol class in the GResourceAccessorClasses, if not found return -1}
 { 根据URL中的协议查找Class在列表中的位置，没有找到返回为-1，否则为在列表中的索引号。 }
-function IndexOfLocatorClass(const aURL: string): Integer;
-//分析aURL类型，查找Locator类工厂，如果发现就创建该Locator，否则返回nil.
-function CreateLocator(const aURL: string; const aLocalBaseDir: string = ''): PMeResourceLocator;
+function IndexOfAccessorClass(const aURL: string): Integer;
+//分析aURL类型，查找 Resource Accessor 类工厂，如果发现就创建该 Accessor，否则返回nil.
+function CreateResourceAccessor(const aURL: string; const aLocalBaseDir: string = ''): PMeResourceAccessor;
 
 function GetResourceHeader(const aURL: string; const aInfo: PMeStrings; const aLocalBaseDir: string = ''): TMeResourceResult;
 function GetResource(const aURL: string; var aStream: PMeStream; const aLocalBaseDir: string = ''): TMeResourceResult;
 function PutResource(const aURL: string; const aStream: PMeStream; const aLocalBaseDir: string = ''): TMeResourceResult;
 function DeleteResource(const aURL: string; const aLocalBaseDir: string = ''): TMeResourceResult; 
 
-//将Locator类注册到locator类工厂。
-procedure Register(const aLocatorClass: TMeClass);
+//将Accessor类注册到Accessor类工厂。
+procedure Register(const aAccessorClass: TMeClass);
 
-//get the aLocatorClass supports protocols.
-function GetLocatorProtocols(const aLocatorClass: TMeClass): string;
-//返回该 Locator 支持的操作集合
-function GetLocatorSupports(const aLocatorClass: TMeClass): TMeResourceSupports;
+//get the aAccessorClass supports protocols.
+function GetAccessorProtocols(const aAccessorClass: TMeClass): string;
+//返回该 Accessor 支持的操作集合
+function GetAccessorSupports(const aAccessorClass: TMeClass): TMeResourceSupports;
 //test whether this Protocol can be processed.
-//测试该 Locator 是否支持 aProtocol 协议。
-function ProtocolCanProcessed(const aLocatorClass: TMeClass; const aProtocol: string): Boolean;
+//测试该 Accessor 是否支持 aProtocol 协议。
+function ProtocolCanProcessed(const aAccessorClass: TMeClass; const aProtocol: string): Boolean;
 
 implementation
 
@@ -164,56 +174,57 @@ uses
   uMeStrUtils;
 
 type
-  PMeVMTResourceLocator = ^ TMeVMTResourceLocator;
-  TMeVMTResourceLocator = object(TMeVMT)
+  //get the method pointer from the VMT directly.
+  PMeVMTResourceAccessor = ^ TMeVMTResourceAccessor;
+  TMeVMTResourceAccessor = object(TMeVMT)
   public
     Supports: Pointer;
     Protocols: Pointer;
   end;
 
 var
-  FResourceLocatorClasses: PMeList;
+  FResourceAccessorClasses: PMeList;
 
-function GResourceLocatorClasses: PMeList;
+function GResourceAccessorClasses: PMeList;
 begin
-  if not Assigned(FResourceLocatorClasses) then
-    New(FResourceLocatorClasses, Create);
-  Result := FResourceLocatorClasses;
+  if not Assigned(FResourceAccessorClasses) then
+    New(FResourceAccessorClasses, Create);
+  Result := FResourceAccessorClasses;
 end;
 
 
-function GetLocatorSupports(const aLocatorClass: TMeClass): TMeResourceSupports;
+function GetAccessorSupports(const aAccessorClass: TMeClass): TMeResourceSupports;
 var
   vFunc: function(Self: Pointer): TMeResourceSupports;
 begin
-  //if MeInheritsFrom(aLocatorClass, TypeOf(TMeResourceLocator)) then
-  if Assigned(aLocatorClass) then
+  if MeInheritsFrom(aAccessorClass, TypeOf(TMeResourceAccessor)) then
+  if Assigned(aAccessorClass) then
   begin
-    @vFunc := PMeVMTResourceLocator(aLocatorClass).Supports;
-    Result := vFunc(aLocatorClass);
+    @vFunc := PMeVMTResourceAccessor(aAccessorClass).Supports;
+    Result := vFunc(aAccessorClass);
   end
   else
     Result := [];
 end;
 
-function GetLocatorProtocols(const aLocatorClass: TMeClass): string;
+function GetAccessorProtocols(const aAccessorClass: TMeClass): string;
 var
   vFunc: function(Self: Pointer): string;
 begin
-  if MeInheritsFrom(aLocatorClass, TypeOf(TMeResourceLocator)) then
+  if MeInheritsFrom(aAccessorClass, TypeOf(TMeResourceAccessor)) then
   begin
-    @vFunc := PMeVMTResourceLocator(aLocatorClass).Protocols;
-    Result := vFunc(aLocatorClass);
+    @vFunc := PMeVMTResourceAccessor(aAccessorClass).Protocols;
+    Result := vFunc(aAccessorClass);
   end
   else
     Result := '';
 end;
 
-function ProtocolCanProcessed(const aLocatorClass: TMeClass; const aProtocol: string): Boolean;
+function ProtocolCanProcessed(const aAccessorClass: TMeClass; const aProtocol: string): Boolean;
 var
   s: string;
 begin
-  s := GetLocatorProtocols(aLocatorClass);
+  s := GetAccessorProtocols(aAccessorClass);
   Result := False;
   while (s <> '') and not Result do
   begin
@@ -221,14 +232,14 @@ begin
   end;
 end;
 
-procedure Register(const aLocatorClass: TMeClass);
+procedure Register(const aAccessorClass: TMeClass);
 begin
-  with GResourceLocatorClasses^ do
-    if IndexOf(aLocatorClass) < 0 then
-      Add(aLocatorClass);
+  with GResourceAccessorClasses^ do
+    if IndexOf(aAccessorClass) < 0 then
+      Add(aAccessorClass);
 end;
 
-function IndexOfLocatorClass(const aURL: string): Integer;
+function IndexOfAccessorClass(const aURL: string): Integer;
 var
   vProtocol: string;
 begin
@@ -236,22 +247,22 @@ begin
   if Result > 0 then
   begin
     vProtocol := Copy(aURL, 1, Result - 1);
-    with GResourceLocatorClasses^ do
+    with GResourceAccessorClasses^ do
       for Result := 0 to Count -1 do
-        if AnsiCompareText(vProtocol, GetLocatorProtocols(Items[Result])) = 0 then
+        if AnsiCompareText(vProtocol, GetAccessorProtocols(Items[Result])) = 0 then
           exit;
   end;
   Result := -1;
 end;
 
-function CreateLocator(const aURL: string; const aLocalBaseDir: string = ''): PMeResourceLocator;
+function CreateResourceAccessor(const aURL: string; const aLocalBaseDir: string = ''): PMeResourceAccessor;
 var
   i: Integer;
 begin
-  i := IndexOfLocatorClass(aURL);
+  i := IndexOfAccessorClass(aURL);
   if i >= 0 then
   begin
-    Result := PMeResourceLocator(NewMeObject(GResourceLocatorClasses.Items[i]));
+    Result := PMeResourceAccessor(NewMeObject(GResourceAccessorClasses.Items[i]));
     Result.URL := aURL;
     Result.LocalBaseDir := aLocalBaseDir;
   end
@@ -261,14 +272,14 @@ end;
 
 function GetResourceHeader(const aURL: string; const aInfo: PMeStrings; const aLocalBaseDir: string = ''): TMeResourceResult;
 var
-  vLocator: PMeResourceLocator;
+  vAccessor: PMeResourceAccessor;
 begin
-  vLocator := CreateLocator(aURL, aLocalBaseDir);
-  if Assigned(vLocator) then
+  vAccessor := CreateResourceAccessor(aURL, aLocalBaseDir);
+  if Assigned(vAccessor) then
   try
-    Result := vLocator.GetResourceHeader(aInfo);
+    Result := vAccessor.GetResourceHeader(aInfo);
   finally
-    vLocator.Free;
+    vAccessor.Free;
   end
   else
     Result := rrNoSuchProtocol;  
@@ -276,14 +287,14 @@ end;
 
 function GetResource(const aURL: string; var aStream: PMeStream; const aLocalBaseDir: string = ''): TMeResourceResult;
 var
-  vLocator: PMeResourceLocator;
+  vAccessor: PMeResourceAccessor;
 begin
-  vLocator := CreateLocator(aURL, aLocalBaseDir);
-  if Assigned(vLocator) then
+  vAccessor := CreateResourceAccessor(aURL, aLocalBaseDir);
+  if Assigned(vAccessor) then
   try
-    Result := vLocator.GetResource(aStream);
+    Result := vAccessor.GetResource(aStream);
   finally
-    vLocator.Free;
+    vAccessor.Free;
   end
   else
     Result := rrNoSuchProtocol;  
@@ -291,14 +302,14 @@ end;
 
 function PutResource(const aURL: string; const aStream: PMeStream; const aLocalBaseDir: string = ''): TMeResourceResult;
 var
-  vLocator: PMeResourceLocator;
+  vAccessor: PMeResourceAccessor;
 begin
-  vLocator := CreateLocator(aURL, aLocalBaseDir);
-  if Assigned(vLocator) then
+  vAccessor := CreateResourceAccessor(aURL, aLocalBaseDir);
+  if Assigned(vAccessor) then
   try
-    Result := vLocator.PutResource(aStream);
+    Result := vAccessor.PutResource(aStream);
   finally
-    vLocator.Free;
+    vAccessor.Free;
   end
   else
     Result := rrNoSuchProtocol;  
@@ -306,21 +317,21 @@ end;
 
 function DeleteResource(const aURL: string; const aLocalBaseDir: string = ''): TMeResourceResult;
 var
-  vLocator: PMeResourceLocator;
+  vAccessor: PMeResourceAccessor;
 begin
-  vLocator := CreateLocator(aURL, aLocalBaseDir);
-  if Assigned(vLocator) then
+  vAccessor := CreateResourceAccessor(aURL, aLocalBaseDir);
+  if Assigned(vAccessor) then
   try
-    Result := vLocator.DeleteResource();
+    Result := vAccessor.DeleteResource();
   finally
-    vLocator.Free;
+    vAccessor.Free;
   end
   else
     Result := rrNoSuchProtocol;  
 end;
 
-{ TMeResourceLocator }
-destructor TMeResourceLocator.Destroy;
+{ TMeResourceAccessor }
+destructor TMeResourceAccessor.Destroy;
 begin
   FURL := '';
   FLocalBaseDir := '';
@@ -328,7 +339,7 @@ begin
   inherited;
 end;
 
-function TMeResourceLocator.CanProcessed(const aProtocol: string): Boolean;
+function TMeResourceAccessor.CanProcessed(const aProtocol: string): Boolean;
 var
   s: string;
 begin
@@ -340,7 +351,7 @@ begin
   end;
 end;
 
-procedure TMeResourceLocator.SetURL(const aURL: string);
+procedure TMeResourceAccessor.SetURL(const aURL: string);
 var
   s: string;
 begin
@@ -352,7 +363,7 @@ begin
   end;
 end;
 
-function TMeResourceLocator.GetResourceHeader(const aInfo: PMeStrings): TMeResourceResult;
+function TMeResourceAccessor.GetResourceHeader(const aInfo: PMeStrings): TMeResourceResult;
 begin
   if rsfHead in Supports then
     Result := iGetHeader(aInfo)
@@ -360,7 +371,7 @@ begin
     Result := rrNoSupports;
 end;
 
-function TMeResourceLocator.GetResource(var aStream: PMeStream): TMeResourceResult;
+function TMeResourceAccessor.GetResource(var aStream: PMeStream): TMeResourceResult;
 begin
   if rsfGet in Supports then
     Result := iGet(aStream)
@@ -368,7 +379,7 @@ begin
     Result := rrNoSupports;
 end;
 
-function TMeResourceLocator.PutResource(const aStream: PMeStream): TMeResourceResult;
+function TMeResourceAccessor.PutResource(const aStream: PMeStream): TMeResourceResult;
 begin
   if rsfPut in Supports then
     Result := iPut(aStream)
@@ -376,7 +387,7 @@ begin
     Result := rrNoSupports;
 end;
 
-function TMeResourceLocator.DeleteResource(): TMeResourceResult;
+function TMeResourceAccessor.DeleteResource(): TMeResourceResult;
 begin
   if rsfDelete in Supports then
     Result := iDelete()
@@ -384,15 +395,15 @@ begin
     Result := rrNoSupports;
 end;
 
-function TMeResourceLocator.UpdateURL(Var Value: string): Boolean;
+function TMeResourceAccessor.UpdateURL(Var Value: string): Boolean;
 begin
   FProtocol := StrFetch(Value, ':', True);
   Result := (FProtocol <> '') and CanProcessed(FProtocol);
   //if not Result then FProtocol := '';
 end;
 
-{ TMeCustomFileLocator }
-destructor TMeCustomFileLocator.Destroy;
+{ TMeCustomFileAccessor }
+destructor TMeCustomFileAccessor.Destroy;
 begin
   FFileName:= '';
   FResourceName:='';
@@ -401,7 +412,7 @@ begin
   inherited;
 end;
 
-function TMeCustomFileLocator.GetFileName: string;
+function TMeCustomFileAccessor.GetFileName: string;
 begin
   if FLocalBaseDir <> '' then
     Result := IncludeTrailingPathDelimiter(FLocalBaseDir)
@@ -410,7 +421,7 @@ begin
   Result := Result + FFileName;
 end;
 
-function TMeCustomFileLocator.UpdateURL(Var Value: string): Boolean;
+function TMeCustomFileAccessor.UpdateURL(Var Value: string): Boolean;
 Var
   s: string;
 begin
@@ -441,11 +452,11 @@ end;
 initialization
   {$IFDEF MeRTTI_SUPPORT}
   //Make the ovtVmtClassName point to PShortString class name
-  SetMeVirtualMethod(TypeOf(TMeResourceLocator), ovtVmtClassName, nil);
-  SetMeVirtualMethod(TypeOf(TMeCustomFileLocator), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeResourceAccessor), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeCustomFileAccessor), ovtVmtClassName, nil);
   {$ENDIF}
-  SetMeVirtualMethod(TypeOf(TMeResourceLocator), ovtVmtParent, TypeOf(TMeDynamicObject));
-  SetMeVirtualMethod(TypeOf(TMeCustomFileLocator), ovtVmtParent, TypeOf(TMeResourceLocator));
+  SetMeVirtualMethod(TypeOf(TMeResourceAccessor), ovtVmtParent, TypeOf(TMeDynamicObject));
+  SetMeVirtualMethod(TypeOf(TMeCustomFileAccessor), ovtVmtParent, TypeOf(TMeResourceAccessor));
 finalization
-  MeFreeAndNil(FResourceLocatorClasses);
+  MeFreeAndNil(FResourceAccessorClasses);
 end.
