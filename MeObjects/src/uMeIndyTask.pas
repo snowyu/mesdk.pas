@@ -55,16 +55,33 @@ type
   PMeDownloadTask = ^ TMeDownloadTask;
   PMeDownloadPartTask = ^ TMeDownloadPartTask;
 
+{
+Client send this request to server:
+http.Request.Range := '0-'; //取所有的数据。
+Range头域可以请求实体的一个或者多个子范围。例如，   
+　　表示头500个字节：bytes=0-499   
+　　表示第二个500字节：bytes=500-999   
+　　表示最后500个字节：bytes=-500   
+　　表示500字节以后的范围：bytes=500-   
+　　第一个和最后一个字节：bytes=0-0,-1   
+　　同时指定几个范围：bytes=500-600,601-999   
+
+　　但是服务器可以忽略此请求头，如果无条件GET包含Range请求头，响应会以状态码206（PartialContent）返回而不是以200   （OK）
+    如果支持，那么服务器将返回： /后面的数字为Instance长度
+     content-range: bytes 1-65536/102400
+     content-range: bytes */102400
+     content-range: bytes 1-65536/*
+}
   TMeDownloadTask = object(TMeTask)
   protected
     // the header properties is inited or not.
     FHeaderInited: Boolean;
     FURL: PMeURI;
     FContentLength: Int64;
-    FContentRangeEnd: Int64;
-    FContentRangeStart: Int64;
-    FContentRangeInstanceLength: Int64;
-    FHasSize: Boolean;
+    FHasContentLength: Boolean;
+    //the response to tell the client it can be resume by unit:
+    // Accept-Ranges: bytes
+    FAcceptRanges: string;
     (*
     lValue := Values['Expires']; {do not localize}
     if IsNumeric(lValue) then
@@ -103,8 +120,9 @@ type
   protected
     //owner
     FOwner: PMeDownloadTask;
-    FBeginPosition: Int64;
-    FEndPosition: Int64;
+    FContentRangeEnd: Int64;
+    FContentRangeStart: Int64;
+    FContentRangeInstanceLength: Int64;
 
     procedure DoHeadersAvailable(Sender: TObject; aHeaders: TIdHeaderList; var vContinue: Boolean);
 
@@ -184,55 +202,30 @@ begin
 end;
 
 procedure TMeHttpDownloadPartTask.DoHeadersAvailable(Sender: TObject; aHeaders: TIdHeaderList; var vContinue: Boolean);
-var
-  s: string;
-  lCRange: string;
-  lILength: string;
 begin
   if Assigned(FOwner) and not FOwner.FHeaderInited then 
   with FOwner^ do
   begin
-    FContentLength := StrToIntDef(Values['Content-Length'], -1);
-    FHasSize := FContentLength > 0;
-    FDate := GMTToLocalDateTime(Values['Date']);
-    FLastModified := GMTToLocalDateTime(Values['Last-Modified']);
+    FContentLength := (Sender as TIdCustomHTTP).Response.ContentLength;
+    FHasContentLength := FContentLength > 0;
+    FDate := (Sender as TIdCustomHTTP).Response.Date;
+    FLastModified := (Sender as TIdCustomHTTP).Response.LastModified;
     FHttp.Request.LastModified := LastModified;
-    s := Values['Expires']; {do not localize}
-    if IsNumeric(s) then
-    begin
-      // This is happening when expires is an integer number in seconds
-      LSecs := IndyStrToInt(s);
-      // RLebeau 01/23/2005 - IIS sometimes sends an 'Expires: -1' header
-      if LSecs >= 0 then begin
-        FExpires := Now +  (LSecs / SecsPerDay);
-      end else begin
-        FExpires := 0.0;
-      end;
-    end else
-    begin
-      FExpires := GMTToLocalDateTime(s);
-    end;
+    FExpires := (Sender as TIdCustomHTTP).Response.Expires;
 
-    {
+    FAcceptRanges := (Sender as TIdCustomHTTP).Response.AcceptRanges;
+    FCanResume := FAcceptRanges <> '';
+
+    { tell the client this connection what the download range 
      handle content-range headers, like:
 
      content-range: bytes 1-65536/102400
      content-range: bytes */102400
      content-range: bytes 1-65536/*
     }
-    s := Values['Content-Range']; {do not localize}
-    FCanResume := s <> '';
-    if FCanResume <> '' then
-    begin
-      // strip the bytes unit, and keep the range and instance info
-      Fetch(s);
-      lCRange := Fetch(s, '/');
-      lILength := Fetch(s);
-
-      FContentRangeStart := IndyStrToInt64(Fetch(lCRange, '-'), 0);
-      FContentRangeEnd := IndyStrToInt64(lCRange, 0);
-      FContentRangeInstanceLength := IndyStrToInt64(lILength, 0);
-    end;
+    FContentRangeStart := (Sender as TIdCustomHTTP).Response.ContentRangeStart;
+    FContentRangeEnd := (Sender as TIdCustomHTTP).Response.ContentRangeEnd;
+    FContentRangeInstanceLength := (Sender as TIdCustomHTTP).Response.ContentRangeInstanceLength;
 
     FHeaderInited := True;
   end;
