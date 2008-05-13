@@ -28,7 +28,7 @@ interface
 {$I MeSetting.inc}
 
 uses
-  SysUtils,
+  SysUtils, Classes //TStream
   uMeObject
   , uMeStream
   , uMeThread
@@ -51,6 +51,10 @@ const
   cDefaultTimeout = 30 * 60 * 1000; //30 min
   cDefaultUserAgent = 'Mozilla/4.0 (Windows; zh-CN) Gecko';
 
+  //Global
+  IdTimeoutDefault = -1;
+  IdTimeoutInfinite = -2;
+
 type
   PMeDownloadTask = ^ TMeDownloadTask;
   PMeDownloadPartTask = ^ TMeDownloadPartTask;
@@ -71,12 +75,14 @@ Range头域可以请求实体的一个或者多个子范围。例如，
      content-range: bytes 1-65536/102400
      content-range: bytes */102400
      content-range: bytes 1-65536/*
+  when read or connection timeout, this should re-connection it.
 }
   TMeDownloadTask = object(TMeTask)
   protected
     // the header properties is inited or not.
     FHeaderInited: Boolean;
-    FURL: PMeURI;
+    FMaxParts: Integer;
+    FURI: PMeURI;
     FContentLength: Int64;
     FHasContentLength: Boolean;
     //the response to tell the client it can be resume by unit:
@@ -107,21 +113,34 @@ Range头域可以请求实体的一个或者多个子范围。例如，
     //'Content-Version'
     FRevision: string; 
     FCanResume: Boolean;
-    FTimeout: Integer;
+    FConnectTimeout: Integer;
+    FReadTimeout: Integer;
     //collect the TMeDownloadPartTask.
     FParts: PMeThreadSafeList;
 
+    procedure DoPartTaskDone(const aPart: PMeDownloadPartTask);
+    procedure BeforeRun; virtual; //override
     procedure Init; virtual; //override
   public
     destructor Destroy; virtual; //override
+
+    //the MaxParts default is 1.
+    property ConnectTimeout: Integer read FConnectTimeout write FConnectTimeout;
+    property ReadTimeout: Integer read FReadTimeout write FReadTimeout;
+    property MaxParts: Integer read FMaxParts write FMaxParts;
+    property Parts: PMeThreadSafeList read FParts;
   end;
 
+  //abstract DownloadPart task
   TMeDownloadPartTask = object(TMeTask)
   protected
+    FURL: string;
+    FStream: TMemoryStream;
     //owner
     FOwner: PMeDownloadTask;
     FContentRangeEnd: Int64;
     FContentRangeStart: Int64;
+    //the real downloaded size.
     FContentRangeInstanceLength: Int64;
 
     procedure DoHeadersAvailable(Sender: TObject; aHeaders: TIdHeaderList; var vContinue: Boolean);
@@ -129,9 +148,15 @@ Range头域可以请求实体的一个或者多个子范围。例如，
     //procedure AfterRun; virtual; //override
     //procedure BeforeRun; virtual; //override
     //function Run: Boolean; virtual; //override
-    procedure HandleException(const aException: Exception); virtual;//override
+    procedure HandleException(const Sender: PMeCustomThread; const aException: Exception); virtual;//override
+    procedure Init; virtual; //override
+    procedure BeforeRun; virtual; //override
   public
     constructor Create(const Owner: PMeDownloadTask);
+    destructor Destroy; virtual; //override
+
+    property Stream: TMemoryStream read FStream;
+    property URL: string read FURL write FURL;
   end;
 
   TMeHttpDownloadPartTask = object(TMeDownloadPartTask)
@@ -140,6 +165,7 @@ Range头域可以请求实体的一个或者多个子范围。例如，
    {$ifdef UseOpenSsl}
     FIOSSL : TIdSSLIOHandlerSocketOpenSSL;
    {$endif}
+    procedure BeforeRun; virtual; //override
     function Run: Boolean; virtual; //override
     procedure Init; virtual; //override
   public
@@ -160,13 +186,26 @@ var
 procedure TMeDownloadTask.Init;
 begin
   inherited;
+  New(FParts, Create);
+  New(FURI, Create);
   FContentLength := -1;
+  FMaxParts := 1;
+  FReadTimeout := IdTimeoutDefault;
+  FConnectTimeout := IdTimeoutDefault;
 end;
 
 destructor TMeDownloadTask.Destroy;
 begin
+  FParts.FreeMeObjects;
+  MeFreeAndNil(FParts);
+  MeFreeAndNil(FURI);
   FRevision := '';
+  FAcceptRanges := '';
   inherited;
+end;
+
+procedure TMeDownloadTask.BeforeRun;
+begin
 end;
 
 { TMeDownloadPartTask }
@@ -174,6 +213,28 @@ constructor TMeDownloadPartTask.Create(const Owner: PMeDownloadTask);
 Begin
   inherited Create;
   FOwner := Owner;
+  if Assigned(Owner) then
+  begin
+    FURL := Owner.FURI.URI;
+  end;
+end;
+
+procedure TMeDownloadPartTask.Init;
+begin
+  inherited;
+  FStream := TMemoryStream.Create;
+end;
+
+destructor TMeDownloadPartTask.Destroy;
+begin
+  FreeAndNil(FStream);
+  FURL := '';
+  inherited;
+end;
+
+procedure TMeDownloadPartTask.BeforeRun;
+begin
+  FStream.Clear;
 end;
 
 { TMeHttpDownloadPartTask }
@@ -185,12 +246,13 @@ begin
   FIOSSL := TIdSSLIOHandlerSocketOpenSSL.Create;
   FHttp.IOHandler := FIOSSL;
   {$endif}
-  FHttp.Compressor := LCompressor;
+  //MUST decode manually!!
+  //FHttp.Compressor := LCompressor;
   FHttp.CookieManager := LCookieManager;
   FHttp.RedirectMaximum := 5;
   FHttp.HandleRedirects := True;
-  FHTTP.Request.UserAgent := cDefaultUserAgent;
   FHTTP.OnHeadersAvailable := DoHeadersAvailable;
+  FHTTP.Request.UserAgent := cDefaultUserAgent;
 end;
 
 destructor TMeHttpDownloadPartTask.Destroy;
@@ -199,6 +261,20 @@ begin
    FreeAndNil(FIOSSL);
   {$endif}
   FreeAndNil(FHttp);
+end;
+
+procedure TMeHttpDownloadPartTask.BeforeRun;
+begin
+  inherited;
+  if Assigned(FOwner) and FOwner.FCanResume and (FContentRangeEnd > 0) then
+  begin
+    FHTTP.Request.Range := 'bytes=';
+    if FContentRangeStart > 0 then
+      FHTTP.Request.Range := FHTTP.Request.Range + IntToStr(FContentRangeStart);
+    FHTTP.Request.Range := FHTTP.Request.Range + '-' + IntToStr(FContentRangeEnd);
+    FHTTP.ConnectTimeout := FOwner.FConnectTimeout;
+    FHTTP.ReadTimeout := FOwner.FReadTimeout;
+  end;
 end;
 
 procedure TMeHttpDownloadPartTask.DoHeadersAvailable(Sender: TObject; aHeaders: TIdHeaderList; var vContinue: Boolean);
@@ -225,15 +301,20 @@ begin
     }
     FContentRangeStart := (Sender as TIdCustomHTTP).Response.ContentRangeStart;
     FContentRangeEnd := (Sender as TIdCustomHTTP).Response.ContentRangeEnd;
-    FContentRangeInstanceLength := (Sender as TIdCustomHTTP).Response.ContentRangeInstanceLength;
+    //FContentRangeInstanceLength := (Sender as TIdCustomHTTP).Response.ContentRangeInstanceLength;
 
     FHeaderInited := True;
   end;
 end;
 
+procedure TMeHttpDownloadPartTask.HandleException(const Sender: PMeCustomThread; const aException: Exception);
+begin
+  ///for re-use EIdConnClosedGracefully, EIdReadTimeout, EIdConnectTimeout, EIdReadLnMaxLineLengthExceeded, EIdReadLnWaitMaxAttemptsExceeded, 
+end;
+
 function TMeHttpDownloadPartTask.Run: Boolean;
 begin
-  
+  FHttp.Get(FURL, FStream);
 end;
 
 initialization
