@@ -58,6 +58,7 @@ resourcestring
   RsLeaveMainThreadThreadError = 'AsyncCalls.LeaveMainThread() was called outside of the main thread';
   RsThreadTerminateAndWaitFor  = 'Cannot call TerminateAndWaitFor on FreeAndTerminate threads';
   RsInvalidThreadHandleError = 'TMeCustomThread: invalid thread handle';
+  RsMaxThreadsExceedError = 'Error : the Max threads count exceed!';
 
 const
   cWaitAllThreadsTerminatedCount = 1 * 60 * 1000;
@@ -72,11 +73,14 @@ type
   PMeTask = ^ TMeTask;
   PMeThreadMgrTask = ^ TMeThreadMgrTask;
   PMeThreadMgr = ^ TMeThreadMgr;
+  PMeScheduler = ^ TMeScheduler;
 
   TMeCustomThreadMethod = procedure of object;
 {$IFDEF MSWINDOWS}
   TMeThreadPriority = (tpIdle, tpLowest, tpLower, tpNormal, tpHigher, tpHighest,
     tpTimeCritical);
+{$ELSE}
+  TMeThreadPriority = -20..19;
 {$ENDIF}
 
   PSynchronizeRecord = ^TSynchronizeRecord;
@@ -139,11 +143,11 @@ type
     procedure Suspend;
     procedure Terminate;
     function WaitFor(const aTimeout: LongWord = INFINITE): LongWord;
-    class procedure Queue(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod); overload;
-    class procedure RemoveQueuedEvents(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
-    class procedure StaticQueue(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
-    class procedure Synchronize(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod); overload;
-    class procedure StaticSynchronize(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
+    class procedure Queue(aThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod); overload;
+    class procedure RemoveQueuedEvents(aThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
+    class procedure StaticQueue(aThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
+    class procedure Synchronize(aThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod); overload;
+    class procedure StaticSynchronize(aThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
     property FatalException: TObject read FFatalException;
     property FreeOnTerminate: Boolean read FFreeOnTerminate write FFreeOnTerminate;
 {$IFDEF MSWINDOWS}
@@ -200,19 +204,56 @@ type
 
   TMeYarn = object(TMeDynamicObject)
   protected
-    //FThread: PMeCustomThread;
+    FScheduler: PMeScheduler;
     //generate the VMT for the object
     class function ParentClassAddress: TMeClass;virtual;abstract; //override
   end;
 
   TMeThreadYarn = object(TMeDynamicObject)
   protected
-    FThread: PMeCustomThread;
+    FThread: PMeThread;
+  public
+    destructor Destroy; override;
+    property Thread: PMeThread read FThread;
   end;
 
+  { abstract task Scheduler }
   TMeScheduler = object(TMeDynamicObject)
   protected
+    FTerminatingTimeout: LongWord;
     FActiveYarns: PMeThreadSafeList;
+    procedure Init; virtual; //override
+  public
+    destructor Destroy; virtual; //override;
+    function AcquireYarn: PMeYarn; virtual; abstract;
+    // ReleaseYarn is to remove a yarn from the list that has already been
+    // terminated (usually self termination);
+    procedure ReleaseYarn(const aYarn: PMeYarn); virtual;
+    procedure StartYarn(const aYarn: PMeYarn; const aTask: PMeTask); virtual; abstract;
+    // TerminateYarn is to terminate a yarn explicitly and remove it also
+    procedure TerminateYarn(const aYarn: PMeYarn); virtual; abstract;
+    procedure TerminateAllYarns; virtual;
+    //
+    property ActiveYarns: PMeThreadSafeList read FActiveYarns;
+    // it will force terminate threads after timeout. the default is INFINITE! 
+    property TerminatingTimeout: LongWord read FTerminatingTimeout write FTerminatingTimeout;
+  end;
+
+  TMeThreadScheduler = class(TMeScheduler)
+  protected
+    FMaxThreads: Integer;
+    FThreadPriority: TMeThreadPriority;
+    //
+    procedure Init; virtual;//override;
+  public
+    destructor Destroy; virtual;//override;
+    function NewThread: PMeThread; virtual;
+    function NewYarn(const aThread: PMeThread = nil): PMeThreadYarn;
+    procedure StartYarn(const aYarn: PMeYarn; const aTask: PMeTask); virtual;//override;
+    procedure TerminateYarn(const aYarn: PMeYarn); virtual;//override;
+  published
+    property MaxThreads: Integer read FMaxThreads write FMaxThreads;
+    property ThreadPriority: TMeThreadPriority read FThreadPriority write FThreadPriority default tpNormal;
   end;
 
   TMeNotifyThreadEvent = procedure(const aThread: PMeCustomThread) of object;
@@ -475,7 +516,7 @@ var
 procedure EnterMainThread;
 procedure LeaveMainThread;
 
-function NewThreadTask(const aTask: PMeTask): PMeThread;
+function NewThreadTask(const aTask: PMeTask): PMeThread; overload;
 
 implementation
 
@@ -508,6 +549,7 @@ function NewThreadTask(const aTask: PMeTask): PMeThread;
 begin
   New(Result, Create(aTask));
 end;
+
 
 procedure InitThreadSynchronization;
 begin
@@ -869,12 +911,12 @@ begin
   end;
 end;
 
-class procedure TMeAbstractThread.Queue(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
+class procedure TMeAbstractThread.Queue(aThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
 var
   LSynchronize: PSynchronizeRecord;
 begin
-  if AThread <> nil then
-    AThread.Queue(AMethod)
+  if aThread <> nil then
+    aThread.Queue(AMethod)
   else
   begin
     New(LSynchronize);
@@ -890,7 +932,7 @@ begin
   end;
 end;
 
-class procedure TMeAbstractThread.RemoveQueuedEvents(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
+class procedure TMeAbstractThread.RemoveQueuedEvents(aThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
 var
   I: Integer;
   SyncProc: PSyncProc;
@@ -902,7 +944,7 @@ begin
       begin
         SyncProc := SyncList.Items[I];
         if (SyncProc.Signal = 0) and
-          (((AThread <> nil) and (SyncProc.SyncRec.FThread = AThread)) or
+          (((aThread <> nil) and (SyncProc.SyncRec.FThread = aThread)) or
             (Assigned(AMethod) and (TMethod(SyncProc.SyncRec.FMethod).Code = TMethod(AMethod).Code) and
              (TMethod(SyncProc.SyncRec.FMethod).Data = TMethod(AMethod).Data))) then
         begin
@@ -916,9 +958,9 @@ begin
   end;
 end;
 
-class procedure TMeAbstractThread.StaticQueue(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
+class procedure TMeAbstractThread.StaticQueue(aThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
 begin
-  Queue(AThread, AMethod);
+  Queue(aThread, AMethod);
 end;
 
 class procedure TMeAbstractThread.Synchronize(ASyncRec: PSynchronizeRecord; QueueEvent: Boolean = False);
@@ -990,12 +1032,12 @@ begin
   Synchronize(@FSynchronize);
 end;
 
-class procedure TMeAbstractThread.Synchronize(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
+class procedure TMeAbstractThread.Synchronize(aThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
 var
   SyncRec: TSynchronizeRecord;
 begin
-  if AThread <> nil then
-    AThread.Synchronize(AMethod)
+  if aThread <> nil then
+    aThread.Synchronize(AMethod)
   else
   begin
     SyncRec.FThread := nil;
@@ -1005,9 +1047,9 @@ begin
   end;
 end;
 
-class procedure TMeAbstractThread.StaticSynchronize(AThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
+class procedure TMeAbstractThread.StaticSynchronize(aThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
 begin
-  Synchronize(AThread, AMethod);
+  Synchronize(aThread, AMethod);
 end;
 
 procedure TMeAbstractThread.SetSuspended(Value: Boolean);
@@ -1784,6 +1826,122 @@ end;
 function TMeThreadMgr.AddTask(const aTask: PMeTask): Boolean;
 begin
   Result := PMeThreadMgrTask(FTask).Add(aTask);
+end;
+
+{ TMeScheduler }
+destructor TMeScheduler.Destroy;
+begin
+  MeFreeAndNil(FActiveYarns);
+  inherited Destroy;
+end;
+
+procedure TMeScheduler.Init;
+begin
+  inherited Init;
+  New(FActiveYarns, Create);
+end;
+
+procedure TMeScheduler.ReleaseYarn(const aYarn: PMeYarn);
+begin
+  ActiveYarns.Remove(aYarn);
+end;
+
+procedure TMeScheduler.TerminateAllYarns;
+var
+  i: Integer;
+begin
+  Assert(FActiveYarns<>nil);
+
+  while True do 
+  begin
+    // Must unlock each time to allow yarns that are temrinating to remove themselves from the list
+    with FActiveYarns.LockList^ do 
+    try
+      if Count = 0 then 
+      begin
+        Break;
+      end;
+      for i := Count - 1 downto 0 do 
+      begin
+        TerminateYarn(PMeYarn(Items[i]));
+      end;
+    finally 
+      FActiveYarns.UnlockList; 
+    end;
+    //TODO: Put terminate timeout check back
+    Sleep(500); // Wait a bit before looping to prevent thrashing
+  end; //while
+end;
+
+{ TMeThreadScheduler }
+
+destructor TMeThreadScheduler.Destroy;
+begin
+  TerminateAllYarns;
+  inherited Destroy;
+end;
+
+procedure TMeThreadScheduler.StartYarn(const aYarn: PMeYarn; const aTask: PMeTask);
+begin
+  with PMeThreadYarn(aYarn).Thread^ do 
+  begin
+    Task := aTask;
+    Start;
+  end;
+end;
+
+function TMeThreadScheduler.NewThread: PMeThread;
+begin
+  Assert(FThreadClass<>nil);
+  if ActiveYarns.Count > FMaxThreads then
+    Raise EMeError.Create(RsMaxThreadsExceedError);
+
+  {EIdSchedulerMaxThreadsExceeded.IfTrue(
+   (FMaxThreads <> 0) and (not ActiveYarns.IsCountLessThan(FMaxThreads + 1))
+   , RSchedMaxThreadEx);}
+  New(Result, Create());
+  //Result := FThreadClass.Create(nil, IndyFormat('%s User', [Name])); {do not localize}
+  if ThreadPriority <> tpNormal then 
+  begin
+    Result.Priority := ThreadPriority;
+    //IndySetThreadPriority(Result, ThreadPriority);
+  end;
+end;
+
+function TMeThreadScheduler.NewYarn(const aThread: PMeThread): PMeThreadYarn;
+begin
+  EIdException.IfNotAssigned(aThread, RSThreadSchedulerThreadRequired);
+  // Create Yarn
+  Result := PMeThreadYarn.Create(Self, aThread);
+end;
+
+procedure TMeThreadScheduler.TerminateYarn(const aYarn: PMeYarn);
+var
+  LYarn: PMeThreadYarn;
+begin
+  Assert(aYarn<>nil);
+  LYarn := PMeThreadYarn(aYarn);
+  if LYarn.Thread = nil then begin
+    FreeAndNil(LYarn);
+  end
+  else if LYarn.Thread.Suspended then begin
+    // If suspended, was created but never started
+    // ie waiting on connection accept
+    FreeAndNil(LYarn.FThread);
+  end else
+  begin
+    // Is already running and will free itself
+    LYarn.Thread.Stop;
+    // Dont free the yarn. The thread frees it (IdThread.pas)
+  end;
+end;
+
+procedure TMeThreadScheduler.Init;
+begin
+  inherited Init;
+  FThreadPriority := tpNormal;
+  FMaxThreads := 0;
+  FThreadClass := PMeThread;
 end;
 
 {----------------------------------------------------------------------------}
