@@ -314,7 +314,7 @@ type
     function TerminateAndWaitFor(const aTimeout: LongWord = INFINITE): LongWord; virtual;
 
     //Represents the thread or fiber for the scheduler of the thread.
-    //it will be free when the thread free.
+    //it will be free when the thread free or when Cleanup.
     property Yarn: PMeYarn read FYarn write FYarn;
     property Loop: Boolean read FLoop write FLoop;
     {$IFDEF NamedThread}

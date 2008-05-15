@@ -29,13 +29,15 @@ interface
 
 uses
   SysUtils, Classes //TStream
-  uMeObject
+  , uMeObject
   , uMeStream
+  , uMeSysUtils
   , uMeThread
   , uMeURI
 
   //, IdGlobal
   //, IdGlobalProtocols //GMTXXX
+  , IdHeaderList
   , IdAuthenticationDigest //MD5-Digest authentication
   , IdURI, IdCookie, IdCookieManager
   , IdHTTPHeaderInfo    //for HTTP request and response info.
@@ -57,31 +59,14 @@ const
 
 type
   PMeDownloadTask = ^ TMeDownloadTask;
-  PMeDownloadPartTask = ^ TMeDownloadPartTask;
+  PMeDownloadPartTask = ^ TMeCustomDownloadPartTask;
+  PMeDownloadInfo = ^ TMeDownloadInfo;
+  PMeHttpDownloadSimpleTask = ^ TMeHttpDownloadSimpleTask;
 
-{
-Client send this request to server:
-http.Request.Range := '0-'; //取所有的数据。
-Range头域可以请求实体的一个或者多个子范围。例如，   
-　　表示头500个字节：bytes=0-499   
-　　表示第二个500字节：bytes=500-999   
-　　表示最后500个字节：bytes=-500   
-　　表示500字节以后的范围：bytes=500-   
-　　第一个和最后一个字节：bytes=0-0,-1   
-　　同时指定几个范围：bytes=500-600,601-999   
-
-　　但是服务器可以忽略此请求头，如果无条件GET包含Range请求头，响应会以状态码206（PartialContent）返回而不是以200   （OK）
-    如果支持，那么服务器将返回： /后面的数字为Instance长度
-     content-range: bytes 1-65536/102400
-     content-range: bytes */102400
-     content-range: bytes 1-65536/*
-  when read or connection timeout, this should re-connection it.
-}
-  TMeDownloadTask = object(TMeTask)
+  TMeDownloadInfo = object(TMeDynamicObject)
   protected
     // the header properties is inited or not.
     FHeaderInited: Boolean;
-    FMaxParts: Integer;
     FURI: PMeURI;
     FContentLength: Int64;
     FHasContentLength: Boolean;
@@ -115,63 +100,100 @@ Range头域可以请求实体的一个或者多个子范围。例如，
     FCanResume: Boolean;
     FConnectTimeout: Integer;
     FReadTimeout: Integer;
-    //collect the TMeDownloadPartTask.
-    FParts: PMeThreadSafeList;
 
-    procedure DoPartTaskDone(const aPart: PMeDownloadPartTask);
+    procedure Init; virtual; //override
+  public
+    destructor Destroy; virtual; //override
+
+    property ConnectTimeout: Integer read FConnectTimeout write FConnectTimeout;
+    property ReadTimeout: Integer read FReadTimeout write FReadTimeout;
+  end;
+{
+Client send this request to server:
+http.Request.Range := '0-'; //取所有的数据。
+Range头域可以请求实体的一个或者多个子范围。例如，   
+　　表示头500个字节：bytes=0-499   
+　　表示第二个500字节：bytes=500-999   
+　　表示最后500个字节：bytes=-500   
+　　表示500字节以后的范围：bytes=500-   
+　　第一个和最后一个字节：bytes=0-0,-1   
+　　同时指定几个范围：bytes=500-600,601-999   
+
+　　但是服务器可以忽略此请求头，如果无条件GET包含Range请求头，响应会以状态码206（PartialContent）返回而不是以200   （OK）
+    如果支持，那么服务器将返回： /后面的数字为Instance长度
+     content-range: bytes 1-65536/102400
+     content-range: bytes */102400
+     content-range: bytes 1-65536/*
+  when read or connection timeout, this should re-connection it.
+}
+  TMeDownloadTask = object(TMeTask)
+  protected
+    FMaxParts: Integer;
+    //collect the TMeCustomDownloadPartTask.
+    FParts: PMeThreadSafeList;
+    FDownInfo: PMeDownloadInfo;
+
+    //procedure DoPartTaskDone(const aPart: PMeDownloadPartTask);
     procedure BeforeRun; virtual; //override
     procedure Init; virtual; //override
   public
     destructor Destroy; virtual; //override
 
     //the MaxParts default is 1.
-    property ConnectTimeout: Integer read FConnectTimeout write FConnectTimeout;
-    property ReadTimeout: Integer read FReadTimeout write FReadTimeout;
     property MaxParts: Integer read FMaxParts write FMaxParts;
     property Parts: PMeThreadSafeList read FParts;
   end;
 
   //abstract DownloadPart task
-  TMeDownloadPartTask = object(TMeTask)
+  TMeCustomDownloadPartTask = object(TMeTask)
   protected
     FURL: string;
     FStream: TMemoryStream;
     //owner
-    FOwner: PMeDownloadTask;
+    FDownInfo: PMeDownloadInfo;
     FContentRangeEnd: Int64;
     FContentRangeStart: Int64;
     //the real downloaded size.
     FContentRangeInstanceLength: Int64;
 
-    procedure DoHeadersAvailable(Sender: TObject; aHeaders: TIdHeaderList; var vContinue: Boolean);
 
     //procedure AfterRun; virtual; //override
     //procedure BeforeRun; virtual; //override
     //function Run: Boolean; virtual; //override
-    procedure HandleException(const Sender: PMeCustomThread; const aException: Exception); virtual;//override
     procedure Init; virtual; //override
     procedure BeforeRun; virtual; //override
   public
-    constructor Create(const Owner: PMeDownloadTask);
+    constructor Create(const aDownInfo: PMeDownloadInfo);
     destructor Destroy; virtual; //override
 
     property Stream: TMemoryStream read FStream;
     property URL: string read FURL write FURL;
   end;
 
-  TMeHttpDownloadPartTask = object(TMeDownloadPartTask)
+  TMeHttpDownloadPartTask = object(TMeCustomDownloadPartTask)
   protected
     FHttp: TIdHTTP;
    {$ifdef UseOpenSsl}
     FIOSSL : TIdSSLIOHandlerSocketOpenSSL;
    {$endif}
+
+    procedure DoHeadersAvailable(Sender: TObject; aHeaders: TIdHeaderList; var vContinue: Boolean);
+
     procedure BeforeRun; virtual; //override
     function Run: Boolean; virtual; //override
+    procedure HandleException(const Sender: PMeCustomThread; const aException: Exception); virtual;//override
     procedure Init; virtual; //override
   public
     destructor Destroy; virtual; //override
   end;
 
+  TMeHttpDownloadSimpleTask = object(TMeHttpDownloadPartTask)
+  protected
+    //procedure Init; virtual; //override
+  public
+    constructor Create(const aURL: string);
+    destructor Destroy; virtual; //override
+  end;
 
 implementation
 
@@ -182,25 +204,43 @@ var
   LCompressor: TIdCompressorZLib;
   LCookieManager: TIdCookieManager;
 
+{ TMeDownloadInfo }
+procedure TMeDownloadInfo.Init;
+begin
+  inherited;
+  New(FURI, Create);
+  FContentLength := -1;
+  FReadTimeout := IdTimeoutDefault;
+  FConnectTimeout := IdTimeoutDefault;
+end;
+
+destructor TMeDownloadInfo.Destroy;
+begin
+  MeFreeAndNil(FURI);
+  FRevision := '';
+  FAcceptRanges := '';
+  inherited;
+end;
+
 { TMeDownloadTask }
 procedure TMeDownloadTask.Init;
 begin
   inherited;
   New(FParts, Create);
-  New(FURI, Create);
-  FContentLength := -1;
-  FMaxParts := 1;
-  FReadTimeout := IdTimeoutDefault;
-  FConnectTimeout := IdTimeoutDefault;
+  New(FDownInfo, Create);
 end;
 
 destructor TMeDownloadTask.Destroy;
 begin
-  FParts.FreeMeObjects;
+  with FParts.LockList^ do
+  try
+    FreeMeObjects;
+  finally
+    FParts.UnlockList;
+  end;
+
   MeFreeAndNil(FParts);
-  MeFreeAndNil(FURI);
-  FRevision := '';
-  FAcceptRanges := '';
+  MeFreeAndNil(FDownInfo);
   inherited;
 end;
 
@@ -208,31 +248,31 @@ procedure TMeDownloadTask.BeforeRun;
 begin
 end;
 
-{ TMeDownloadPartTask }
-constructor TMeDownloadPartTask.Create(const Owner: PMeDownloadTask);
+{ TMeCustomDownloadPartTask }
+constructor TMeCustomDownloadPartTask.Create(const aDownInfo: PMeDownloadInfo);
 Begin
   inherited Create;
-  FOwner := Owner;
-  if Assigned(Owner) then
+  FDownInfo := aDownInfo;
+  if Assigned(FDownInfo) then
   begin
-    FURL := Owner.FURI.URI;
+    FURL := FDownInfo.FURI.URI;
   end;
 end;
 
-procedure TMeDownloadPartTask.Init;
+procedure TMeCustomDownloadPartTask.Init;
 begin
   inherited;
   FStream := TMemoryStream.Create;
 end;
 
-destructor TMeDownloadPartTask.Destroy;
+destructor TMeCustomDownloadPartTask.Destroy;
 begin
   FreeAndNil(FStream);
   FURL := '';
   inherited;
 end;
 
-procedure TMeDownloadPartTask.BeforeRun;
+procedure TMeCustomDownloadPartTask.BeforeRun;
 begin
   FStream.Clear;
 end;
@@ -261,32 +301,33 @@ begin
    FreeAndNil(FIOSSL);
   {$endif}
   FreeAndNil(FHttp);
+  inherited;
 end;
 
 procedure TMeHttpDownloadPartTask.BeforeRun;
 begin
   inherited;
-  if Assigned(FOwner) and FOwner.FCanResume and (FContentRangeEnd > 0) then
+  if Assigned(FDownInfo) and FDownInfo.FCanResume and (FContentRangeEnd > 0) then
   begin
     FHTTP.Request.Range := 'bytes=';
     if FContentRangeStart > 0 then
       FHTTP.Request.Range := FHTTP.Request.Range + IntToStr(FContentRangeStart);
     FHTTP.Request.Range := FHTTP.Request.Range + '-' + IntToStr(FContentRangeEnd);
-    FHTTP.ConnectTimeout := FOwner.FConnectTimeout;
-    FHTTP.ReadTimeout := FOwner.FReadTimeout;
+    FHTTP.ConnectTimeout := FDownInfo.FConnectTimeout;
+    FHTTP.ReadTimeout := FDownInfo.FReadTimeout;
   end;
 end;
 
 procedure TMeHttpDownloadPartTask.DoHeadersAvailable(Sender: TObject; aHeaders: TIdHeaderList; var vContinue: Boolean);
 begin
-  if Assigned(FOwner) and not FOwner.FHeaderInited then 
-  with FOwner^ do
+  if Assigned(FDownInfo) and not FDownInfo.FHeaderInited then 
+  with FDownInfo^ do
   begin
     FContentLength := (Sender as TIdCustomHTTP).Response.ContentLength;
     FHasContentLength := FContentLength > 0;
     FDate := (Sender as TIdCustomHTTP).Response.Date;
     FLastModified := (Sender as TIdCustomHTTP).Response.LastModified;
-    FHttp.Request.LastModified := LastModified;
+    FHttp.Request.LastModified := FLastModified;
     FExpires := (Sender as TIdCustomHTTP).Response.Expires;
 
     FAcceptRanges := (Sender as TIdCustomHTTP).Response.AcceptRanges;
@@ -315,18 +356,38 @@ end;
 function TMeHttpDownloadPartTask.Run: Boolean;
 begin
   FHttp.Get(FURL, FStream);
+  Result := False;
+end;
+
+{ TMeHttpDownloadSimpleTask }
+constructor TMeHttpDownloadSimpleTask.Create(const aURL: string);
+begin
+  inherited Create(New(PMeDownloadInfo, Create));
+  FURL := aURL;
+  FDownInfo.FURI.URI := aURL;
+  FHttp.Compressor := LCompressor;
+end;
+
+destructor TMeHttpDownloadSimpleTask.Destroy;
+begin
+  MeFreeAndNil(FDownInfo);
+  inherited;
 end;
 
 initialization
   {$IFDEF MeRTTI_SUPPORT}
   //Make the ovtVmtClassName point to PShortString class name
+  SetMeVirtualMethod(TypeOf(TMeDownloadInfo), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeDownloadTask), ovtVmtClassName, nil);
-  SetMeVirtualMethod(TypeOf(TMeDownloadPartTask), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeCustomDownloadPartTask), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeHttpDownloadPartTask), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeHttpDownloadSimpleTask), ovtVmtClassName, nil);
   {$ENDIF}
+  SetMeVirtualMethod(TypeOf(TMeDownloadInfo), ovtVmtParent, TypeOf(TMeDynamicObject));
   SetMeVirtualMethod(TypeOf(TMeDownloadTask), ovtVmtParent, TypeOf(TMeTask));
-  SetMeVirtualMethod(TypeOf(TMeDownloadPartTask), ovtVmtParent, TypeOf(TMeTask));
-  SetMeVirtualMethod(TypeOf(TMeHttpDownloadPartTask), ovtVmtParent, TypeOf(TMeDownloadPartTask));
+  SetMeVirtualMethod(TypeOf(TMeCustomDownloadPartTask), ovtVmtParent, TypeOf(TMeTask));
+  SetMeVirtualMethod(TypeOf(TMeHttpDownloadPartTask), ovtVmtParent, TypeOf(TMeCustomDownloadPartTask));
+  SetMeVirtualMethod(TypeOf(TMeHttpDownloadSimpleTask), ovtVmtParent, TypeOf(TMeHttpDownloadPartTask));
 
 
    LCompressor:= TIdCompressorZLib.Create(nil);
