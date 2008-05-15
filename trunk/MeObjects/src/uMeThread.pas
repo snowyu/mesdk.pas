@@ -58,7 +58,7 @@ resourcestring
   RsLeaveMainThreadThreadError = 'AsyncCalls.LeaveMainThread() was called outside of the main thread';
   RsThreadTerminateAndWaitFor  = 'Cannot call TerminateAndWaitFor on FreeAndTerminate threads';
   RsInvalidThreadHandleError = 'TMeCustomThread: invalid thread handle';
-  RsMaxThreadsExceedError = 'Error : the Max threads count exceed!';
+  RsMaxThreadsExceedError = 'Error : the Max threads limits exceed!';
 
 const
   cWaitAllThreadsTerminatedCount = 1 * 60 * 1000;
@@ -74,13 +74,14 @@ type
   PMeThreadMgrTask = ^ TMeThreadMgrTask;
   PMeThreadMgr = ^ TMeThreadMgr;
   PMeScheduler = ^ TMeScheduler;
+  PMeThreadYarn = ^ TMeThreadYarn;
 
   TMeCustomThreadMethod = procedure of object;
-{$IFDEF MSWINDOWS}
+{$IFDEF IntThreadPriority}
+  TMeThreadPriority = -20..19;
+{$ELSE}
   TMeThreadPriority = (tpIdle, tpLowest, tpLower, tpNormal, tpHigher, tpHighest,
     tpTimeCritical);
-{$ELSE}
-  TMeThreadPriority = -20..19;
 {$ENDIF}
 
   PSynchronizeRecord = ^TSynchronizeRecord;
@@ -116,7 +117,7 @@ type
     class procedure Synchronize(ASyncRec: PSynchronizeRecord; QueueEvent: Boolean = False); overload;
 {$IFDEF MSWINDOWS}
     function GetPriority: TMeThreadPriority;
-    procedure SetPriority(Value: TMeThreadPriority);
+    procedure SetPriority(const Value: TMeThreadPriority);
 {$ENDIF}
 {$IFDEF LINUX}
     // ** Priority is an Integer value in Linux
@@ -209,11 +210,12 @@ type
     class function ParentClassAddress: TMeClass;virtual;abstract; //override
   end;
 
-  TMeThreadYarn = object(TMeDynamicObject)
+  TMeThreadYarn = object(TMeYarn)
   protected
     FThread: PMeThread;
   public
-    destructor Destroy; override;
+  constructor Create(const aScheduler: PMeScheduler; const aThread: PMeThread);
+    destructor Destroy; virtual;//override;
     property Thread: PMeThread read FThread;
   end;
 
@@ -239,7 +241,7 @@ type
     property TerminatingTimeout: LongWord read FTerminatingTimeout write FTerminatingTimeout;
   end;
 
-  TMeThreadScheduler = class(TMeScheduler)
+  TMeThreadScheduler = object(TMeScheduler)
   protected
     FMaxThreads: Integer;
     FThreadPriority: TMeThreadPriority;
@@ -251,7 +253,8 @@ type
     function NewYarn(const aThread: PMeThread = nil): PMeThreadYarn;
     procedure StartYarn(const aYarn: PMeYarn; const aTask: PMeTask); virtual;//override;
     procedure TerminateYarn(const aYarn: PMeYarn); virtual;//override;
-  published
+
+    //=0 means no limits
     property MaxThreads: Integer read FMaxThreads write FMaxThreads;
     property ThreadPriority: TMeThreadPriority read FThreadPriority write FThreadPriority default tpNormal;
   end;
@@ -830,13 +833,13 @@ begin
     if Priorities[I] = P then Result := I;
 end;
 
-procedure TMeAbstractThread.SetPriority(Value: TMeThreadPriority);
+procedure TMeAbstractThread.SetPriority(const Value: TMeThreadPriority);
 begin
   CheckThreadError(SetThreadPriority(FHandle, Priorities[Value]));
 end;
 {$ENDIF}
 {$IFDEF LINUX}
-function TMeAbstractThread.GetPriority: Integer;
+function TMeAbstractThread.GetPriority: TMeThreadPriority;
 var
   P: Integer;
   J: TSchedParam;
@@ -860,7 +863,7 @@ end;
 {
   Note that to fully utilize Linux Scheduling, see SetPolicy.
 }
-procedure TMeAbstractThread.SetPriority(Value: Integer);
+procedure TMeAbstractThread.SetPriority(const Value: TMeThreadPriority);
 var
   P: TSchedParam;
 begin
@@ -1828,6 +1831,24 @@ begin
   Result := PMeThreadMgrTask(FTask).Add(aTask);
 end;
 
+{ TMeThreadYarn }
+constructor TMeThreadYarn.Create(
+  const aScheduler: PMeScheduler;
+  const aThread: PMeThread
+  );
+begin
+  inherited Create;
+  FScheduler := aScheduler;
+  FThread := aThread;
+  aThread.Yarn := @Self;
+end;
+
+destructor TMeThreadYarn.Destroy; 
+begin
+  FScheduler.ReleaseYarn(@Self);
+  inherited;
+end;
+
 { TMeScheduler }
 destructor TMeScheduler.Destroy;
 begin
@@ -1892,8 +1913,8 @@ end;
 
 function TMeThreadScheduler.NewThread: PMeThread;
 begin
-  Assert(FThreadClass<>nil);
-  if ActiveYarns.Count > FMaxThreads then
+  //Assert(FThreadClass<>nil);
+  if (FMaxThreads <> 0) and (ActiveYarns.Count > FMaxThreads) then
     Raise EMeError.Create(RsMaxThreadsExceedError);
 
   {EIdSchedulerMaxThreadsExceeded.IfTrue(
@@ -1910,9 +1931,10 @@ end;
 
 function TMeThreadScheduler.NewYarn(const aThread: PMeThread): PMeThreadYarn;
 begin
-  EIdException.IfNotAssigned(aThread, RSThreadSchedulerThreadRequired);
+  Assert(Assigned(aThread));
+  //EIdException.IfNotAssigned(aThread, RSThreadSchedulerThreadRequired);
   // Create Yarn
-  Result := PMeThreadYarn.Create(Self, aThread);
+  New(Result, Create(@Self, aThread));
 end;
 
 procedure TMeThreadScheduler.TerminateYarn(const aYarn: PMeYarn);
@@ -1941,7 +1963,7 @@ begin
   inherited Init;
   FThreadPriority := tpNormal;
   FMaxThreads := 0;
-  FThreadClass := PMeThread;
+  //FThreadClass := PMeThread;
 end;
 
 {----------------------------------------------------------------------------}
