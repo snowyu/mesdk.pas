@@ -86,6 +86,12 @@ ALERT_jedi_inc_incompatible
  {$DEFINE PUREPASCAL}
 {$ENDIF FPC}
 
+{$IFNDEF FPC}
+  {$IFDEF LINUX}
+    {$DEFINE IntThreadPriority}
+  {$ENDIF}
+{$ENDIF}
+
 {$IFDEF MeRTTI_EXT_SUPPORT}
   {$IFNDEF MeRTTI_SUPPORT}
     {$DEFINE MeRTTI_SUPPORT}
