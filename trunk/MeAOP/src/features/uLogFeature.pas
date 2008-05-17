@@ -20,13 +20,12 @@ uses
   , uMeTypInfo
   , uMeInterceptor
   , uMeFeature
-  , CustomLogBase
+  , uMeLog
   ;
 
 type
   TMeLogFeature = class(TMeCustomFeature)
   private
-    FLogBase: TCustomLogBase;
   protected
     { Summary te }
     procedure AfterExecute(Sender: TObject; MethodItem:
@@ -36,7 +35,6 @@ type
             TMeInterceptedMethodItem; const Params: PMeProcParams = nil);
             override;
   public
-    property LogBase: TCustomLogBase read FLogBase write FLogBase;
   end;
 
 
@@ -49,17 +47,17 @@ procedure TMeLogFeature.AfterExecute(Sender: TObject; MethodItem:
         TMeInterceptedMethodItem; const thisState: TMeExecuteStates; const
         Params: PMeProcParams = nil);
 var
-  vLevel: TLogLevel;
+  vLevel: TMeLogLevel;
   s: string;
   I: Integer;
 begin
-  if Assigned(FLogBase) then
+  //if Assigned(GLogger) then
   begin
     //s := '';
     vLevel := vlDebug;
     if esException in thisState then
     begin
-      vLevel := vlErrors;
+      vLevel := vlError;
       s := 'Error! Exception occur:';
     end
     else if not (esAllowed in thisState) then
@@ -71,7 +69,7 @@ begin
       s := s + Sender.ClassName + '.';
     s := s + MethodItem.name + ':';
     S := s + uMeTypInfo.SetToString(TypeInfo(TMeExecuteState), Byte(thisState));
-    FLogBase.Log(vLevel, s);
+    GLogger.Log(vLevel, s);
 
     if Assigned(Params) then
     begin
@@ -85,21 +83,21 @@ begin
         end
         else s := '';
         s := s + Format('Param[%s]=$%x', [Params.Items[I].Name, Params.Items[I].AsInteger]);
-        FLogBase.Log(vlDebug, s);
+        GLogger.Log(vlDebug, s);
 
       end;
       if Assigned(Params.SelfParam) and (Sender <> Params.SelfParam.AsPointer) then
       begin
         s := 'Sender <> Params.SelfParam';
-        FLogBase.Log(vlErrors, s);
+        GLogger.Log(vlError, s);
       end;
       if (esAfter in thisState) and Assigned(Params.ResultParam) and (Params.ResultParam.DataType.Kind = mtkInt64) then
       begin
         s :=  Format('Old Result=$%x', [Params.ResultParam.AsInt64]);
-        FLogBase.Log(vlDebug, s);
+        GLogger.Log(vlDebug, s);
         Params.ResultParam.AsInt64 := $3344556600;
         s :=  Format('New Result=$%x', [Params.ResultParam.AsInt64]);
-        FLogBase.Log(vlDebug, s);
+        GLogger.Log(vlDebug, s);
       end;
     end;
   end;

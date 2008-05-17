@@ -41,9 +41,31 @@ uses
   {$ENDIF}
   ;
 
-const
+//const
 { TMeFileStream create mode }
-  fmCreate = $FFFF;
+  {$IFDEF MSWINDOWS}
+  const
+    fmCreate         = $FFFF;
+    fmOpenRead       = $0000;
+    fmOpenWrite      = $0001;
+    fmOpenReadWrite  = $0002;
+
+    fmShareCompat    = $0000 platform;
+    fmShareExclusive = $0010;
+    fmShareDenyWrite = $0020;
+    fmShareDenyRead  = $0030 platform;
+    fmShareDenyNone  = $0040;
+  {$ENDIF}
+
+  {$IFDEF LINUX}
+  const
+    fmOpenRead       = O_RDONLY;
+    fmOpenWrite      = O_WRONLY;
+    fmOpenReadWrite  = O_RDWR;
+    fmShareExclusive = $0010;
+    fmShareDenyWrite = $0020;
+    fmShareDenyNone  = $0030;
+  {$ENDIF}
 
 type
   PMeHandleStream = ^ TMeHandleStream;

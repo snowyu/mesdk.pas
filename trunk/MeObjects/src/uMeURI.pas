@@ -403,6 +403,7 @@ type
     destructor Destroy; virtual; { override }
     function GetFullURI(const AOptionalFields: TMeURIOptionalFieldsSet = [ofAuthInfo, ofBookmark]): String;
     function GetPathAndParams: String;
+    function Empty: Boolean;
     { Summary: Normalize the directory delimiters to follow the UNIX syntax }
     class procedure NormalizePath(var APath: string);
     class function URLDecode(ASrc: string): string;
@@ -469,6 +470,10 @@ begin
       inc(i, 1);
     end;
   end;
+end;
+function TMeURI.Empty: Boolean;
+begin
+  Result := FURI = '';
 end;
 
 procedure TMeURI.SetURI(const Value: String);

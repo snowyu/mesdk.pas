@@ -11,9 +11,9 @@ uses
   , uMeTypInfo
   , uMeInterceptor
   , uMeFeature
+  , uMeLog
+  , uStringsLogger
   , uLogFeature
-  , CustomLogBase
-  , LogStrings
   , uLoginFeature
   , uLoginManager
   ;
@@ -37,7 +37,7 @@ type
     procedure FormDestroy(Sender: TObject);
   private
     { Private declarations }
-    FLogStrs: TLogStringList;
+    FLogStrs: PStringsLogger;
     procedure DoLoginStatus(Sender: TObject);
   public
     { Public declarations }
@@ -141,13 +141,12 @@ end;
 
 procedure TForm1.FormCreate(Sender: TObject);
 begin
-  FLogStrs := TLogStringList.Create(nil);
-  FLogStrs.Strings := mmoLog.Lines;
-  FLogStrs.Level := vlDebug;
-  FLogStrs.Active := True;
+  FLogStrs := New(PStringsLogger, Create(mmoLog.Lines));
+  GLogger.AddLogger(FLogStrs);
+  GLogger.Level := vlDebug;
+  GLogger.Active := True;
 
   GLogFeature := TMeLogFeature(TMeLogFeature.AddTo(TForm1, @TForm1.btnFunctionClick, 'btnFunctionClick'));
-  GLogFeature.LogBase := FLogStrs;
   TMeLogFeature.AddTo(@DoSth, 'DoSth', TypeInfo(TDoSthProc));
   TMeLogFeature.AddTo(@ShowIt, 'ShowIt', TypeInfo(TProc));
   TMeLogFeature.AddTo(@Test, 'Test', TypeInfo(TtestProc));
@@ -182,7 +181,7 @@ end;
 
 procedure TForm1.FormDestroy(Sender: TObject);
 begin
-  FreeAndNil(FLogStrs);
+  //FreeAndNil(FLogStrs);
 end;
 
 initialization

@@ -181,7 +181,7 @@ Range头域可以请求实体的一个或者多个子范围。例如，
 
     procedure BeforeRun; virtual; //override
     function Run: Boolean; virtual; //override
-    procedure HandleException(const Sender: PMeCustomThread; const aException: Exception); virtual;//override
+    procedure HandleRunException(const Sender: PMeCustomThread; const aException: Exception; var aProcessed: Boolean); virtual;//override
     procedure Init; virtual; //override
   public
     destructor Destroy; virtual; //override
@@ -253,7 +253,7 @@ constructor TMeCustomDownloadPartTask.Create(const aDownInfo: PMeDownloadInfo);
 Begin
   inherited Create;
   FDownInfo := aDownInfo;
-  if Assigned(FDownInfo) then
+  if (FURL = '') and Assigned(FDownInfo) and not FDownInfo.FURI.Empty then
   begin
     FURL := FDownInfo.FURI.URI;
   end;
@@ -348,7 +348,7 @@ begin
   end;
 end;
 
-procedure TMeHttpDownloadPartTask.HandleException(const Sender: PMeCustomThread; const aException: Exception);
+procedure TMeHttpDownloadPartTask.HandleRunException(const Sender: PMeCustomThread; const aException: Exception; var aProcessed: Boolean);
 begin
   ///for re-use EIdConnClosedGracefully, EIdReadTimeout, EIdConnectTimeout, EIdReadLnMaxLineLengthExceeded, EIdReadLnWaitMaxAttemptsExceeded, 
 end;
