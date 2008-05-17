@@ -6,8 +6,11 @@ program wget;
 uses
   Windows,
   SysUtils, Classes
+  , uMeObject
   , uMeThread
   , uMeIndyTask
+  , uMeLog
+  , uMeLoggerEx
   ;
  
 const
@@ -21,7 +24,21 @@ begin
     Code := aProc;
   end;
 end;
- 
+
+var
+  HasError: Boolean = False;
+procedure DoException(constSelf: TObject; const aThread: PMeCustomThread; const aException: Exception);
+begin
+  {EnterMainThread;
+  try
+    HasError := True;
+    with aException do writeln('Exception: ', ClassName, ' Error:', Message);
+  finally
+    LeaveMainThread;
+  end;//}
+  with aException do GLogger.error('Exception: '+ ClassName+ ' Error:'+ Message);
+end;
+
 {procedure DoRedirect(const Self: TObject; Sender: TObject; var dest: string; var NumRedirect: Integer; var Handled: boolean; var VMethod: TIdHTTPMethod);
 begin
   handled := true;
@@ -37,9 +54,14 @@ var
  vURL : string;
  vStream: TMemoryStream;
  vBegin, vEnd: Longword;
+ vStrs: PMeStrings;
 begin
  try
   Writeln(cCopyright);
+  GLogger.AddLogger(New(PMeDebugLogger, Create));
+  vStrs := New(PMeStrings, Create);
+  GLogger.AddLogger(New(PMeStringsLogger, Create(vStrs)));
+  GLogger.Open;
   vURL := ParamStr(1);
   vFileName := '';
   if ParamCount >= 2 then
@@ -47,13 +69,15 @@ begin
   FVerbose := ParamCount >= 3;
   vStream := TMemoryStream.Create;
   FLogData := TStringList.Create;
+  writeln(vURL);
   New(vTask, Create(vURL));
   vThread := NewThreadTask(vTask);
   try
+    vThread.OnException := TMeExceptionThreadEvent(ToMethod(@DoException));
     vBegin := GetTickCount;
     //vHttp.Get(vURL, vStream);
     vThread.Start;
-    while not vThread.Stopped do
+    while not vThread.Terminated do
     begin
       Sleep(100);
     end;
@@ -74,9 +98,16 @@ begin
     begin
     end;
     if vFileName = '' then vFileName := 'index.htm';
-    vTask.Stream.SaveToFile(vFileName);
-    Writeln('Get ',vURL ,' Done. save to ',vFileName ,', Total Time:', vEnd - vBegin);
+    if HasError then
+    begin
+      vTask.Stream.SaveToFile(vFileName);
+      Writeln('Get ',vURL ,' Done. save to ',vFileName ,', Total Time:', vEnd - vBegin);
+    end;
+    //Sleep(500);
+    if vStrs.count > 0 then
+      writeln('vStrs=', vStrs.Text);
   finally
+    vStrs.Free;
     FreeAndNil(FLogData);
     vStream.Free;
     vThread.Free;

@@ -76,7 +76,7 @@ type
   PMeScheduler = ^ TMeScheduler;
   PMeThreadYarn = ^ TMeThreadYarn;
 
-  TMeCustomThreadMethod = procedure of object;
+  TMeThreadMethod = procedure of object;
 {$IFDEF IntThreadPriority}
   TMeThreadPriority = -20..19;
 {$ELSE}
@@ -87,7 +87,7 @@ type
   PSynchronizeRecord = ^TSynchronizeRecord;
   TSynchronizeRecord = record
     FThread: PMeAbstractThread;
-    FMethod: TMeCustomThreadMethod;
+    FMethod: TMeThreadMethod;
     FSynchronizeException: TObject;
   end;
 
@@ -132,8 +132,8 @@ type
     procedure CheckThreadError(Success: Boolean); overload;
     procedure DoTerminate; virtual;
     procedure Execute; virtual; abstract;
-    procedure Queue(AMethod: TMeCustomThreadMethod); overload;
-    procedure Synchronize(const aMethod: TMeCustomThreadMethod); overload;
+    procedure Queue(AMethod: TMeThreadMethod); overload;
+    procedure Synchronize(const aMethod: TMeThreadMethod); overload;
     property ReturnValue: Integer read FReturnValue write FReturnValue;
     property Terminated: Boolean read FTerminated;
     procedure Init; virtual; //override
@@ -144,11 +144,11 @@ type
     procedure Suspend;
     procedure Terminate;
     function WaitFor(const aTimeout: LongWord = INFINITE): LongWord;
-    class procedure Queue(aThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod); overload;
-    class procedure RemoveQueuedEvents(aThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
-    class procedure StaticQueue(aThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
-    class procedure Synchronize(aThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod); overload;
-    class procedure StaticSynchronize(aThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
+    class procedure Queue(aThread: PMeAbstractThread; AMethod: TMeThreadMethod); overload;
+    class procedure RemoveQueuedEvents(aThread: PMeAbstractThread; AMethod: TMeThreadMethod);
+    class procedure StaticQueue(aThread: PMeAbstractThread; AMethod: TMeThreadMethod);
+    class procedure Synchronize(aThread: PMeAbstractThread; AMethod: TMeThreadMethod); overload;
+    class procedure StaticSynchronize(aThread: PMeAbstractThread; AMethod: TMeThreadMethod);
     property FatalException: TObject read FFatalException;
     property FreeOnTerminate: Boolean read FFreeOnTerminate write FFreeOnTerminate;
 {$IFDEF MSWINDOWS}
@@ -190,6 +190,8 @@ type
     { Summary: the task exectution. }
     function Run: Boolean; virtual; abstract;
     procedure HandleException(const Sender: PMeCustomThread; const aException: Exception); virtual;
+    //aProcessed means this Exception is already processed, do not terminate the Thread.
+    procedure HandleRunException(const Sender: PMeCustomThread; const aException: Exception; var aProcessed: Boolean); virtual;
   public
     // The Do's are separate so we can add events later if necessary without
     // needing the inherited calls to perform them, as well as allowing
@@ -301,7 +303,7 @@ type
     procedure DoStopped; virtual;
     procedure Execute; virtual; //override
     function GetStopped: Boolean;
-    function HandleRunException(AException: Exception): Boolean; virtual;
+    function HandleRunException(const aException: Exception): Boolean; virtual;
     procedure Run; virtual; abstract;
     class procedure WaitAllThreadsTerminated(AMSec: Integer = cWaitAllThreadsTerminatedCount);
   public
@@ -309,7 +311,7 @@ type
     destructor Destroy; virtual;
     procedure Start; virtual;
     procedure Stop; virtual;
-    procedure Synchronize(const Method: TMeCustomThreadMethod); overload;
+    procedure Synchronize(const Method: TMeThreadMethod); overload;
     procedure Terminate; virtual;
     function TerminateAndWaitFor(const aTimeout: LongWord = INFINITE): LongWord; virtual;
 
@@ -354,6 +356,7 @@ type
     procedure Run; virtual; //override;
     //Note: if threadTerminatingTimeout occur the aException is nil!!
     procedure DoException(const aException: Exception); virtual; //override;
+    function HandleRunException(const aException: Exception): Boolean; virtual; //override;
   public
     // Defaults because
     // Must always create suspended so task can be set
@@ -898,7 +901,7 @@ begin
 end;
 {$ENDIF}
 
-procedure TMeAbstractThread.Queue(AMethod: TMeCustomThreadMethod);
+procedure TMeAbstractThread.Queue(AMethod: TMeThreadMethod);
 var
   LSynchronize: PSynchronizeRecord;
 begin
@@ -914,7 +917,7 @@ begin
   end;
 end;
 
-class procedure TMeAbstractThread.Queue(aThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
+class procedure TMeAbstractThread.Queue(aThread: PMeAbstractThread; AMethod: TMeThreadMethod);
 var
   LSynchronize: PSynchronizeRecord;
 begin
@@ -935,7 +938,7 @@ begin
   end;
 end;
 
-class procedure TMeAbstractThread.RemoveQueuedEvents(aThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
+class procedure TMeAbstractThread.RemoveQueuedEvents(aThread: PMeAbstractThread; AMethod: TMeThreadMethod);
 var
   I: Integer;
   SyncProc: PSyncProc;
@@ -961,7 +964,7 @@ begin
   end;
 end;
 
-class procedure TMeAbstractThread.StaticQueue(aThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
+class procedure TMeAbstractThread.StaticQueue(aThread: PMeAbstractThread; AMethod: TMeThreadMethod);
 begin
   Queue(aThread, AMethod);
 end;
@@ -1027,7 +1030,7 @@ begin
   end;
 end;
 
-procedure TMeAbstractThread.Synchronize(const aMethod: TMeCustomThreadMethod);
+procedure TMeAbstractThread.Synchronize(const aMethod: TMeThreadMethod);
 begin
   FSynchronize.FThread := @Self;
   FSynchronize.FSynchronizeException := nil;
@@ -1035,7 +1038,7 @@ begin
   Synchronize(@FSynchronize);
 end;
 
-class procedure TMeAbstractThread.Synchronize(aThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
+class procedure TMeAbstractThread.Synchronize(aThread: PMeAbstractThread; AMethod: TMeThreadMethod);
 var
   SyncRec: TSynchronizeRecord;
 begin
@@ -1050,7 +1053,7 @@ begin
   end;
 end;
 
-class procedure TMeAbstractThread.StaticSynchronize(aThread: PMeAbstractThread; AMethod: TMeCustomThreadMethod);
+class procedure TMeAbstractThread.StaticSynchronize(aThread: PMeAbstractThread; AMethod: TMeThreadMethod);
 begin
   Synchronize(aThread, AMethod);
 end;
@@ -1204,6 +1207,10 @@ begin
 end;
 
 procedure TMeTask.HandleException(const Sender: PMeCustomThread; const aException: Exception);
+begin
+end;
+
+procedure TMeTask.HandleRunException(const Sender: PMeCustomThread; const aException: Exception; var aProcessed: Boolean);
 begin
 end;
 
@@ -1518,13 +1525,13 @@ begin
   end;//}
 end;
 
-function TMeCustomThread.HandleRunException(AException: Exception): Boolean;
+function TMeCustomThread.HandleRunException(const aException: Exception): Boolean;
 begin
   // Default behavior: Exception is death sentence
   Result := False;
 end;
 
-procedure TMeCustomThread.Synchronize(const Method: TMeCustomThreadMethod);
+procedure TMeCustomThread.Synchronize(const Method: TMeThreadMethod);
 begin
   inherited Synchronize(Method);
 end;
@@ -1579,6 +1586,12 @@ begin
 
   inherited DoException(aException);
   FTask.DoException(@Self, aException);
+end;
+
+function TMeThread.HandleRunException(const aException: Exception): Boolean;
+begin
+  Result := inherited HandleRunException(aException);
+  FTask.HandleRunException(@Self, aException, Result);
 end;
 
 procedure TMeThread.Run;
@@ -2190,7 +2203,7 @@ asm
   push edx
   mov ecx, OFFSET ExecuteInMainThread
   push ecx
-  call TThread.StaticSynchronize
+  call TMeAbstractThread.StaticSynchronize
 
   { Clean up try/finally }
   xor eax,eax

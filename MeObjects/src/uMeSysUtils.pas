@@ -72,10 +72,131 @@ RemoveFreeNotification removes the NotificationProc specified by the aProc param
 }
 procedure RemoveFreeNotification(const aInstance : TObject; const aProc : TFreeNotifyProc);
 
+//the thread safe version:
+function FormatDateTimeS(const Format: string; aDateTime: TDateTime): string;
+function FormatS(const Format: string; const Args: array of const): string;
+function TimeToStrS(const aTime: TDateTime): string;
+function DateToStrS(const aDate: TDateTime): string;
+function DateTimeToStrS(const aDateTime: TDateTime): string;
+
+procedure GetDefaultFormatSettings(var Result: TFormatSettings);
+
+//return GMT now.
+function GMTNow: TDateTime;
+
 implementation
 
 uses
   RTLConsts;
+
+{$IFDEF LINUX}
+var
+  // For linux the user needs to set these variables to be accurate where used (mail, etc)
+  GOffsetFromUTC: TDateTime = 0;
+
+function OffsetFromUTC: TDateTime;
+begin
+  //TODO: Fix OffsetFromUTC for Linux to be automatic from OS
+  Result := GOffsetFromUTC;
+end;
+{$ENDIF}
+{$IFDEF DOTNET}
+function OffsetFromUTC: TDateTime;
+begin
+  Result := System.Timezone.CurrentTimezone.GetUTCOffset(now).TotalDays;
+end;
+{$ENDIF}
+{$IFDEF MSWINDOWS}
+function OffsetFromUTC: TDateTime;
+var
+  iBias: Integer;
+  tmez: TTimeZoneInformation;
+begin
+  Case GetTimeZoneInformation(tmez) of
+    //TIME_ZONE_ID_INVALID:
+      //raise EIdFailedToRetreiveTimeZoneInfo.Create(RSFailedTimeZoneInfo);
+    TIME_ZONE_ID_UNKNOWN  :
+       iBias := tmez.Bias;
+    TIME_ZONE_ID_DAYLIGHT :
+      iBias := tmez.Bias + tmez.DaylightBias;
+    TIME_ZONE_ID_STANDARD :
+      iBias := tmez.Bias + tmez.StandardBias;
+    else begin
+      Result := 0;
+      Exit;
+    end
+      //raise EIdFailedToRetreiveTimeZoneInfo.Create(RSFailedTimeZoneInfo);
+  end;
+  {We use ABS because EncodeTime will only accept positve values}
+  Result := EncodeTime(Abs(iBias) div 60, Abs(iBias) mod 60, 0, 0);
+  {The GetTimeZone function returns values oriented towards convertin
+   a GMT time into a local time.  We wish to do the do the opposit by returning
+   the difference between the local time and GMT.  So I just make a positive
+   value negative and leave a negative value as positive}
+  if iBias > 0 then begin
+    Result := 0 - Result;
+  end;
+end;
+{$ENDIF}
+
+function GMTNow: TDateTime;
+begin
+  Result := Now - OffsetFromUTC;
+end;
+
+function FormatS(const Format: string; const Args: array of const): string;
+var
+  vFormatSettings:  TFormatSettings;
+begin
+  GetDefaultFormatSettings(vFormatSettings);
+  SysUtils.Format(Format, Args, vFormatSettings);
+end;
+
+function FormatDateTimeS(const Format: string; aDateTime: TDateTime): string;
+var
+  vFormatSettings: TFormatSettings;
+begin
+  vFormatSettings.DateSeparator := '-';
+  vFormatSettings.LongDateFormat := 'yyyy-mm-dd';
+  vFormatSettings.ShortDateFormat := LongDateFormat;
+  vFormatSettings.TimeSeparator := ':';
+  vFormatSettings.LongTimeFormat := 'hh:nn:ss';
+  vFormatSettings.ShortTimeFormat := LongTimeFormat;
+  Result := FormatDateTime(Format, aDateTime, vFormatSettings);
+end;
+
+function DateTimeToStrS(const aDateTime: TDateTime): string;
+var
+  vFormatSettings: TFormatSettings;
+begin
+  vFormatSettings.DateSeparator := '-';
+  vFormatSettings.LongDateFormat := 'yyyy-mm-dd';
+  vFormatSettings.ShortDateFormat := LongDateFormat;
+  vFormatSettings.TimeSeparator := ':';
+  vFormatSettings.LongTimeFormat := 'hh:nn:ss';
+  vFormatSettings.ShortTimeFormat := LongTimeFormat;
+  Result := FormatDateTime('yyyy-mm-dd hh:nn:ss', aDateTime, vFormatSettings);
+end;
+
+function DateToStrS(const aDate: TDateTime): string;
+var
+  vFormatSettings: TFormatSettings;
+begin
+  vFormatSettings.DateSeparator := '-';
+  vFormatSettings.LongDateFormat := 'yyyy-mm-dd';
+  vFormatSettings.ShortDateFormat := LongDateFormat;
+  Result := SysUtils.DateToStr(aDate, vFormatSettings);
+end;
+
+function TimeToStrS(const aTime: TDateTime): string;
+var
+  vFormatSettings: TFormatSettings;
+begin
+  vFormatSettings.TimeSeparator := ':';
+  vFormatSettings.LongTimeFormat := 'hh:nn:ss';
+  vFormatSettings.ShortTimeFormat := LongTimeFormat;
+  Result := SysUtils.TimeToStr(aTime, vFormatSettings);
+end;
 
 type
   {
@@ -496,6 +617,42 @@ end;
 procedure TMeThreadSafeList.UnlockList;
 begin
   FLock.Leave;
+end;
+
+procedure GetDefaultFormatSettings(var Result: TFormatSettings);
+var
+  i: Integer;
+begin
+  with Result do
+  begin
+    CurrencyFormat:= SysUtils.CurrencyFormat;
+    NegCurrFormat := SysUtils.NegCurrFormat;;
+    ThousandSeparator := SysUtils.ThousandSeparator;
+    DecimalSeparator := SysUtils.DecimalSeparator;
+    CurrencyDecimals := SysUtils.CurrencyDecimals;
+    DateSeparator := SysUtils.DateSeparator;
+    TimeSeparator := SysUtils.TimeSeparator;
+    ListSeparator :=  SysUtils.ListSeparator;
+    CurrencyString := SysUtils.CurrencyString;
+    ShortDateFormat := SysUtils.ShortDateFormat;
+    LongDateFormat := SysUtils.LongDateFormat;
+    TimeAMString :=  SysUtils.TimeAMString;
+    TimePMString := SysUtils.TimePMString;
+    ShortTimeFormat:= SysUtils.ShortTimeFormat;
+    LongTimeFormat:= SysUtils.LongTimeFormat;
+
+    for i:= 1 to 12 do
+    begin
+      ShortMonthNames[i] := SysUtils.ShortMonthNames[i];
+      LongMonthNames[i] := SysUtils.LongMonthNames[i];
+    end;
+    for i := 1 to 7 do
+    begin
+      ShortDayNames[i]:= SysUtils.ShortDayNames[i];
+      LongDayNames[i]:= SysUtils.LongDayNames[i];
+    end;
+    TwoDigitYearCenturyWindow:= SysUtils.TwoDigitYearCenturyWindow;
+  end;
 end;
 
 initialization
