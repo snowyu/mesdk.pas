@@ -181,6 +181,7 @@ type
   }
   TMeTask = object(TMeDynamicObject)
   protected
+    FIsRunning: Boolean;
     FBeforeRunDone: Boolean;
 
     { Summary: after the task exectution. }
@@ -203,6 +204,7 @@ type
     // BeforeRunDone property to allow flexibility in alternative schedulers
     // it will be set to true before executing the BeforeRun.
     property BeforeRunDone: Boolean read FBeforeRunDone;
+    property IsRunning: Boolean read FIsRunning;
   end;
 
   TMeYarn = object(TMeDynamicObject)
@@ -411,7 +413,7 @@ type
 
     function CreateThread(const aTask: PMeTask): PMeThread;
     //some task is done, free the task, the thread is idle.
-    procedure DoThreadStopped(const aThread: PMeCustomThread);
+    procedure DoThreadStopped(const aThread: PMeCustomThread); virtual;
     //if thread Exception then free this thread.
     procedure DoThreadException(const aThread: PMeCustomThread; const aException: Exception);
 
@@ -1217,12 +1219,14 @@ end;
 procedure TMeTask.DoAfterRun;
 begin
   AfterRun;
+  FIsRunning := False;
 end;
 
 procedure TMeTask.DoBeforeRun;
 begin
   FBeforeRunDone := True;
   BeforeRun;
+  FIsRunning := True;
 end;
 
 function TMeTask.DoRun: Boolean;
@@ -1615,6 +1619,13 @@ end;
 
 destructor TMeThreadMgrTask.Destroy;
 begin
+  if FFreeTask then
+    with FTaskQueue.LockList^ do
+    try
+      FreeMeObjects;
+    finally
+      FTaskQueue.UnLockList;
+    end;
   FTaskQueue.Free;
   FThreadPool.Free;
   FActiveThreads.Free;
