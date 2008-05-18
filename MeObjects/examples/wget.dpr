@@ -11,6 +11,7 @@ uses
   , uMeIndyTask
   , uMeLog
   , uMeLoggerEx
+  , IdComponent
   ;
  
 const
@@ -27,8 +28,9 @@ end;
 
 var
   HasError: Boolean = False;
-procedure DoException(constSelf: TObject; const aThread: PMeCustomThread; const aException: Exception);
+procedure DoException(const Self: TObject; const aThread: PMeCustomThread; const aException: Exception);
 begin
+  with aException do GLogger.error('Exception: '+ ClassName+ ' Error:'+ Message);
   {EnterMainThread;
   try
     HasError := True;
@@ -36,7 +38,11 @@ begin
   finally
     LeaveMainThread;
   end;//}
-  with aException do GLogger.error('Exception: '+ ClassName+ ' Error:'+ Message);
+end;
+
+procedure DoStatus(const Self: TObject; ASender: TObject; const AStatus: TIdStatus; const AStatusText: string);
+begin
+  GLogger.info(AStatusText);
 end;
 
 {procedure DoRedirect(const Self: TObject; Sender: TObject; var dest: string; var NumRedirect: Integer; var Handled: boolean; var VMethod: TIdHTTPMethod);
@@ -61,6 +67,7 @@ begin
   GLogger.AddLogger(New(PMeDebugLogger, Create));
   vStrs := New(PMeStrings, Create);
   GLogger.AddLogger(New(PMeStringsLogger, Create(vStrs)));
+  GLogger.Level := vlAll;
   GLogger.Open;
   vURL := ParamStr(1);
   vFileName := '';
@@ -74,6 +81,7 @@ begin
   vThread := NewThreadTask(vTask);
   try
     vThread.OnException := TMeExceptionThreadEvent(ToMethod(@DoException));
+    vTask.OnStatus := TIdStatusEvent(ToMethod(@DoStatus));
     vBegin := GetTickCount;
     //vHttp.Get(vURL, vStream);
     vThread.Start;
@@ -98,7 +106,7 @@ begin
     begin
     end;
     if vFileName = '' then vFileName := 'index.htm';
-    if HasError then
+    if not HasError then
     begin
       vTask.Stream.SaveToFile(vFileName);
       Writeln('Get ',vURL ,' Done. save to ',vFileName ,', Total Time:', vEnd - vBegin);

@@ -37,6 +37,9 @@ uses
 
   //, IdGlobal
   //, IdGlobalProtocols //GMTXXX
+  , IdComponent
+  , IdException
+  , IdExceptionCore
   , IdHeaderList
   , IdAuthenticationDigest //MD5-Digest authentication
   , IdURI, IdCookie, IdCookieManager
@@ -167,7 +170,10 @@ Range头域可以请求实体的一个或者多个子范围。例如，
     destructor Destroy; virtual; //override
 
     property Stream: TMemoryStream read FStream;
-    property URL: string read FURL write FURL;
+    //property URL: string read FURL write FURL;
+    property ContentRangeEnd: Int64 read FContentRangeEnd;
+    property ContentRangeStart: Int64 read FContentRangeStart;
+    property ContentRangeInstanceLength: Int64 read FContentRangeInstanceLength;
   end;
 
   TMeHttpDownloadPartTask = object(TMeCustomDownloadPartTask)
@@ -176,8 +182,10 @@ Range头域可以请求实体的一个或者多个子范围。例如，
    {$ifdef UseOpenSsl}
     FIOSSL : TIdSSLIOHandlerSocketOpenSSL;
    {$endif}
+    FOnStatus: TIdStatusEvent;
 
     procedure DoHeadersAvailable(Sender: TObject; aHeaders: TIdHeaderList; var vContinue: Boolean);
+    procedure DoStatus(ASender: TObject; const AStatus: TIdStatus; const AStatusText: string);
 
     procedure BeforeRun; virtual; //override
     function Run: Boolean; virtual; //override
@@ -185,14 +193,29 @@ Range头域可以请求实体的一个或者多个子范围。例如，
     procedure Init; virtual; //override
   public
     destructor Destroy; virtual; //override
+    property OnStatus: TIdStatusEvent read FOnStatus write FOnStatus;
   end;
 
   TMeHttpDownloadSimpleTask = object(TMeHttpDownloadPartTask)
   protected
     //procedure Init; virtual; //override
+    procedure SetURL(const Value: string);
   public
     constructor Create(const aURL: string);
     destructor Destroy; virtual; //override
+    property URL: string read FURL write SetURL;
+  end;
+
+  TMeTaskDoneEvent = procedure(const aTask: TMeTask) of object;
+  TMeHttpDownloadSimpleThreadMgrTask = object(TMeThreadMgrTask)
+  protected
+    FIdleTasks: PMeThreadSafeList;
+    FOnTaskDone: TMeTaskDoneEvent;
+    procedure DoThreadStopped(const aThread: PMeCustomThread); virtual; //override
+    procedure Init; virtual; //override
+  public
+    destructor Destroy; virtual; //override
+    procedure Download(const aURL: string);
   end;
 
 implementation
@@ -293,6 +316,7 @@ begin
   FHttp.HandleRedirects := True;
   FHTTP.OnHeadersAvailable := DoHeadersAvailable;
   FHTTP.Request.UserAgent := cDefaultUserAgent;
+  FHTTP.OnStatus := DoStatus;
 end;
 
 destructor TMeHttpDownloadPartTask.Destroy;
@@ -333,24 +357,30 @@ begin
     FAcceptRanges := (Sender as TIdCustomHTTP).Response.AcceptRanges;
     FCanResume := FAcceptRanges <> '';
 
-    { tell the client this connection what the download range 
-     handle content-range headers, like:
-
-     content-range: bytes 1-65536/102400
-     content-range: bytes */102400
-     content-range: bytes 1-65536/*
-    }
-    FContentRangeStart := (Sender as TIdCustomHTTP).Response.ContentRangeStart;
-    FContentRangeEnd := (Sender as TIdCustomHTTP).Response.ContentRangeEnd;
-    //FContentRangeInstanceLength := (Sender as TIdCustomHTTP).Response.ContentRangeInstanceLength;
-
     FHeaderInited := True;
   end;
+  { tell the client this connection what the download range 
+   handle content-range headers, like:
+
+   content-range: bytes 1-65536/102400
+   content-range: bytes */102400
+   content-range: bytes 1-65536/*
+  }
+  FContentRangeStart := (Sender as TIdCustomHTTP).Response.ContentRangeStart;
+  FContentRangeEnd := (Sender as TIdCustomHTTP).Response.ContentRangeEnd;
+  FContentRangeInstanceLength := (Sender as TIdCustomHTTP).Response.ContentRangeInstanceLength;
+end;
+
+procedure TMeHttpDownloadPartTask.DoStatus(ASender: TObject; const AStatus: TIdStatus; const AStatusText: string);
+begin
+  //IdStati[AStatus] + ':' + AStatusText 
+  FOnStatus(ASender, AStatus, AStatusText);
 end;
 
 procedure TMeHttpDownloadPartTask.HandleRunException(const Sender: PMeCustomThread; const aException: Exception; var aProcessed: Boolean);
 begin
   ///for re-use EIdConnClosedGracefully, EIdReadTimeout, EIdConnectTimeout, EIdReadLnMaxLineLengthExceeded, EIdReadLnWaitMaxAttemptsExceeded, 
+  //EIdSocketError
 end;
 
 function TMeHttpDownloadPartTask.Run: Boolean;
@@ -372,6 +402,66 @@ destructor TMeHttpDownloadSimpleTask.Destroy;
 begin
   MeFreeAndNil(FDownInfo);
   inherited;
+end;
+
+procedure TMeHttpDownloadSimpleTask.SetURL(const Value: string);
+begin
+  if (FURL <> Value) and not FIsRunning then
+  begin
+    FURL := Value;
+    FContentRangeEnd := 0;
+    if Assigned(FDownInfo) then
+      FDownInfo.FHeaderInited := False;
+  end;
+end;
+
+{ TMeHttpDownloadSimpleThreadMgrTask }
+procedure TMeHttpDownloadSimpleThreadMgrTask.Init;
+begin
+  inherited;
+  New(FIdleTasks, Create);
+  FFreeTask := False;
+end;
+
+destructor TMeHttpDownloadSimpleThreadMgrTask.Destroy;
+begin
+  with FIdleTasks.LockList^ do
+  try
+    FreeMeObjects;
+  finally
+    FIdleTasks.UnLockList;
+  end;
+  FIdleTasks.Free;
+  FFreeTask := True;
+  inherited;
+end;
+
+procedure TMeHttpDownloadSimpleThreadMgrTask.DoThreadStopped(const aThread: PMeCustomThread);
+begin
+  with FIdleTasks.LockList^ do
+  try
+    Add(PMeThread(aThread).Task);
+  finally
+    FIdleTasks.UnLockList;
+  end;
+  inherited;
+end;
+
+procedure TMeHttpDownloadSimpleThreadMgrTask.Download(const aURL: string);
+var
+  vTask: PMeHttpDownloadSimpleTask;
+begin
+  with FIdleTasks.LockList^ do
+  try
+    vTask := Popup;
+    if not Assigned(vTask) then
+    begin
+      New(vTask, Create(aURL));
+    end;
+  finally
+    FIdleTasks.UnLockList;
+  end;
+  Add(vTask);
 end;
 
 initialization
