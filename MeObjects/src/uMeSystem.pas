@@ -92,6 +92,11 @@ type
     StackTop: Pointer;
     StackBottom: Pointer;
   end;
+  PStackFrame = ^ TStackFrame;
+  TStackFrame = record
+    CallerEBP: LongWord;
+    CallerAdr: LongWord;
+  end;
 
   { Summary the Near Jump directive }
   PRedirectCodeRec = ^TRedirectCodeRec;
@@ -202,10 +207,41 @@ function IsSameMethod(Var A,B): Boolean;
 }
 function CleanUpAndGetTIB: PTIB;
 
+function GetModuleFromAddr(const Addr:Pointer): HModule;
+
 implementation
 
 uses
   RTLConsts;
+
+{$IFOPT W+}
+  {$DEFINE StackFrames_On}
+{$ENDIF}
+{$StackFrames Off}
+function GetEBP: Pointer;
+asm
+  MOV  EAX, EBP
+end;
+
+function GetESP: Pointer;
+asm
+  MOV  EAX, ESP
+end;
+
+function GetFS: Pointer;
+asm
+  XOR EAX, EAX
+  MOV EAX, FS:[EAX]
+end;
+
+function GetStackTop: Pointer;
+asm
+  MOV EAX, FS:[4]
+end;
+
+{$IFDEF StackFrames_On}
+  {$StackFrames On}
+{$ENDIF}
 
 {$IFDEF MSWINDOWS}
 var
@@ -860,6 +896,44 @@ asm
   MOV EAX, 0   
 end;
 {$ENDIF}
+
+function GetModuleFromAddr(const Addr:Pointer): HModule;
+var
+  vMI: TMemoryBasicInformation;
+begin
+  VirtualQuery(Addr, vMI, SizeOf(vMI));
+  if vMI.State = MEM_COMMIT then
+    Result := HModule(vMI.AllocationBase)
+  else
+    Result := 0;
+end;
+
+//function CallerComeFromModule(const aModule: HModule): Boolean;
+{
+var
+  vBaseOfStack: Cardinal;
+  vTopOfStack: Cardinal;
+  vStackFrame: PStackFrame;
+  vCaller: Pointer;
+begin
+  vStackFrame := GetEBP;
+  vTopOfStack := GetStackTop;
+  vBaseOfStack := Cardinal(vStackFrame) -1;
+
+  //check caller whether come from some HModule
+  while (Cardinal(vStackFrame) >= vBaseOfStack) and (Cardinal(vStackFrame) < vTopOfStack) do
+  begin
+    vCaller := Pointer(vStackFrame.CallerAdr-1);
+    if GetModuleFromAddr(vCaller) = aModule then
+    begin
+      Result := True;
+      Exit;
+    end;
+    vStackFrame := vStackFrame.CallerEBP;
+  end;
+  Result := False;
+end;
+}
 
 { EMeError }
 constructor EMeError.Create(const Msg: string; const aErrorCode: Integer);
