@@ -183,6 +183,7 @@ Range头域可以请求实体的一个或者多个子范围。例如，
     FIOSSL : TIdSSLIOHandlerSocketOpenSSL;
    {$endif}
     FOnStatus: TIdStatusEvent;
+    FHasException: Boolean;
 
     procedure DoHeadersAvailable(Sender: TObject; aHeaders: TIdHeaderList; var vContinue: Boolean);
     procedure DoStatus(ASender: TObject; const AStatus: TIdStatus; const AStatusText: string);
@@ -193,6 +194,7 @@ Range头域可以请求实体的一个或者多个子范围。例如，
     procedure Init; virtual; //override
   public
     destructor Destroy; virtual; //override
+    property HasException: Boolean read FHasException;
     property OnStatus: TIdStatusEvent read FOnStatus write FOnStatus;
   end;
 
@@ -216,6 +218,8 @@ Range头域可以请求实体的一个或者多个子范围。例如，
   public
     destructor Destroy; virtual; //override
     procedure Download(const aURL: string);
+
+    property OnTaskDone: TMeTaskDoneEvent read FOnTaskDone write FOnTaskDone;
   end;
 
 implementation
@@ -331,6 +335,7 @@ end;
 procedure TMeHttpDownloadPartTask.BeforeRun;
 begin
   inherited;
+  FHasException := False;
   if Assigned(FDownInfo) and FDownInfo.FCanResume and (FContentRangeEnd > 0) then
   begin
     FHTTP.Request.Range := 'bytes=';
@@ -381,6 +386,7 @@ procedure TMeHttpDownloadPartTask.HandleRunException(const Sender: PMeCustomThre
 begin
   ///for re-use EIdConnClosedGracefully, EIdReadTimeout, EIdConnectTimeout, EIdReadLnMaxLineLengthExceeded, EIdReadLnWaitMaxAttemptsExceeded, 
   //EIdSocketError
+  FHasException := True;
 end;
 
 function TMeHttpDownloadPartTask.Run: Boolean;
@@ -437,10 +443,20 @@ begin
 end;
 
 procedure TMeHttpDownloadSimpleThreadMgrTask.DoThreadStopped(const aThread: PMeCustomThread);
+var
+  vTask: PMeHttpDownloadSimpleTask;
 begin
   with FIdleTasks.LockList^ do
   try
-    Add(PMeThread(aThread).Task);
+    vTask := PMeHttpDownloadSimpleTask(PMeThread(aThread).Task);
+    if Assigned(FOnTaskDone) then
+      FOnTaskDone(vTask);
+    if (MaxThreads <= 0) or (Count < MaxThreads) then
+      Add(vTask)
+    else begin
+      MeFreeAndNil(vTask);
+      PMeThread(aThread).Task := nil;
+    end;
   finally
     FIdleTasks.UnLockList;
   end;
