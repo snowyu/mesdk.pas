@@ -1659,13 +1659,13 @@ begin
     SendDebug({$IFDEF NamedThread}PMeThread(aThread).FName+{$ENDIF} ' DoThreadStopped, A='+IntToStr(FActiveThreads.Count));
  {$ENDIF}
 
+    FActiveThreads.Remove(aThread);
     with FThreadPool.LockList^ do
     try
       if FFreeTask then
         MeFreeAndNil(PMeThread(aThread).FTask)
       else
         PMeThread(aThread).FTask := nil;
-      FActiveThreads.Remove(aThread);
       Add(aThread);
     finally
       FThreadPool.UnlockList;
