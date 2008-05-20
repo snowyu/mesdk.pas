@@ -40,6 +40,7 @@ type
     FList: PMeList;
     FLock: PMeCriticalSection;
     FDuplicates: TDuplicates;
+    //FMaxCount: Integer;
 
     procedure Init; virtual; //override
   public
@@ -55,6 +56,8 @@ type
     procedure UnlockList;
     property Duplicates: TDuplicates read FDuplicates write FDuplicates;
     property List: PMeList read FList;
+    //##if MaxCount > 0 then limits the list count by Add method 
+    //##property MaxCount: Integer read FMaxCount write FMaxCount;
   end;
 
   TFreeNotifyProc = procedure(Instance : TObject) of object;

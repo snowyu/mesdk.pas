@@ -117,7 +117,7 @@ http.Request.Range := '0-'; //取所有的数据。
 Range头域可以请求实体的一个或者多个子范围。例如，   
 　　表示头500个字节：bytes=0-499   
 　　表示第二个500字节：bytes=500-999   
-　　表示最后500个字节：bytes=-500   
+　　表示最后500个字节：bytes=-500
 　　表示500字节以后的范围：bytes=500-   
 　　第一个和最后一个字节：bytes=0-0,-1   
 　　同时指定几个范围：bytes=500-600,601-999   
@@ -151,7 +151,7 @@ Range头域可以请求实体的一个或者多个子范围。例如，
   TMeCustomDownloadPartTask = object(TMeTask)
   protected
     FURL: string;
-    FStream: TMemoryStream;
+    FStream: TStream;
     //owner
     FDownInfo: PMeDownloadInfo;
     FContentRangeEnd: Int64;
@@ -160,16 +160,17 @@ Range头域可以请求实体的一个或者多个子范围。例如，
     FContentRangeInstanceLength: Int64;
 
 
+    procedure SetStream(const aStream: TStream);
     //procedure AfterRun; virtual; //override
     //procedure BeforeRun; virtual; //override
     //function Run: Boolean; virtual; //override
     procedure Init; virtual; //override
     procedure BeforeRun; virtual; //override
   public
-    constructor Create(const aDownInfo: PMeDownloadInfo);
+    constructor Create(const aDownInfo: PMeDownloadInfo; const aStream: TStream);
     destructor Destroy; virtual; //override
 
-    property Stream: TMemoryStream read FStream;
+    property Stream: TStream read FStream write SetStream;
     //property URL: string read FURL write FURL;
     property ContentRangeEnd: Int64 read FContentRangeEnd;
     property ContentRangeStart: Int64 read FContentRangeStart;
@@ -203,7 +204,7 @@ Range头域可以请求实体的一个或者多个子范围。例如，
     //procedure Init; virtual; //override
     procedure SetURL(const Value: string);
   public
-    constructor Create(const aURL: string);
+    constructor Create(const aURL: string; const aStream: TStream);
     destructor Destroy; virtual; //override
     property URL: string read FURL write SetURL;
   end;
@@ -213,12 +214,16 @@ Range头域可以请求实体的一个或者多个子范围。例如，
   protected
     FIdleTasks: PMeThreadSafeList;
     FOnTaskDone: TMeTaskDoneEvent;
+    FProxyParameters: TIdProxyConnectionInfo;
+
     procedure DoThreadStopped(const aThread: PMeCustomThread); virtual; //override
     procedure Init; virtual; //override
   public
     destructor Destroy; virtual; //override
-    procedure Download(const aURL: string);
+    procedure Download(const aURL: string; const aStream: TStream);
 
+    property ProxyParameters: TIdProxyConnectionInfo read FProxyParameters;
+    //this event must support thread-safe.
     property OnTaskDone: TMeTaskDoneEvent read FOnTaskDone write FOnTaskDone;
   end;
 
@@ -276,10 +281,12 @@ begin
 end;
 
 { TMeCustomDownloadPartTask }
-constructor TMeCustomDownloadPartTask.Create(const aDownInfo: PMeDownloadInfo);
+constructor TMeCustomDownloadPartTask.Create(const aDownInfo: PMeDownloadInfo; const aStream: TStream);
 Begin
   inherited Create;
   FDownInfo := aDownInfo;
+  FStream := aStream;
+  Assert(FStream <> nil, 'no stream assigned error!';
   if (FURL = '') and Assigned(FDownInfo) and not FDownInfo.FURI.Empty then
   begin
     FURL := FDownInfo.FURI.URI;
@@ -302,6 +309,12 @@ end;
 procedure TMeCustomDownloadPartTask.BeforeRun;
 begin
   FStream.Clear;
+end;
+
+procedure TMeCustomDownloadPartTask.SetStream(const aStream: TStream);
+begin
+  if not IsRunning and (FStream <> aStream) then
+    FStream := aStream;
 end;
 
 { TMeHttpDownloadPartTask }
@@ -384,6 +397,7 @@ end;
 
 procedure TMeHttpDownloadPartTask.HandleRunException(const Sender: PMeCustomThread; const aException: Exception; var aProcessed: Boolean);
 begin
+  inherited;
   ///for re-use EIdConnClosedGracefully, EIdReadTimeout, EIdConnectTimeout, EIdReadLnMaxLineLengthExceeded, EIdReadLnWaitMaxAttemptsExceeded, 
   //EIdSocketError
   FHasException := True;
@@ -396,9 +410,9 @@ begin
 end;
 
 { TMeHttpDownloadSimpleTask }
-constructor TMeHttpDownloadSimpleTask.Create(const aURL: string);
+constructor TMeHttpDownloadSimpleTask.Create(const aURL: string; const aStream: TStream);
 begin
-  inherited Create(New(PMeDownloadInfo, Create));
+  inherited Create(New(PMeDownloadInfo, Create), aStream);
   FURL := aURL;
   FDownInfo.FURI.URI := aURL;
   FHttp.Compressor := LCompressor;
@@ -426,6 +440,7 @@ procedure TMeHttpDownloadSimpleThreadMgrTask.Init;
 begin
   inherited;
   New(FIdleTasks, Create);
+  FProxyParameters := TIdProxyConnectionInfo.Create();
   FFreeTask := False;
 end;
 
@@ -438,6 +453,7 @@ begin
     FIdleTasks.UnLockList;
   end;
   FIdleTasks.Free;
+  FProxyParameters.Free;
   FFreeTask := True;
   inherited;
 end;
@@ -446,24 +462,19 @@ procedure TMeHttpDownloadSimpleThreadMgrTask.DoThreadStopped(const aThread: PMeC
 var
   vTask: PMeHttpDownloadSimpleTask;
 begin
-  with FIdleTasks.LockList^ do
-  try
-    vTask := PMeHttpDownloadSimpleTask(PMeThread(aThread).Task);
-    if Assigned(FOnTaskDone) then
-      FOnTaskDone(vTask);
-    if (MaxThreads <= 0) or (Count < MaxThreads) then
-      Add(vTask)
-    else begin
-      MeFreeAndNil(vTask);
-      PMeThread(aThread).Task := nil;
-    end;
-  finally
-    FIdleTasks.UnLockList;
+  vTask := PMeHttpDownloadSimpleTask(PMeThread(aThread).Task);
+  if Assigned(FOnTaskDone) then
+    FOnTaskDone(vTask);
+  if (MaxThreads <= 0) or (FIdleTasks.Count < MaxThreads) then
+    FIdleTasks.Add(vTask)
+  else begin
+    MeFreeAndNil(vTask);
+    PMeThread(aThread).Task := nil;
   end;
   inherited;
 end;
 
-procedure TMeHttpDownloadSimpleThreadMgrTask.Download(const aURL: string);
+procedure TMeHttpDownloadSimpleThreadMgrTask.Download(const aURL: string; const aStream: TStream);
 var
   vTask: PMeHttpDownloadSimpleTask;
 begin
@@ -472,8 +483,11 @@ begin
     vTask := Popup;
     if not Assigned(vTask) then
     begin
-      New(vTask, Create(aURL));
-    end;
+      New(vTask, Create(aURL, aStream));
+    end
+    else
+      vTask.FStream := aStream;
+    vTask.FHttp.ProxyParameters.Assign(FProxyParameters);
   finally
     FIdleTasks.UnLockList;
   end;
