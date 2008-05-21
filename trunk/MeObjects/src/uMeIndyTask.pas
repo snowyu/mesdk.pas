@@ -65,6 +65,7 @@ type
   PMeDownloadPartTask = ^ TMeCustomDownloadPartTask;
   PMeDownloadInfo = ^ TMeDownloadInfo;
   PMeHttpDownloadSimpleTask = ^ TMeHttpDownloadSimpleTask;
+  PMeHttpDownloadSimpleThreadMgrTask = ^ TMeHttpDownloadSimpleThreadMgrTask;
 
   TMeDownloadInfo = object(TMeDynamicObject)
   protected
@@ -209,7 +210,7 @@ Range头域可以请求实体的一个或者多个子范围。例如，
     property URL: string read FURL write SetURL;
   end;
 
-  TMeTaskDoneEvent = procedure(const aTask: TMeTask) of object;
+  TMeTaskDoneEvent = procedure(const aTask: PMeTask) of object;
   TMeHttpDownloadSimpleThreadMgrTask = object(TMeThreadMgrTask)
   protected
     FIdleTasks: PMeThreadSafeList;
@@ -231,6 +232,9 @@ implementation
 
 uses
   uMeStrUtils;
+
+type
+  TIdHTTPAccess = class(TIdHTTP);
 
 var
   LCompressor: TIdCompressorZLib;
@@ -286,7 +290,7 @@ Begin
   inherited Create;
   FDownInfo := aDownInfo;
   FStream := aStream;
-  Assert(FStream <> nil, 'no stream assigned error!';
+  Assert(FStream <> nil, 'no stream assigned error!');
   if (FURL = '') and Assigned(FDownInfo) and not FDownInfo.FURI.Empty then
   begin
     FURL := FDownInfo.FURI.URI;
@@ -301,14 +305,14 @@ end;
 
 destructor TMeCustomDownloadPartTask.Destroy;
 begin
-  FreeAndNil(FStream);
+  //FreeAndNil(FStream);
   FURL := '';
   inherited;
 end;
 
 procedure TMeCustomDownloadPartTask.BeforeRun;
 begin
-  FStream.Clear;
+  FStream.Size := 0;
 end;
 
 procedure TMeCustomDownloadPartTask.SetStream(const aStream: TStream);
@@ -387,6 +391,8 @@ begin
   FContentRangeStart := (Sender as TIdCustomHTTP).Response.ContentRangeStart;
   FContentRangeEnd := (Sender as TIdCustomHTTP).Response.ContentRangeEnd;
   FContentRangeInstanceLength := (Sender as TIdCustomHTTP).Response.ContentRangeInstanceLength;
+  with TIdHTTPAccess(Sender) do
+    DoStatus(hsStatusText, ['Response='+Response.RawHeaders.Text]);
 end;
 
 procedure TMeHttpDownloadPartTask.DoStatus(ASender: TObject; const AStatus: TIdStatus; const AStatusText: string);
@@ -487,7 +493,7 @@ begin
     end
     else
       vTask.FStream := aStream;
-    vTask.FHttp.ProxyParameters.Assign(FProxyParameters);
+    vTask.FHttp.ProxyParams.Assign(FProxyParameters);
   finally
     FIdleTasks.UnLockList;
   end;
@@ -502,12 +508,14 @@ initialization
   SetMeVirtualMethod(TypeOf(TMeCustomDownloadPartTask), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeHttpDownloadPartTask), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeHttpDownloadSimpleTask), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeHttpDownloadSimpleThreadMgrTask), ovtVmtClassName, nil);
   {$ENDIF}
   SetMeVirtualMethod(TypeOf(TMeDownloadInfo), ovtVmtParent, TypeOf(TMeDynamicObject));
   SetMeVirtualMethod(TypeOf(TMeDownloadTask), ovtVmtParent, TypeOf(TMeTask));
   SetMeVirtualMethod(TypeOf(TMeCustomDownloadPartTask), ovtVmtParent, TypeOf(TMeTask));
   SetMeVirtualMethod(TypeOf(TMeHttpDownloadPartTask), ovtVmtParent, TypeOf(TMeCustomDownloadPartTask));
   SetMeVirtualMethod(TypeOf(TMeHttpDownloadSimpleTask), ovtVmtParent, TypeOf(TMeHttpDownloadPartTask));
+  SetMeVirtualMethod(TypeOf(TMeHttpDownloadSimpleThreadMgrTask), ovtVmtParent, TypeOf(TMeThreadMgrTask));
 
 
    LCompressor:= TIdCompressorZLib.Create(nil);
