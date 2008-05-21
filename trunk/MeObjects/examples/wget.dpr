@@ -31,9 +31,9 @@ var
 procedure DoException(const Self: TObject; const aThread: PMeCustomThread; const aException: Exception);
 begin
   with aException do GLogger.error('Exception: '+ ClassName+ ' Error:'+ Message);
+  HasError := True;
   {EnterMainThread;
   try
-    HasError := True;
     with aException do writeln('Exception: ', ClassName, ' Error:', Message);
   finally
     LeaveMainThread;
@@ -77,7 +77,7 @@ begin
   vStream := TMemoryStream.Create;
   FLogData := TStringList.Create;
   writeln(vURL);
-  New(vTask, Create(vURL));
+  New(vTask, Create(vURL, vStream));
   vThread := NewThreadTask(vTask);
   try
     vThread.OnException := TMeExceptionThreadEvent(ToMethod(@DoException));
@@ -90,8 +90,6 @@ begin
       Sleep(100);
     end;
     vEnd := GetTickCount;
-    if FVerbose then
-        WriteLn('-------------------------');
     {
     for i := 0 to vHTTP.Response.RawHeaders.Count -1 do
     begin  
@@ -102,18 +100,22 @@ begin
         end;
     end;}
  
+    if (vStrs.count > 0) then
+    begin
+      WriteLn('-------------------------');
+      writeln(Trim(vStrs.Text));
+      WriteLn('-------------------------');
+    end;
     if vFileName = '' then
     begin
     end;
     if vFileName = '' then vFileName := 'index.htm';
-    if not HasError then
+    if not HasError and (vStream.Size > 0) then
     begin
-      vTask.Stream.SaveToFile(vFileName);
+      vStream.SaveToFile(vFileName);
       Writeln('Get ',vURL ,' Done. save to ',vFileName ,', Total Time:', vEnd - vBegin);
     end;
     //Sleep(500);
-    if vStrs.count > 0 then
-      writeln('vStrs=', vStrs.Text);
   finally
     vStrs.Free;
     FreeAndNil(FLogData);
@@ -122,7 +124,7 @@ begin
   end;
  except
    On E: Exception Do
-     writeln('Exception: ', E.ClassName, ' Error:', E.Message);
+     writeln('Exception Occur: ', E.ClassName, ' Error:', E.Message);
  end;
 end.
 
