@@ -1611,8 +1611,8 @@ begin
   begin
     s := ReadString();
     AsString := s;
-    s := ReadString();
-    s := ReadString();
+    s := ReadString(); //skip the ParamName if any
+    s := ReadString(); //Skip the ParamType if any
   end;
 end;
 
