@@ -53,7 +53,7 @@ type
     procedure SetTransport(const Value: TMeTransport);
     procedure TransportFreeNotify(Instance : TObject);
   public
-    class function AddTo(aProc:Pointer; const aProcName: string = '';
+    class function AddTo(aProc:Pointer; const aProcName: string;
             aMethodParams: PTypeInfo = nil; const aTransport: TMeTransport = nil): TMeAbstractInterceptor; overload;
     destructor Destroy; override;
     property Transport: TMeTransport read FTransport write SetTransport;
@@ -67,12 +67,13 @@ begin
   Result := inherited AddToProcedure(aProc, aProcName, aMethodParams);
   
   if Assigned(aTransport) then
-    Result.Transport := aTransport;
+    TMeRemoteFuncFeature(Result).Transport := aTransport;
 end;
 
 destructor TMeRemoteFuncFeature.Destroy;
 begin
   //FreeAndNil(FTransport);
+  Transport := nil;
   inherited;
 end;
 
@@ -88,12 +89,12 @@ begin
     New(vStream, Create);
     New(vResultStream, Create);
     try
-      vStream.WriteString(MethodItem.Name);
+      //vStream.WriteString(MethodItem.Name);
       if Assigned(Params) then
       begin
         SaveParamsToStream(Params, vStream);
       end;
-      FTransport.Send(vStream, vResultStream);
+      FTransport.Send(MethodItem.Name, vStream, vResultStream);
       vResultStream.Seek(0, soBeginning);
       if Assigned(Params) then
         LoadParamsFromStream(Params, vResultStream);

@@ -1,7 +1,3 @@
-{$IFNDEF MeRTTI_EXT_SUPPORT}
-  $Message Fatal 'need MeRTTI_EXT_SUPPORT'}
-{$ENDIF}
-
 {Summary Abstract MeTransport class and factory.}
 {
    @author  Riceball LEE(riceballl@hotmail.com)
@@ -34,9 +30,13 @@ DELETE        DELETE        Delete a resource
 }
 unit uMeTransport;
 
-interface
+{$I MeSetting.inc}
 
-{$I Setting.inc}
+{$IFNDEF MeRTTI_EXT_SUPPORT}
+  {$Message Fatal 'need MeRTTI_EXT_SUPPORT'}
+{$ENDIF}
+
+interface
 
 uses
   {$IFDEF MSWINDOWS}
@@ -44,6 +44,7 @@ uses
   {$ENDIF MSWINDOWS}
   SysUtils, Classes
   , uMeObject
+  , uMeSyncObjs
   ;
 
 type
@@ -53,24 +54,40 @@ type
   http://host/cat/aMethod?param=xx
   i will use REST protocol to do?
   }
-  TMeReceivedDataEvent = procedure (const Sender: TObject; const aReply: PMeStream) of object;
+  TMeReceivedDataEvent = procedure (const Sender: TObject; const aCmd: string; const aReply: PMeStream) of object;
   //abstract Transport class
-  TMeTransport = class()
+  TMeTransport = class
   protected
     //for Async method:
     //the default timeout
     FTimeOut: Integer;
+    FLock: PMeCriticalSection;
+    FIsBusy: Integer;
+    FConnected: Boolean;
+    FURL: string;
+    FKeepAlive: Boolean;
     FOnReceived: TMeReceivedDataEvent;
 
-    procedure iSendAsyn(const aRequest: TStream; const aReply: PMeStream; const aTimeOut: Integer = 0);virtual;abstract;
-    procedure iSend(const aRequest: TStream; const aReply: PMeStream);virtual;abstract;
+    procedure SetURL(const Value: string);
+    //procedure iSendAsyn(const aCmd: string; const aRequest: PMeStream; const aReply: PMeStream; const aTimeOut: Integer = 0);virtual;abstract;
+    procedure iSend(const aCmd: string; const aRequest: PMeStream; const aReply: PMeStream);virtual;abstract;
+    procedure iConnect();virtual;abstract;
+    procedure iDisconnect();virtual;abstract;
+    procedure iURLChanged;virtual;abstract;
   public
+    constructor Create; virtual;
+    destructor Destroy; override;
+    procedure Connect();
+    procedure Disconnect();
     //ProcessStream(Data, Message)?
     //send the aRequest, received the aReply.
-    procedure Send(const aRequest: PMeStream; const aReply: PMeStream);
-    procedure SendAsyn(const aRequest: PMeStream; const aReply: PMeStream; const aTimeOut: Integer = 0);
+    procedure Send(const aCmd: string; const aRequest: PMeStream; const aReply: PMeStream);
+    //aTimeOut: -1 means the default timeout(FTimeout property), 0 means for ever.
+    //procedure SendAsyn(const aCmd: string; const aRequest: PMeStream; const aReply: PMeStream; const aTimeOut: Integer = 0);
 
     property TimeOut: Integer read FTimeOut write FTimeOut;
+    property URL: string read FURL write SetURL;
+    property KeepAlive: Boolean read FKeepAlive write FKeepAlive;
     property OnReceived: TMeReceivedDataEvent read FOnReceived write FOnReceived;
   end;
 
@@ -101,20 +118,98 @@ var
 
 implementation
 
-procedure TMeTransport.SendAsyn(const aRequest: PMeStream; const aReply: PMeStream; aTimeOut: Integer = 0);
+{ TMeTransport }
+constructor TMeTransport.Create;
+begin
+  inherited;
+  New(FLock, Create);
+end;
+
+destructor TMeTransport.Destroy;
+begin
+  FLock.Free;
+  inherited;
+end;
+
+procedure TMeTransport.Connect();
+begin
+  if not FConnected then
+  begin
+    FLock.Enter;
+    try
+      iConnect;
+      FConnected := True;
+    finally
+      FLock.Leave;
+    end;
+  end;
+end;
+
+procedure TMeTransport.Disconnect();
+begin
+  if FConnected then
+  begin
+    FLock.Enter;
+    try
+      iDisconnect;
+      FConnected := False;
+    finally
+      FLock.Leave;
+    end;
+  end;
+end;
+
+{
+procedure TMeTransport.SendAsyn(const aCmd: string; const aRequest: PMeStream; const aReply: PMeStream; aTimeOut: Integer = 0);
 begin
   if Assigned(aRequest) and Assigned(aReply) then
   begin
     if aTimeOut = -1 then aTimeOut := FTimeOut;
-    iSendAsyn(aRequest, aReply, aTimeOut);
+    InterlockedIncrement(FIsBusy);
+    Connect;
+    try
+      iSendAsyn(aCmd. aRequest, aReply, aTimeOut);
+    finally
+      InterlockedDecrement(FIsBusy);
+      if not FKeepAlive then Disconnect;
+    end;
   end;
 end;
+//}
 
-procedure TMeTransport.Send(const aRequest: TStream; const aReply: TStream);
+procedure TMeTransport.Send(const aCmd: string; const aRequest: PMeStream; const aReply: PMeStream);
 begin
   if Assigned(aRequest) and Assigned(aReply) then
   begin
-    iSend(aRequest, aReply);
+    InterlockedIncrement(FIsBusy);
+    Connect;
+    FLock.Enter;
+    try
+      iSend(aCmd, aRequest, aReply);
+    finally
+      FLock.Leave;
+      InterlockedDecrement(FIsBusy);
+      if not FKeepAlive then Disconnect;
+    end;
+  end;
+end;
+
+procedure TMeTransport.SetURL(const Value: string);
+begin
+  if (FURL <> Value) then
+  begin
+    FLock.Enter;
+    try
+      if FConnected then 
+      begin
+        iDisconnect;
+        FConnected := False;
+      end;
+      FURL := Value;
+      iURLChanged;
+    finally
+      FLock.Leave;
+    end;
   end;
 end;
 

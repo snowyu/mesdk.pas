@@ -28,7 +28,7 @@ unit uMeRemoteServerFunc;
 
 interface
 
-{$I Setting.inc}
+{$I MeSetting.inc}
 
 uses
   {$IFDEF MSWINDOWS}
@@ -67,7 +67,7 @@ type
   end;
 
   PMeRemmoteFunctions = ^ TMeRemmoteFunctions;
-  TMeRemmoteFunctions = object(TMeList)
+  TMeRemmoteFunctions = object(TMeThreadSafeList)
   protected
     function GetItem(const Index: Integer): PMeRemmoteFunction;
   public

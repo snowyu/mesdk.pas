@@ -1,7 +1,3 @@
-{$IFNDEF MeRTTI_EXT_SUPPORT}
-  $Message Fatal 'need MeRTTI_EXT_SUPPORT'}
-{$ENDIF}
-
 {Summary MeRemote Utils.}
 {
    @author  Riceball LEE(riceballl@hotmail.com)
@@ -34,9 +30,12 @@ DELETE        DELETE        Delete a resource
 }
 unit uMeRemoteUtils;
 
-interface
+{$I MeSetting.inc}
+{$IFNDEF MeRTTI_EXT_SUPPORT}
+  {$Message Fatal 'need MeRTTI_EXT_SUPPORT'}
+{$ENDIF}
 
-{$I Setting.inc}
+interface
 
 uses
   {$IFDEF MSWINDOWS}
@@ -48,11 +47,60 @@ uses
   , uMeProcType
   ;
 
+type
+  TMeStreamProxy = class(TStream)
+  protected
+    FMeStream: PMeStream;
+  protected
+    function GetSize: Int64; override;
+    procedure SetSize(const NewSize: Int64); overload; override;
+    function Read(var Buffer; Count: Longint): Longint; override;
+    function Write(const Buffer; Count: Longint): Longint; override;
+    function Seek(const Offset: Int64; Origin: Classes.TSeekOrigin): Int64; overload; override;
+  public
+    constructor Create(const aMeStream: PMeStream);
+    property MeStream: PMeStream read FMeStream write FMeStream;
+  end;
+
 procedure SaveParamsToStream(const aParams: PMeProcParams; const aStream: PMeStream);
 procedure LoadParamsFromStream(const aParams: PMeProcParams; const aStream: PMeStream);
 
 implementation
 
+{ TStreamMeProxy }
+constructor TMeStreamProxy.Create(const aMeStream: PMeStream);
+begin
+  Assert(Assigned(aMeStream));
+  inherited Create;
+  FMeStream := aMeStream;
+end;
+
+function TMeStreamProxy.GetSize: Int64;
+begin
+  Result := FMeStream.Size;
+end;
+
+procedure TMeStreamProxy.SetSize(const NewSize: Int64); 
+begin
+  FMeStream.Size := NewSize;
+end;
+
+function TMeStreamProxy.Read(var Buffer; Count: Longint): Longint; 
+begin
+  Result := FMeStream.Read(Buffer, Count);
+end;
+
+function TMeStreamProxy.Write(const Buffer; Count: Longint): Longint; 
+begin
+  Result := FMeStream.Write(Buffer, Count);
+end;
+
+function TMeStreamProxy.Seek(const Offset: Int64; Origin: Classes.TSeekOrigin): Int64;
+begin
+  Result := FMeStream.Seek(Offset, uMeObject.TSeekOrigin(Origin));
+end;
+
+{---------------------------------}
 procedure SaveParamsToStream(const aParams: PMeProcParams; const aStream: PMeStream);
 var
   i: Integer;
