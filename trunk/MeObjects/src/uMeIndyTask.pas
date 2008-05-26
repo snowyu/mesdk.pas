@@ -210,7 +210,7 @@ Range头域可以请求实体的一个或者多个子范围。例如，
     property URL: string read FURL write SetURL;
   end;
 
-  TMeTaskDoneEvent = procedure(const aTask: PMeTask) of object;
+  TMeTaskDoneEvent = procedure(const aTask: PMeHttpDownloadSimpleTask) of object;
   TMeHttpDownloadSimpleThreadMgrTask = object(TMeThreadMgrTask)
   protected
     FIdleTasks: PMeThreadSafeList;
@@ -221,7 +221,7 @@ Range头域可以请求实体的一个或者多个子范围。例如，
     procedure Init; virtual; //override
   public
     destructor Destroy; virtual; //override
-    procedure Download(const aURL: string; const aStream: TStream);
+    procedure Download(const aURL: string; const aStream: TStream; const aTag: Integer = 0);
 
     property ProxyParameters: TIdProxyConnectionInfo read FProxyParameters;
     //this event must support thread-safe.
@@ -480,7 +480,7 @@ begin
   inherited;
 end;
 
-procedure TMeHttpDownloadSimpleThreadMgrTask.Download(const aURL: string; const aStream: TStream);
+procedure TMeHttpDownloadSimpleThreadMgrTask.Download(const aURL: string; const aStream: TStream; const aTag: Integer);
 var
   vTask: PMeHttpDownloadSimpleTask;
 begin
@@ -493,6 +493,7 @@ begin
     end
     else
       vTask.FStream := aStream;
+    vTask.Tag := aTag;
     vTask.FHttp.ProxyParams.Assign(FProxyParameters);
   finally
     FIdleTasks.UnLockList;
