@@ -183,6 +183,7 @@ type
   protected
     FIsRunning: Boolean;
     FBeforeRunDone: Boolean;
+    FTag: Integer;
 
     { Summary: after the task exectution. }
     procedure AfterRun; virtual;
@@ -205,6 +206,7 @@ type
     // it will be set to true before executing the BeforeRun.
     property BeforeRunDone: Boolean read FBeforeRunDone;
     property IsRunning: Boolean read FIsRunning;
+    property Tag: Integer read FTag write FTag;
   end;
 
   TMeYarn = object(TMeDynamicObject)
@@ -1218,15 +1220,15 @@ end;
 
 procedure TMeTask.DoAfterRun;
 begin
-  AfterRun;
   FIsRunning := False;
+  AfterRun;
 end;
 
 procedure TMeTask.DoBeforeRun;
 begin
   FBeforeRunDone := True;
-  BeforeRun;
   FIsRunning := True;
+  BeforeRun;
 end;
 
 function TMeTask.DoRun: Boolean;
