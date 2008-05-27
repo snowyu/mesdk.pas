@@ -163,7 +163,7 @@ type
     procedure Reset;
 
     { the CoRoutine itself. Override Execute to give the CoRoutine code. }
-    procedure Execute; virtual; abstract;
+    procedure CoExecute; virtual; abstract;
 
 
     property IsRunning: Boolean index Ord(coRunning) read GetState;
@@ -184,12 +184,16 @@ type
 
     class procedure Error(const Msg: string; Data: Integer = 0); overload; virtual;
     class procedure Error(const Msg: PResStringRec; Data: Integer = 0); overload;
+    { Go forward to the next item
+      @return True if there is still an item, False if the enumerator is terminated
+    }
+    function MoveNext: Boolean;
   end;
 
   TMeCoRoutine = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeCustomCoRoutine)
   protected
     FCoRoutineProc: TMeCoRoutineProc;
-    procedure Execute;{$IFDEF YieldClass_Supports}override{$ELSE} virtual{$endif};
+    procedure CoExecute;{$IFDEF YieldClass_Supports}override{$ELSE} virtual{$endif};
   public
     constructor Create(const CoRoutineProc: TMeCoRoutineProc; const aStackSize: Cardinal = MinStackSize);
   end;
@@ -213,7 +217,6 @@ type
     procedure SetNextValue(const Value); virtual; abstract;
   public
     procedure Yield(const Value); {$IFDEF SUPPORTS_REINTRODUCE}reintroduce;{$ENDIF}
-    function MoveNext: Boolean;
   end;
 
   {
@@ -470,7 +473,7 @@ procedure TMeCustomCoRoutine.MainExecute;
 begin
   if not (coTerminating in FStates) then
   try
-      Execute;
+    CoExecute;
   except
     FExceptObject  := AcquireExceptionObject;
     FExceptAddress := ExceptAddr;
@@ -672,6 +675,13 @@ begin
   Result := Index in FStates;
 end;
 
+function TMeCustomCoRoutine.MoveNext: Boolean;
+begin
+  if not (coDead in FStates) then
+    Resume;
+  Result := not (coDead in FStates);
+end;
+
 { TMeCoRoutine }
 constructor TMeCoRoutine.Create(const CoRoutineProc: TMeCoRoutineProc; const aStackSize: Cardinal);
 begin
@@ -679,7 +689,7 @@ begin
   inherited Create(aStackSize);
 end;
 
-procedure TMeCoRoutine.Execute;
+procedure TMeCoRoutine.CoExecute;
 begin
   if Assigned(FCoRoutineProc) then FCoRoutineProc({$IFNDEF YieldClass_Supports}@{$ENDIF}Self);
 end;
@@ -695,16 +705,6 @@ procedure TMeCoRoutineEnumerator.Yield(const Value);
 begin
   SetNextValue(Value);
   inherited Yield;
-end;
-
-{ Go forward to the next item
-  @return True if there is still an item, False if the enumerator is terminated
-}
-function TMeCoRoutineEnumerator.MoveNext: Boolean;
-begin
-  if not (coDead in FStates) then
-    Resume;
-  Result := not (coDead in FStates);
 end;
 
 { TMeCustomCoRoutineEx }
@@ -723,7 +723,7 @@ begin
   if not (coTerminating in FStates) then
   try
     repeat
-      Execute;
+      CoExecute;
       if (Loop = clNextInvoke) and (not (coTerminating in FStates)) then
         Yield;
     until (Loop = clRunOnce) or (coTerminating in FStates);
