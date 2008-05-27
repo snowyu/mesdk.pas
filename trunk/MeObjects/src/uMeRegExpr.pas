@@ -1,5 +1,5 @@
 
-{Summary the RegExpr object .}
+{Summary the MeRegExpr extension object .}
 {
    @author  Riceball LEE(riceballl@hotmail.com)
    @version $Revision: 1.00 $
@@ -51,7 +51,7 @@ uses
 type
 {
 将所有的正则表达式集中在一起
-  Content=/():Count SearchListBegin ():SearchList SearchListEnd ():NextPageURL/:1
+  Content=/():Count: SearchListBegin ():SearchList: SearchListEnd ():NextPageURL:/:1
   SearchListBegin = //
   SearchList = /():Field1 ():Field2/:n
 
@@ -77,6 +77,15 @@ ListBegin=/<tr><th>(.*):Sex</th><th>(.*):Age</th><th>(.*):Name</th></tr>/:1
 List=/<tr><td>(.*):$[ListBegin.Sex]</td><td>(.*):$[ListBegin.Age]</td><td>(.*):$[ListBegin.Name]</td></tr>/:n
 
 /[ListBegin]/ 为子表达式
+
+
+    property MatchStrPos [const aSubExprName : RegExprString] : integer read GetMatchStrPos;
+    property MatchStrLen [const aSubExprName : RegExprString] : integer read GetMatchStrLen;
+    property MatchStr [const aSubExprName : RegExprString] : RegExprString read GetMatchStr;
+    property SubExprMatchCount : integer read GetSubExprMatchCount;
+    property SubExprNames[const index: integer]: RegExprString read GetSubExprName;
+    Function GetSubExprIndexByName(const aSubExprName: RegExprString) : Integer;
+
 }
   PMeCustomSimpleRegExpr = ^ TMeCustomSimpleRegExpr;
   PMeCustomRegExpr = ^ TMeCustomRegExpr;
@@ -157,9 +166,9 @@ List=/<tr><td>(.*):$[ListBegin.Sex]</td><td>(.*):$[ListBegin.Age]</td><td>(.*):$
   end;
 
 const
-   // '\/(.+?):Expression:\/((\:(\d+|n):ExecCount:)|)';
+   // '\/(.+?):Expression:\/(\:(\d+|n):ExecCount:)?';
    {1: Expression; 3: ExecCount}
-  cMeExpressionPattern = '\/(.+?)\/((\:(\d+|n))|)';
+  cMeExpressionPattern = '\/(.+?)\/(\:(\d+|n))?';
   //'\/\[(.+?):SubRegEx:\]\/';
   {1: SubExpressionName}
   cMeSubExpressionNamePattern = '\/\[(.+?)\]\/';
