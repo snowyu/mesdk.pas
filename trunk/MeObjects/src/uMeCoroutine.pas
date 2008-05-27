@@ -736,5 +736,17 @@ begin
 end;
 
 initialization
+{$IFNDEF YieldClass_Supports}
+  SetMeVirtualMethod(TypeOf(TMeCustomCoRoutine), ovtVmtParent, TypeOf(TMeDynamicObject));
+  SetMeVirtualMethod(TypeOf(TMeCoRoutine), ovtVmtParent, TypeOf(TMeCustomCoRoutine));
+  SetMeVirtualMethod(TypeOf(TMeCoRoutineEnumerator), ovtVmtParent, TypeOf(TMeCoRoutine));
+  {$IFDEF MeRTTI_SUPPORT}
+  SetMeVirtualMethod(TypeOf(TMeCustomCoRoutine), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeCoRoutine), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeCoRoutineEnumerator), ovtVmtClassName, nil);
+  {$ENDIF}
+{$ENDIF}
+
   _Init;
+
 end.

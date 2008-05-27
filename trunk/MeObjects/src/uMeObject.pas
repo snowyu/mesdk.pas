@@ -3086,7 +3086,7 @@ end;
 { TMeNamedObjects }
 destructor TMeNamedObjects.Destroy;
 begin
-  FreeMeObjects;
+  Clear;
   inherited;
 end;
 

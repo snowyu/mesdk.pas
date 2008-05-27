@@ -599,4 +599,14 @@ begin
 end;
 
 initialization
+{$IFNDEF YieldClass_Supports}
+  SetMeVirtualMethod(TypeOf(TMeCustomCoRoutine), ovtVmtParent, TypeOf(TMeDynamicObject));
+  SetMeVirtualMethod(TypeOf(TMeCoRoutineEnumerator), ovtVmtParent, TypeOf(TMeCustomCoRoutine));
+  {$IFDEF MeRTTI_SUPPORT}
+  SetMeVirtualMethod(TypeOf(TMeCustomCoRoutine), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeCoRoutineEnumerator), ovtVmtClassName, nil);
+  {$ENDIF}
+
+{$ENDIF}
+
 end.
