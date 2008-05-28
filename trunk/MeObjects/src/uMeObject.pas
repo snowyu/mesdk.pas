@@ -576,6 +576,7 @@ type
     {Summary Converts N to hexadecimal and appends resulting string to the last
        string, very fast. }
     procedure AppendInt2Hex( N: LongWord; MinDigits: Integer );
+    function GetValueByIndex(const Index: Integer): PChar;
   public
     {Summary the Clear method only clear FList.count to zero if true.}
     FastClear: Boolean;
@@ -2655,6 +2656,23 @@ begin
   end
   else
     Result := '';
+end;
+
+function TMeStrings.GetValueByIndex(const Index: Integer): PChar;
+var
+  s, n: PChar;
+begin
+    s := ItemPtrs[ Index ];
+    while (s^ <> '=') and (s^ <> #0) do
+    begin
+      Inc( s );
+    end;
+    if (s^ = '=') then
+    begin
+      Result := s;
+    end
+    else
+      Result := ItemPtrs[ Index ];
 end;
 
 function TMeStrings.GetValue(AName: PChar): PChar;
