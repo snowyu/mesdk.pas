@@ -26,8 +26,8 @@ begin
   New(em, Create(r));
   New(vStrs, Create);
   try try 
-    r.AddExpr('ListBegin', '/<td>(.+?)</td>/', 1);
-    r.Pattern := '/(Good|Better|Bad)[[ListBegin]]/:n';
+    r.AddExpr('ListBegin', '/<td>(.+?):field:</td>/', 1);
+    r.Pattern := '/(Good|Better|Bad):thing:[[ListBegin]]/:n';
     r.InputString := 'this is not a Good <td>New</td>, but it is Better<td>New</td>. it is not Bad<td>New</td>.';
     r.Name := 'root';
     while em.MoveNext() do

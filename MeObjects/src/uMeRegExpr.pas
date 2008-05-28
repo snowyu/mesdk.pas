@@ -30,7 +30,7 @@ unit uMeRegExpr;
 interface
 
 {$I MeSetting.inc}
-{.$DEFINE SubExprName_Support}
+{$DEFINE SubExprName_Support}
 
 uses
 {$IFDEF MSWINDOWS}
@@ -101,6 +101,7 @@ List=/<tr><td>(.*):$[ListBegin.Sex]</td><td>(.*):$[ListBegin.Age]</td><td>(.*):$
     procedure Init; virtual; //override
   public
     destructor Destroy; virtual; //override
+    function GetValueByName(const aName: RegExprString): string;
 
     property Fields: PMeStrings read FFields;
     property RegExpr: PMeCustomSimpleRegExpr read FRegExpr;
@@ -112,8 +113,10 @@ List=/<tr><td>(.*):$[ListBegin.Sex]</td><td>(.*):$[ListBegin.Age]</td><td>(.*):$
   public
     destructor Destroy; virtual;{override}
     procedure Clear;
-    function IndexOf(const aName: RegExprString; const aBeginIndex: Integer = 0): Integer;
-    function Find(const aName: RegExprString): PMeRegExprResultItem;
+    function IndexOfRegEx(const aRegExprName: RegExprString; const aBeginIndex: Integer = 0): Integer;
+    function FindByRegEx(const aRegExprName: RegExprString): PMeRegExprResultItem;
+
+    function ValueOf(const aName: RegExprString): String;
   public
     property Items[Index: Integer]: PMeRegExprResultItem read GetItem; default;
   end;
@@ -145,6 +148,7 @@ List=/<tr><td>(.*):$[ListBegin.Sex]</td><td>(.*):$[ListBegin.Age]</td><td>(.*):$
     //function GetExpression: RegExprString; virtual;
     function GetRoot: PMeCustomRegExpr;
     function GetMatchResult: PMeRegExprResult; overload;
+    function GetName: RegExprString;
     procedure SetPattern(const Value: RegExprString);virtual;
     procedure Init; virtual; //override;
 
@@ -165,7 +169,7 @@ List=/<tr><td>(.*):$[ListBegin.Sex]</td><td>(.*):$[ListBegin.Age]</td><td>(.*):$
     //the default is 1.
     property ExecCount: Integer read FExecCount write FExecCount;
     property InputString: RegExprString read FInputString write FInputString;
-    property Name: RegExprString read FName write FName;
+    property Name: RegExprString read GetName write FName;
     property RegExpr: TRegExpr read FRegExpr;
     property OnFound: TMeRegExprFoundEvent read FOnFound write FOnFound;
   end;
@@ -265,7 +269,7 @@ begin
       {$IFDEF SubExprName_Support}
         s := SubExprNames[i];
         if s <> '' then
-          s := s + '=' + Match[i]
+          s := s + '=' + Match[i];
       {$ELSE}
         s := Match[i];
       {$ENDIF}
@@ -356,6 +360,20 @@ begin
   Result := FRegExpr;
 end;
 }
+
+function TMeCustomSimpleRegExpr.GetName: RegExprString;
+var
+  vP: PMeCustomSimpleRegExpr;
+begin
+  Result := FName;
+  vP := FParent;
+  While (Result = '') and Assigned(vP) do
+  begin
+    Result := vP.FName;
+    if vP = vP.FParent then exit;
+    vP := vP.FParent;
+  end;
+end;
 
 procedure TMeCustomSimpleRegExpr.GetMatchResult(const aResult: PMeStrings);
 var
@@ -611,7 +629,7 @@ function TMeRegExprs.IndexOf(const aName: RegExprString; const aBeginIndex: Inte
 begin
   for Result := aBeginIndex to Count - 1 do
   begin
-    if {$IFDEF UniCode}WideSameText{$ELSE}AnsiSameText{$ENDIF}(aName, Items[Result].Name) then
+    if (aName = Items[Result].Name) then
       exit;
   end;
   Result := -1;
@@ -635,6 +653,19 @@ begin
   Inherited;
 end;
 
+function TMeRegExprResultItem.GetValueByName(const aName: RegExprString): string;
+var
+  i: Integer;
+begin
+  with FFields^ do for i := 0 to Count - 1 do
+  begin
+    if (aName = Names[i]) or (Assigned(RegExpr) and (aName = RegExpr.Name+'.'+Names[i])) then
+    begin
+      Result := GetValueByIndex(i);
+    end;
+  end;
+end;
+
 { TMeRegExprResult }
 destructor TMeRegExprResult.Destroy;
 begin
@@ -653,26 +684,39 @@ begin
   Result := Inherited Get(Index);
 end;
 
-function TMeRegExprResult.Find(const aName: RegExprString): PMeRegExprResultItem;
+function TMeRegExprResult.FindByRegEx(const aRegExprName: RegExprString): PMeRegExprResultItem;
 var
   i: integer;
 begin
-  i := IndexOf(aName);
+  i := IndexOfRegEx(aRegExprName);
   if i >= 0 then
     Result := Items[i]
   else
     Result := nil;
 end;
 
-function TMeRegExprResult.IndexOf(const aName: RegExprString; const aBeginIndex: Integer = 0): Integer;
+function TMeRegExprResult.IndexOfRegEx(const aRegExprName: RegExprString; const aBeginIndex: Integer = 0): Integer;
 begin
   for Result := aBeginIndex to Count - 1 do
   begin
     with Items[Result]^ do 
-      if Assigned(RegExpr) and {$IFDEF UniCode}WideSameText{$ELSE}AnsiSameText{$ENDIF}(aName, RegExpr.Name) then
+      if Assigned(RegExpr) and (aRegExprName = RegExpr.Name) then
         exit;
   end;
   Result := -1;
+end;
+
+function TMeRegExprResult.ValueOf(const aName: RegExprString): String;
+var
+  i: integer;
+begin
+  for i := 0 to Count - 1 do
+  begin
+    with Items[i]^ do 
+      Result := GetValueByName(aName);
+    if Result <> '' then exit;
+  end;
+  Result := '';
 end;
 
 initialization
