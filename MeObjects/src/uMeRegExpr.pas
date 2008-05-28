@@ -119,10 +119,10 @@ List=/<tr><td>(.*):$[ListBegin.Sex]</td><td>(.*):$[ListBegin.Age]</td><td>(.*):$
   end;
 
   TMeRegExprFoundEvent = procedure(const Sender: PMeCustomSimpleRegExpr) of object;
-  TMeCustomSimpleRegExpr = object(TMeNamedObject)
+  TMeCustomSimpleRegExpr = object(TMeDynamicObject)
   protected
     FRegExpr: TRegExpr; //only available on the execution time.
-    //FName: RegExprString;
+    FName: RegExprString;
     //the Regular Expression pattern
     FPattern: RegExprString;
     FExecCount: Integer;
@@ -165,13 +165,14 @@ List=/<tr><td>(.*):$[ListBegin.Sex]</td><td>(.*):$[ListBegin.Age]</td><td>(.*):$
     //the default is 1.
     property ExecCount: Integer read FExecCount write FExecCount;
     property InputString: RegExprString read FInputString write FInputString;
-    //property Name: RegExprString read FName write FName;
+    property Name: RegExprString read FName write FName;
     property RegExpr: TRegExpr read FRegExpr;
     property OnFound: TMeRegExprFoundEvent read FOnFound write FOnFound;
   end;
 
   TMeRegExprs = object(TMeList)
   protected
+    FFreeAll: Boolean;
     function GetItem(Index: Integer): PMeCustomSimpleRegExpr;
   public
     destructor Destroy; virtual;{override}
@@ -188,7 +189,7 @@ List=/<tr><td>(.*):$[ListBegin.Sex]</td><td>(.*):$[ListBegin.Age]</td><td>(.*):$
     //this is Regular Expressions to run
     FSubRegExprs: PMeRegExprs; //of TMeCustomSimpleRegExpr or TMeCustomRegExpr(Ref from FExpressions)
     //this is added Expressions
-    FExpressions: PMeNamedObjects; //of TMeCustomRegExpr
+    FExpressions: PMeRegExprs; //of TMeCustomRegExpr
 
     function CreateSimpleRegExpr: PMeCustomSimpleRegExpr;
     procedure ApplyExpression(const aRegExpr: TRegExpr);virtual; //override
@@ -230,6 +231,7 @@ end;
 destructor TMeCustomSimpleRegExpr.Destroy;
 begin
   FPattern := '';
+  FName := '';
   if Assigned(FMatchResult) then
   begin
     FMatchResult.Free;
@@ -393,6 +395,7 @@ begin
   inherited;
   New(FSubRegExprs, Create);
   New(FExpressions, Create);
+  FExpressions.FFreeAll := True;
 end;
 
 destructor TMeCustomRegExpr.Destroy;
@@ -577,15 +580,18 @@ procedure TMeRegExprs.Clear;
 var
   I: Integer;
 begin
-  for I := Count - 1 downto 0 do
-  begin
-    if Assigned(FItems[I]) then with PMeCustomSimpleRegExpr(FItems[I])^ do
+  if FFreeAll then
+    FreeMeObjects
+  else
+    for I := Count - 1 downto 0 do
     begin
-      if  not Assigned(FOwner) then
-        Free;
+      if Assigned(FItems[I]) then with PMeCustomSimpleRegExpr(FItems[I])^ do
+      begin
+        if  not Assigned(FOwner) then
+          Free;
+      end;
+      FItems[I] := nil;
     end;
-    FItems[I] := nil;
-  end;
 
   inherited Clear;
 end;
