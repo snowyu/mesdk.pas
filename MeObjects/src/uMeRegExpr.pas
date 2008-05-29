@@ -98,10 +98,17 @@ Defines:
   SubExpression: [[SearchListBegin]]
   SubField: $[SubField]
 
+How to use the MatchResult?
+treat the RegExprResultItem as the record item.
+  the record item includes the fields and values.
+    the fields collects only the sub-expressions in the RegExpr.Match[1]...Match[SubExprMatchCount].
+    if the SubExprName_Support enabled, it will be format: "SubExprName=MatchValue" in the Strings.
 }
   PMeAbstractRegExpr = ^ TMeAbstractRegExpr;
   PMeCustomSimpleRegExpr = ^ TMeCustomSimpleRegExpr;
+  PMeSimpleRegExpr = ^ TMeSimpleRegExpr;
   PMeCustomRegExpr = ^ TMeCustomRegExpr;
+  PMeRegExpr = ^ TMeRegExpr;
   PMeRegExprs = ^ TMeRegExprs;
   PMeRegExprResultItem = ^ TMeRegExprResultItem;
   PMeRegExprResult = ^ TMeRegExprResult;
@@ -203,6 +210,11 @@ Defines:
 
   end;
 
+  TMeSimpleRegExpr = object(TMeCustomSimpleRegExpr)
+  public
+    property MatchResult;
+  end;
+
   TMeRegExprs = object(TMeList)
   protected
     FFreeAll: Boolean;
@@ -240,6 +252,8 @@ Defines:
     property SubRegExprs: PMeRegExprs read FSubRegExprs;
     property MatchResult;
   end;
+
+  TMeRegExpr = TMeCustomRegExpr;
 
 const
    // '\/(.*):Expression:\/(\:(\d+|n):ExecCount:)?';
