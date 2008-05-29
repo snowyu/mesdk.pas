@@ -39,6 +39,9 @@ interface
 
 {$I MeSetting.inc}
 
+{$IFNDEF SUPPORTS_FOR_IN}
+  {$Message warn 'Your Compiler does not support the For...In Statement!'}
+{$ENDIF}
 
 uses
   {$IFDEF MSWINDOWS}

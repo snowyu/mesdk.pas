@@ -20,6 +20,9 @@
 {$DEFINE THREADSAFE_SUPPORT}
 {$DEFINE NamedThread}
 
+//-----------------MeRegExpr Compiler Options
+{.$DEFINE SubExprName_Support}
+
 {Include Common setting File}
 {$I Setting.inc}
 
