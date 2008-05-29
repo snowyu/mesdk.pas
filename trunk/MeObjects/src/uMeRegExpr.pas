@@ -30,7 +30,7 @@ unit uMeRegExpr;
 interface
 
 {$I MeSetting.inc}
-{$DEFINE SubExprName_Support}
+{.$DEFINE SubExprName_Support}
 
 uses
 {$IFDEF MSWINDOWS}
@@ -52,9 +52,11 @@ uses
 type
 {
 将所有的正则表达式集中在一起
-  Content=/():Count: SearchListBegin ():SearchList: SearchListEnd ():NextPageURL:/:1
-  SearchListBegin = //
-  SearchList = /():Field1 ():Field2/:n
+  Content=/():Count: [[SearchListBegin]] [[SearchList]] [[SearchListEnd]] ():NextPageURL:/:1
+    SearchListBegin = //
+    SearchList = /():Field1: ():Field2:/:n
+
+SearchListBegin, SearchList 为子表达式，当前禁止在子表达式中嵌套子表达式！
 
 冒号后面的数字表示执行匹配搜索的次数，如果是n表示一直搜索直到没有匹配的内容。
 如果省略最后的冒号和数字，表示此表达式只搜索1次。
@@ -73,11 +75,13 @@ type
 <tr><td>Female</td><td>20</td><td>Jacky</td></tr>
 </table>
 
-Content=//[ListBegin]/ Good /[List]//
-ListBegin=/<tr><th>(.*):Sex</th><th>(.*):Age</th><th>(.*):Name</th></tr>/:1
-List=/<tr><td>(.*):$[ListBegin.Sex]</td><td>(.*):$[ListBegin.Age]</td><td>(.*):$[ListBegin.Name]</td></tr>/:n
+Content=/[[ListTitle]] [[ListDetail]]/
+ListTitle=/<tr><th>(.*):Sex</th><th>(.*):Age</th><th>(.*):Name</th></tr>/:1
+ListDetail=/<tr><td>(.*):$[ListBegin.Sex]:</td><td>(.*):$[ListBegin.Age]:</td><td>(.*):$[ListBegin.Name]:</td></tr>/:n
 
-/[ListBegin]/ 为子表达式
+if not found "$[ListBegin.Sex]" then use ListBegin.Sex as FiledName.
+
+[[ListBegin]] 为子表达式
 
 
     property MatchStrPos [const aSubExprName : RegExprString] : integer read GetMatchStrPos;
@@ -87,24 +91,35 @@ List=/<tr><td>(.*):$[ListBegin.Sex]</td><td>(.*):$[ListBegin.Age]</td><td>(.*):$
     property SubExprNames[const index: integer]: RegExprString read GetSubExprName;
     Function GetSubExprIndexByName(const aSubExprName: RegExprString) : Integer;
 
+
+
+
+Defines:
+  SubExpression: [[SearchListBegin]]
+  SubField: $[SubField]
+
 }
+  PMeAbstractRegExpr = ^ TMeAbstractRegExpr;
   PMeCustomSimpleRegExpr = ^ TMeCustomSimpleRegExpr;
   PMeCustomRegExpr = ^ TMeCustomRegExpr;
   PMeRegExprs = ^ TMeRegExprs;
   PMeRegExprResultItem = ^ TMeRegExprResultItem;
   PMeRegExprResult = ^ TMeRegExprResult;
 
+  TMeRegExprFoundEvent = procedure(const Sender: PMeCustomSimpleRegExpr) of object;
+
   TMeRegExprResultItem = object(TMeDynamicObject)
   protected
-    FRegExpr: PMeCustomSimpleRegExpr;
+    FRegExpr: PMeAbstractRegExpr;
     FFields: PMeStrings;
     procedure Init; virtual; //override
   public
     destructor Destroy; virtual; //override
+    //the aName is FieldName or RegExpr.Name + '.' + FieldName.
     function GetValueByName(const aName: RegExprString): string;
 
     property Fields: PMeStrings read FFields;
-    property RegExpr: PMeCustomSimpleRegExpr read FRegExpr;
+    property RegExpr: PMeAbstractRegExpr read FRegExpr;
   end;
 
   TMeRegExprResult = object(TMeList)
@@ -121,18 +136,16 @@ List=/<tr><td>(.*):$[ListBegin.Sex]</td><td>(.*):$[ListBegin.Age]</td><td>(.*):$
     property Items[Index: Integer]: PMeRegExprResultItem read GetItem; default;
   end;
 
-  TMeRegExprFoundEvent = procedure(const Sender: PMeCustomSimpleRegExpr) of object;
-  TMeCustomSimpleRegExpr = object(TMeDynamicObject)
+  TMeAbstractRegExpr = object(TMeDynamicObject)
   protected
-    FRegExpr: TRegExpr; //only available on the execution time.
-    FName: RegExprString;
-    //the Regular Expression pattern
-    FPattern: RegExprString;
-    FExecCount: Integer;
     FOwner: PMeCustomRegExpr;
     FParent: PMeCustomRegExpr;
+    FRegExpr: TRegExpr; //only available on the execution time.
     FRoot: PMeCustomRegExpr;
+
+    FExecCount: Integer;
     FInputString: RegExprString;
+    FName: RegExprString;
     {
       TMeRegExprResultItem = TMeStrings;
         SubExprName=Value
@@ -141,19 +154,18 @@ List=/<tr><td>(.*):$[ListBegin.Sex]</td><td>(.*):$[ListBegin.Age]</td><td>(.*):$
       TMeRegExprResult = TMeList of PMeStrings
     }
     FMatchResult: PMeRegExprResult; //of PMeStrings
+    //the Regular Expression pattern
+    FPattern: RegExprString;
     FOnFound: TMeRegExprFoundEvent;
 
-    procedure DoFound(const Sender: PMeCustomSimpleRegExpr);
-    //function GetRegExpr: TRegExpr;
-    //function GetExpression: RegExprString; virtual;
     function GetRoot: PMeCustomRegExpr;
-    function GetMatchResult: PMeRegExprResult; overload;
     function GetName: RegExprString;
-    procedure SetPattern(const Value: RegExprString);virtual;
-    procedure Init; virtual; //override;
+    function GetMatchResult: PMeRegExprResult; overload;
 
-    function iExecute(const aRegExpr: TRegExpr; var aPos: Integer): Boolean; virtual;
-    procedure ApplyExpression(const aRegExpr: TRegExpr);virtual;
+    procedure Init; virtual; //override;
+    procedure SetPattern(const Value: RegExprString);virtual;
+    function iExecute(const aRegExpr: TRegExpr; var aPos: Integer): Boolean; virtual;abstract;
+    procedure ApplyExpression(const aRegExpr: TRegExpr);virtual;abstract;
 
     property MatchResult: PMeRegExprResult read GetMatchResult;
     property Root: PMeCustomRegExpr read GetRoot;
@@ -163,32 +175,49 @@ List=/<tr><td>(.*):$[ListBegin.Sex]</td><td>(.*):$[ListBegin.Age]</td><td>(.*):$
     function Execute(): Boolean;overload;
     procedure GetMatchResult(const aResult: PMeStrings);overload; virtual;
 
-    property Pattern: RegExprString read FPattern write SetPattern;
-    //property RegExpr: TRegExpr read GetRegExpr;
     //the exec count for the expression, -1 means for ever until end.
     //the default is 1.
     property ExecCount: Integer read FExecCount write FExecCount;
     property InputString: RegExprString read FInputString write FInputString;
     property Name: RegExprString read GetName write FName;
+    property Pattern: RegExprString read FPattern write SetPattern;
     property RegExpr: TRegExpr read FRegExpr;
     property OnFound: TMeRegExprFoundEvent read FOnFound write FOnFound;
+  end;
+
+  TMeCustomSimpleRegExpr = object(TMeAbstractRegExpr)
+  protected
+    procedure DoResultFound(const Sender: PMeCustomSimpleRegExpr);
+    function DoReplacePatternFunc(aRegExpr : TRegExpr): string;
+    //function GetRegExpr: TRegExpr;
+    //function GetExpression: RegExprString; virtual;
+    function GetAdjustedPattern: RegExprString;
+    //procedure Init; virtual; //override;
+
+    function iExecute(const aRegExpr: TRegExpr; var aPos: Integer): Boolean; virtual; //override
+    procedure ApplyExpression(const aRegExpr: TRegExpr);virtual; //override
+
+  public
+    //destructor Destroy; virtual; //override;
+    //procedure GetMatchResult(const aResult: PMeStrings);overload; virtual; //override
+
   end;
 
   TMeRegExprs = object(TMeList)
   protected
     FFreeAll: Boolean;
-    function GetItem(Index: Integer): PMeCustomSimpleRegExpr;
+    function GetItem(Index: Integer): PMeAbstractRegExpr;
   public
     destructor Destroy; virtual;{override}
     procedure Clear;
     //procedure Assign(const aObjs: PMeNamedObjects);
     function IndexOf(const aName: RegExprString; const aBeginIndex: Integer = 0): Integer;
-    function Find(const aName: RegExprString): PMeCustomSimpleRegExpr;
+    function Find(const aName: RegExprString): PMeAbstractRegExpr;
   public
-    property Items[Index: Integer]: PMeCustomSimpleRegExpr read GetItem; default;
+    property Items[Index: Integer]: PMeAbstractRegExpr read GetItem; default;
   end;
 
-  TMeCustomRegExpr = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeCustomSimpleRegExpr)
+  TMeCustomRegExpr = object(TMeAbstractRegExpr)
   protected
     //this is Regular Expressions to run
     FSubRegExprs: PMeRegExprs; //of TMeCustomSimpleRegExpr or TMeCustomRegExpr(Ref from FExpressions)
@@ -216,23 +245,31 @@ const
    // '\/(.*):Expression:\/(\:(\d+|n):ExecCount:)?';
    {1: Expression; 3: ExecCount}
   cMeExpressionPattern = '\/(.*)\/(\:(\d+|n))?';
-  //'\[\[(.+?):SubRegEx:\]\]';
-  {1: SubExpressionName}
-  cMeSubExpressionNamePattern = '\[\[(.+?)\]\]';
+  //'\[\[(.+?):SubRegEx:\]\]';  ".+? " means non-greedy
+  {1: SubExpressionName} 
+  cMeSubExpressionNamePattern = '\[\[(\S+)\]\]';
+  cMeFieldNamePattern = '\$\[(\S+)\]';
 
 implementation
 
 uses 
   RTLConsts, SysConst;
 
-{ TMeCustomSimpleRegExpr }
-procedure TMeCustomSimpleRegExpr.Init;
+const
+  cRegExprFound = 0;
+  cRegExprNotFound = 1;
+  cRegExprItemNotFound = 2;
+  cRegExprCountError = 3;
+  cRegExprOver = 4;
+
+{ TMeAbstractRegExpr }
+procedure TMeAbstractRegExpr.Init;
 begin
   inherited;
   FExecCount := 1;
 end;
 
-destructor TMeCustomSimpleRegExpr.Destroy;
+destructor TMeAbstractRegExpr.Destroy;
 begin
   FPattern := '';
   FName := '';
@@ -240,20 +277,115 @@ begin
   begin
     FMatchResult.Free;
   end;
-  //FreeAndNil(FRegExpr);
   inherited;
 end;
 
-procedure TMeCustomSimpleRegExpr.ApplyExpression(const aRegExpr: TRegExpr);
+procedure TMeAbstractRegExpr.SetPattern(const Value: RegExprString);
+begin  
+  if FPattern <> Value then
+    FPattern := Value;
+end;
+
+function TMeAbstractRegExpr.Execute(): Boolean;
 begin
-  with aRegExpr do
-  begin
-    Expression := FPattern;
-    Compile;
+  Result := Execute(FInputString);
+end;
+
+function TMeAbstractRegExpr.Execute(const aInputString : RegExprString; const aPos: Integer): Boolean;
+var
+  vPos: Integer;
+begin
+  FRegExpr := TRegExpr.Create;
+  try
+    with MatchResult^ do
+    begin
+      FreeMeObjects;
+      Clear;
+    end;
+    ApplyExpression(FRegExpr);
+    FRegExpr.InputString := aInputString;
+    vPos := aPos;
+    Result := iExecute(FRegExpr, vPos);
+  finally
+    FRegExpr.Free;
+    FRegExpr := nil;
   end;
 end;
 
-procedure TMeCustomSimpleRegExpr.DoFound(const Sender: PMeCustomSimpleRegExpr);
+function TMeAbstractRegExpr.GetMatchResult: PMeRegExprResult;
+begin
+  if Assigned(FRoot) then
+    Result := FRoot.MatchResult
+  else 
+  begin
+    if not Assigned(FMatchResult) then
+      New(FMatchResult, Create);
+    Result := FMatchResult;
+  end;
+end;
+
+procedure TMeAbstractRegExpr.GetMatchResult(const aResult: PMeStrings);
+var
+  i: Integer;
+begin
+  if Assigned(aResult) and Assigned(FMatchResult) then
+  begin
+    with FMatchResult^ do for i := 0 to Count - 1 do
+    aResult.AddStrings(PMeStrings(Items[i].FFields));
+  end;
+end;
+
+function TMeAbstractRegExpr.GetName: RegExprString;
+var
+  vP: PMeAbstractRegExpr;
+begin
+  Result := FName;
+  vP := FParent;
+  While (Result = '') and Assigned(vP) do
+  begin
+    Result := vP.FName;
+    if vP = vP.FParent then exit;
+    vP := vP.FParent;
+  end;
+end;
+
+function TMeAbstractRegExpr.GetRoot: PMeCustomRegExpr;
+begin
+  if Assigned(FRoot) then
+    Result := FRoot
+  else
+    Result := @Self;
+end;
+
+{ TMeCustomSimpleRegExpr }
+{
+procedure TMeCustomSimpleRegExpr.Init;
+begin
+  inherited;
+end;
+
+
+destructor TMeCustomSimpleRegExpr.Destroy;
+begin
+  inherited;
+end;
+//}
+
+procedure TMeCustomSimpleRegExpr.ApplyExpression(const aRegExpr: TRegExpr);
+var
+  vLastError: Integer;
+begin
+  with aRegExpr do
+  begin
+    Expression := GetAdjustedPattern;
+    Compile;
+    vLastError := LastError;
+    if vLastError <> 0 then
+      Error(vLastError);
+  end;
+end;
+
+procedure TMeCustomSimpleRegExpr.DoResultFound(const Sender: PMeCustomSimpleRegExpr);
 var
   vItem: PMeRegExprResultItem;
   i: Integer;
@@ -278,14 +410,14 @@ begin
       end; //for
     finally
       if vItem.FFields.Count > 0 then
-        if Assigned(FRoot) then
-          FRoot.MatchResult.Add(vItem)
-        else
-          MatchResult.Add(vItem)
+      begin
+        vItem.FRegExpr := @Self;
+        MatchResult.Add(vItem);
+      end
       else
         vItem.Free;
     end; //try-finally
-    //Writeln('DoFound:', FRoot.Name);
+    //Writeln('DoResultFound:', FRoot.Name);
     
     //MatchResult.Add(vStrs);
     if Assigned(FOnFound) then
@@ -295,29 +427,25 @@ begin
   end;
 end;
 
-function TMeCustomSimpleRegExpr.Execute(): Boolean;
+function TMeCustomSimpleRegExpr.DoReplacePatternFunc(aRegExpr : TRegExpr): string;
 begin
-  Result := Execute(FInputString);
+  with aRegExpr do
+  begin
+    Result := MatchResult.ValueOf(Match[1]);
+    if Result = '' then
+      Result := Match[1];
+  end;
 end;
 
-function TMeCustomSimpleRegExpr.Execute(const aInputString : RegExprString; const aPos: Integer): Boolean;
-var
-  vPos: Integer;
+function TMeCustomSimpleRegExpr.GetAdjustedPattern: RegExprString;
 begin
-  FRegExpr := TRegExpr.Create;
+  Result := FPattern;
+  with TRegExpr.Create do
   try
-    with MatchResult^ do
-    begin
-      FreeMeObjects;
-      Clear;
-    end;
-    ApplyExpression(FRegExpr);
-    FRegExpr.InputString := aInputString;
-    vPos := aPos;
-    Result := iExecute(FRegExpr, vPos);
+    Expression := cMeFieldNamePattern;
+    Result := ReplaceEx(Result, DoReplacePatternFunc);
   finally
-    FRegExpr.Free;
-    FRegExpr := nil;
+    Free;
   end;
 end;
 
@@ -332,14 +460,15 @@ begin
     begin
       //Yield(FRegExpr);
       //FParent.Yield;
-      DoFound(@Self);
+      DoResultFound(@Self);
       vExecCount := FExecCount - 1;
       aPos := MatchPos[0] + MatchLen[0];
-      while ((vExecCount > 0) or (FExecCount < 0)) and ExecNext do
+      while ((vExecCount > 0) or (FExecCount < 0)) and Result do
       begin
+        Result := ExecNext;
         //Yield(FRegExpr);
         //FParent.Yield;
-        DoFound(@Self);
+        DoResultFound(@Self);
         Dec(vExecCount);
         aPos := MatchPos[0] + MatchLen[0];
       end;
@@ -347,7 +476,7 @@ begin
       if not Result then
       begin
         Raise EMeError.Create('TMeCustomSimpleRegExpr.iExecute: the ExecCount is not enough left:' + IntToStr(vExecCount));
-      end;
+      end
     end;
   end;
 end;
@@ -360,52 +489,6 @@ begin
   Result := FRegExpr;
 end;
 }
-
-function TMeCustomSimpleRegExpr.GetName: RegExprString;
-var
-  vP: PMeCustomSimpleRegExpr;
-begin
-  Result := FName;
-  vP := FParent;
-  While (Result = '') and Assigned(vP) do
-  begin
-    Result := vP.FName;
-    if vP = vP.FParent then exit;
-    vP := vP.FParent;
-  end;
-end;
-
-procedure TMeCustomSimpleRegExpr.GetMatchResult(const aResult: PMeStrings);
-var
-  i: Integer;
-begin
-  if Assigned(aResult) and Assigned(FMatchResult) then
-  begin
-    with FMatchResult^ do for i := 0 to Count - 1 do
-    aResult.AddStrings(PMeStrings(Items[i].FFields));
-  end;
-end;
-
-function TMeCustomSimpleRegExpr.GetMatchResult: PMeRegExprResult;
-begin
-  if not Assigned(FMatchResult) then
-    New(FMatchResult, Create);
-  Result := FMatchResult;
-end;
-
-function TMeCustomSimpleRegExpr.GetRoot: PMeCustomRegExpr;
-begin
-  if Assigned(FRoot) then
-    Result := FRoot
-  else
-    Result := @Self;
-end;
-
-procedure TMeCustomSimpleRegExpr.SetPattern(const Value: RegExprString);
-begin  
-  if FPattern <> Value then
-    FPattern := Value;
-end;
 
 { TMeCustomRegExpr }
 procedure TMeCustomRegExpr.Init;
@@ -425,19 +508,42 @@ end;
 
 function TMeCustomRegExpr.AddExpr(const aName: RegExprString; const aExpression: RegExprString; const aExecCount: Integer = -2): Integer;
 var
-  vExpr: PMeCustomRegExpr;
+  vExpr: PMeAbstractRegExpr;
+  vIsSimple: Boolean;
+  s: string;
 begin
   Result := FExpressions.IndexOf(aName);
   if Result < 0 then
   begin
-    New(vExpr, Create);
+    vIsSimple := True;
+    s := aExpression;
+    with TRegExpr.Create do
+    try
+      Expression := cMeExpressionPattern;
+      if Exec(s) then 
+      begin
+        s := Match[1];
+        Expression := cMeSubExpressionNamePattern;
+        if Exec(s) then //only SubExpression exists
+        begin
+          vIsSimple := False;
+          s := aExpression;
+        end;
+      end;
+    finally
+      Free;
+    end;
+    if vIsSimple then
+      vExpr := New(PMeCustomSimpleRegExpr, Create)
+    else
+      vExpr := New(PMeCustomRegExpr, Create);
     with vExpr^ do
     begin
       FOwner  := @Self;
       FParent := @Self;
       FRoot   := Self.Root;
       Name := aName;
-      Pattern := aExpression;
+      Pattern := s;
       if aExecCount <> -2 then
         FExecCount := aExecCount;
     end;
@@ -477,6 +583,7 @@ end;
 function TMeCustomRegExpr.iExecuteList(const aRegExpr: TRegExpr; var aPos: Integer): Boolean;
 var
   i: Integer;
+  vPrevPos: Integer;
 begin
   Result := False;
   for i := 0 to FSubRegExprs.Count - 1 do with FSubRegExprs.Items[i]^ do
@@ -484,6 +591,7 @@ begin
     //Writeln('run ', FName, ' ', FPattern);
     FRegExpr := aRegExpr;
     ApplyExpression(aRegExpr);
+    vPrevPos := aPos;
     Result := iExecute(aRegExpr, aPos);
     FRegExpr := nil;
     if not Result then
@@ -491,27 +599,39 @@ begin
       //Raise EMeError.Create('TMeCustomRegExpr.Exec: the SubExpr['+Name+'] is not match:'+Pattern);
       Exit;
     end;
+    {
+    Result := Result and (vPrevPos = aRegExpr.MatchPos[0]);
+    if not Result then
+    begin
+      //Raise EMeError.Create('TMeCustomRegExpr.Exec: the SubExpr can not link to anthoer pattern!!');
+      Exit;
+    end; //}
   end;
 end;
 
 function TMeCustomRegExpr.iExecute(const aRegExpr: TRegExpr; var aPos: Integer): Boolean;
 var
   vExecCount: Integer;
+  vPrevPos: Integer;
 begin
   Result := FSubRegExprs.Count > 0;
   if Result then
   begin
+    vPrevPos := aPos;
     Result := iExecuteList(aRegExpr, aPos);
-    if Result then
+    vExecCount := FExecCount - 1;
+    if (vExecCount > 0) or (FExecCount < 0) then
     begin
-      vExecCount := FExecCount - 1;
-      while ((vExecCount > 0) or (FExecCount < 0)) and iExecuteList(aRegExpr, aPos) do
+      while ((vExecCount > 0) or (FExecCount < 0)) and (vPrevPos <> aPos) do
       begin
+        vPrevPos := aPos;
+        Result := iExecuteList(aRegExpr, aPos);
+        //writeln('iExecuteList=', Result);
         //Yield(FRegExpr);
         Dec(vExecCount);
         //aPos := MatchPos[0] + MatchLen[0];
       end;
-      Result := vExecCount <= 0;
+      Result := (vExecCount <= 0);
       if not Result then
       begin
         Raise EMeError.Create('TMeCustomRegExpr.iExecute['+Name+']: the ExecCount is not enough left:' + IntToStr(vExecCount));
@@ -603,7 +723,7 @@ begin
   else
     for I := Count - 1 downto 0 do
     begin
-      if Assigned(FItems[I]) then with PMeCustomSimpleRegExpr(FItems[I])^ do
+      if Assigned(FItems[I]) then with PMeAbstractRegExpr(FItems[I])^ do
       begin
         if  not Assigned(FOwner) then
           Free;
@@ -614,7 +734,7 @@ begin
   inherited Clear;
 end;
 
-function TMeRegExprs.Find(const aName: RegExprString): PMeCustomSimpleRegExpr;
+function TMeRegExprs.Find(const aName: RegExprString): PMeAbstractRegExpr;
 var
   i: integer;
 begin
@@ -635,7 +755,7 @@ begin
   Result := -1;
 end;
 
-function TMeRegExprs.GetItem(Index: Integer): PMeCustomSimpleRegExpr;
+function TMeRegExprs.GetItem(Index: Integer): PMeAbstractRegExpr;
 begin
   Result := Inherited Get(Index);
 end;
@@ -662,8 +782,10 @@ begin
     if (aName = Names[i]) or (Assigned(RegExpr) and (aName = RegExpr.Name+'.'+Names[i])) then
     begin
       Result := GetValueByIndex(i);
+      Exit;
     end;
   end;
+  Result := ''; 
 end;
 
 { TMeRegExprResult }
@@ -720,14 +842,20 @@ begin
 end;
 
 initialization
-  SetMeVirtualMethod(TypeOf(TMeCustomSimpleRegExpr), ovtVmtParent, TypeOf(TMeDynamicObject));
-  SetMeVirtualMethod(TypeOf(TMeCustomRegExpr), ovtVmtParent, TypeOf(TMeCustomSimpleRegExpr));
-  SetMeVirtualMethod(TypeOf(TMeRegExprs), ovtVmtParent, TypeOf(TMeNamedObjects));
+  SetMeVirtualMethod(TypeOf(TMeAbstractRegExpr), ovtVmtParent, TypeOf(TMeDynamicObject));
+  SetMeVirtualMethod(TypeOf(TMeCustomSimpleRegExpr), ovtVmtParent, TypeOf(TMeAbstractRegExpr));
+  SetMeVirtualMethod(TypeOf(TMeCustomRegExpr), ovtVmtParent, TypeOf(TMeAbstractRegExpr));
+  SetMeVirtualMethod(TypeOf(TMeRegExprs), ovtVmtParent, TypeOf(TMeList));
+  SetMeVirtualMethod(TypeOf(TMeRegExprResultItem), ovtVmtParent, TypeOf(TMeDynamicObject));
+  SetMeVirtualMethod(TypeOf(TMeRegExprResult), ovtVmtParent, TypeOf(TMeList));
 
   {$IFDEF MeRTTI_SUPPORT}
+  SetMeVirtualMethod(TypeOf(TMeAbstractRegExpr), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeCustomSimpleRegExpr), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeCustomRegExpr), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeRegExprs), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeRegExprResultItem), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeRegExprResult), ovtVmtClassName, nil);
   {$ENDIF}
 end.
 

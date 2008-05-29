@@ -85,8 +85,10 @@ type
     procedure TestEmptyList;
     procedure TestClear;
     procedure TestAdd;
+    procedure TestAddNamedPair;
   published
     procedure Test_Add;
+    procedure Test_ValueNamePair;
     procedure Test_InheritsFrom;override;
   end;
 
@@ -114,6 +116,7 @@ var
   aPtrList: array [0..cTestSize - 1] of Pointer;
   aRandomIntList: array [0..cTestSize - 1] of Integer;
   aStrList: array [0..cTestSize - 1] of string;
+  aNamedStrList: array [0..cTestSize - 1] of string;
   aRandomStrList: array [0..cTestSize - 1] of string;
 
 implementation
@@ -404,6 +407,34 @@ begin
   TestEmptyList;
 end;
 
+procedure TTest_MeStrings.TestAddNamedPair;
+var 
+  i: Integer;
+  j,k: Integer;
+begin
+  with PMeStrings(FMeObject)^ do
+  begin
+    k := Count;
+    for i := Low(aNamedStrList) to High(aNamedStrList) do
+    begin
+      j := Add(aNamedStrList[i]);
+      CheckEquals(k, j, 'the Added MeStrings.index is error.');
+      Objects[i] := i;
+      Inc(k);
+    end;
+    CheckEquals(k, Count, 'the Added MeStrings.Count is error.');
+    k := k - (High(aNamedStrList) - Low(aNamedStrList) + 1);
+    for i := Low(aNamedStrList) to High(aNamedStrList) do
+    begin
+      CheckEquals(aNamedStrList[i], Items[k+i], 'the MeStrings['+IntToStr(k+i)+'].value is error.');
+      CheckEquals(i, Objects[k+i], 'the MeStrings.Objects['+IntToStr(k+i)+'].value is error.');
+      CheckEquals(StrToInt(GetValueByIndex(k+i)), Objects[k+i], 'the MeStrings.Objects['+IntToStr(k+i)+'].GetValueByIndex() is error.');
+      CheckEquals(aStrList[i], Names[k+i], 'the MeStrings['+IntToStr(k+i)+'].Names[] is error.');
+      CheckEquals(StrToInt(Values[PChar(Names[k+i])]), Objects[k+i], 'the MeStrings.Objects['+IntToStr(k+i)+'].Values[] is error.');
+    end;
+  end;
+end;
+
 procedure TTest_MeStrings.TestAdd;
 var 
   i: Integer;
@@ -440,6 +471,12 @@ procedure TTest_MeStrings.Test_InheritsFrom;
 begin
   Inherited;
   CheckEquals(True, FMeObject.InheritsFrom(TypeOf(TMeContainer)), 'the object should Inherit From TMeContainer.');
+end;
+
+procedure TTest_MeStrings.Test_ValueNamePair;
+begin
+  TestClear;
+  TestAddNamedPair;
 end;
 
 { TTest_MeDynamicMemory }
@@ -701,6 +738,7 @@ begin
     aDoubleList[i] := i;
     aPtrList[i] := Pointer(i);
     aStrList[i] := 'Item '+ Format('%4d', [i]);
+    aNamedStrList[i] :=aStrList[i] + '=' + IntToStr(i);
     aRandomStrList[i] := aStrList[i];
   end;
 

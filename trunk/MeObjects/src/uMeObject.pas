@@ -2660,7 +2660,7 @@ end;
 
 function TMeStrings.GetValueByIndex(const Index: Integer): PChar;
 var
-  s, n: PChar;
+  s: PChar;
 begin
     s := ItemPtrs[ Index ];
     while (s^ <> '=') and (s^ <> #0) do
@@ -2670,6 +2670,7 @@ begin
     if (s^ = '=') then
     begin
       Result := s;
+      Inc( Result );
     end
     else
       Result := ItemPtrs[ Index ];
