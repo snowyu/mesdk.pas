@@ -65,7 +65,7 @@ SearchListBegin, SearchList 为子表达式，当前禁止在子表达式中嵌套子表达式！
 等号分隔匹配定义名称以及匹配内容: Name=Content[:n]
 如果Content为引号内容，表示为简单字符串匹配（支持*号和?号通配符号，转义符号为\）： Name='my*.*':1
 如果Content为"/"斜杠扩起的，则表示为正则匹配，可以定义子字段
-如： Name =/hello(.*):myfield/:n
+如： Name =/hello(.*):myfield:/:n
 
 
 举一个复杂的例子：
