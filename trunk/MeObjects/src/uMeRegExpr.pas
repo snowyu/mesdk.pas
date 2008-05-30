@@ -97,6 +97,8 @@ if not found "$[ListBegin.Sex]" then use ListBegin.Sex as FiledName.
 Defines:
   SubExpression: [[SearchListBegin]]
   SubField: $[SubField]
+  Macro(inline): $[:Macro:]
+    the macro is pure Regular expression!
 
 How to use the MatchResult?
 treat the RegExprResultItem as the record item.
@@ -149,6 +151,7 @@ treat the RegExprResultItem as the record item.
     FParent: PMeCustomRegExpr;
     FRegExpr: TRegExpr; //only available on the execution time.
     FRoot: PMeCustomRegExpr;
+    FMacros: PMeStrings;
 
     FExecCount: Integer;
     FInputString: RegExprString;
@@ -167,6 +170,7 @@ treat the RegExprResultItem as the record item.
 
     function GetRoot: PMeCustomRegExpr;
     function GetName: RegExprString;
+    function GetMacros: PMeStrings;
     function GetMatchResult: PMeRegExprResult; overload;
 
     procedure Init; virtual; //override;
@@ -174,6 +178,7 @@ treat the RegExprResultItem as the record item.
     function iExecute(const aRegExpr: TRegExpr; var aPos: Integer): Boolean; virtual;abstract;
     procedure ApplyExpression(const aRegExpr: TRegExpr);virtual;abstract;
 
+    property Macros: PMeStrings read GetMacros;
     property MatchResult: PMeRegExprResult read GetMatchResult;
     property Root: PMeCustomRegExpr read GetRoot;
   public
@@ -181,6 +186,7 @@ treat the RegExprResultItem as the record item.
     function Execute(const aInputString: RegExprString; const aPos: Integer = 1): Boolean;overload;
     function Execute(): Boolean;overload;
     procedure GetMatchResult(const aResult: PMeStrings);overload; virtual;
+    function AddMacro(const aName: RegExprString; const aExpression: RegExprString): Integer;
 
     //the exec count for the expression, -1 means for ever until end.
     //the default is 1.
@@ -212,6 +218,7 @@ treat the RegExprResultItem as the record item.
 
   TMeSimpleRegExpr = object(TMeCustomSimpleRegExpr)
   public
+    property Macros;
     property MatchResult;
   end;
 
@@ -247,13 +254,26 @@ treat the RegExprResultItem as the record item.
     destructor Destroy; virtual; //override;
     //Add a New varaible Expression define into Exprssions List
     function AddExpr(const aName: RegExprString; const aExpression: RegExprString; const aExecCount: Integer = -2): Integer;
-    //procedure GetMatchResult(const aResult: PMeStrings);overload; virtual; //override
+    { the Strs Fmt: 
+        the first Line is always the main pattern.
+        the fllowing non-empty lines are the SubExpressions.
+        eg,
+        /[[Before]][[List]][[After]]/
+        Before=/..../
+        List=/.../
+        After=/.../
+    }
+    procedure LoadPatternFromStrs(const aStrs: PMeStrings);
+    procedure SavePatternToStrs(const aStrs: PMeStrings);
 
     property SubRegExprs: PMeRegExprs read FSubRegExprs;
+    property Macros;
     property MatchResult;
   end;
 
-  TMeRegExpr = TMeCustomRegExpr;
+  TMeRegExpr = object(TMeCustomRegExpr)
+  public
+  end;
 
 const
    // '\/(.*):Expression:\/(\:(\d+|n):ExecCount:)?';
@@ -291,13 +311,22 @@ begin
   begin
     FMatchResult.Free;
   end;
+  MeFreeAndNil(FMacros);
   inherited;
 end;
 
-procedure TMeAbstractRegExpr.SetPattern(const Value: RegExprString);
-begin  
-  if FPattern <> Value then
-    FPattern := Value;
+function TMeAbstractRegExpr.AddMacro(const aName: RegExprString; const aExpression: RegExprString): Integer;
+begin
+  with Macros^ do
+  begin
+    Result := IndexOfName(PChar(aName));
+    if Result < 0 then
+    begin
+      Result := Add(aName+'='+aExpression);
+    end
+    else
+      Result := -1;
+  end;
 end;
 
 function TMeAbstractRegExpr.Execute(): Boolean;
@@ -323,6 +352,18 @@ begin
   finally
     FRegExpr.Free;
     FRegExpr := nil;
+  end;
+end;
+
+function TMeAbstractRegExpr.GetMacros: PMeStrings;
+begin
+  if Assigned(FRoot) then
+    Result := FRoot.Macros
+  else 
+  begin
+    if not Assigned(FMacros) then
+      New(FMacros, Create);
+    Result := FMacros;
   end;
 end;
 
@@ -369,6 +410,12 @@ begin
     Result := FRoot
   else
     Result := @Self;
+end;
+
+procedure TMeAbstractRegExpr.SetPattern(const Value: RegExprString);
+begin  
+  if FPattern <> Value then
+    FPattern := Value;
 end;
 
 { TMeCustomSimpleRegExpr }
@@ -442,12 +489,23 @@ begin
 end;
 
 function TMeCustomSimpleRegExpr.DoReplacePatternFunc(aRegExpr : TRegExpr): string;
+var
+  s: RegExprString;
 begin
   with aRegExpr do
   begin
-    Result := MatchResult.ValueOf(Match[1]);
+    s := Trim(Match[1]);
+    if (Length(s) >= 3) and (s[1] =':') and (s[Length(s)]=':') then 
+    begin
+      //Is Macro
+      s := Copy(s, 2, Length(s)-2);
+      s := Macros.Values[PChar(s)];
+      if s = '' then
+        s := Trim(Match[1]);
+    end;
+    Result := MatchResult.ValueOf(s);
     if Result = '' then
-      Result := Match[1];
+      Result := s;
   end;
 end;
 
@@ -654,6 +712,37 @@ begin
   end
   else
     Raise EMeError.Create('TMeCustomRegExpr.Exec: No Expression to execute!');
+end;
+
+procedure TMeCustomRegExpr.LoadPatternFromStrs(const aStrs: PMeStrings);
+var
+  i: Integer;
+begin
+  if Assigned(aStrs) then with aStrs^ do
+  begin
+    FExpressions.Clear;
+    for i := 1 to Count - 1 do
+    begin
+      AddExpr(Names[i], GetValueByIndex(i));
+    end;
+    Pattern := Items[0];
+  end;
+end;
+
+procedure TMeCustomRegExpr.SavePatternToStrs(const aStrs: PMeStrings);
+var
+  i: Integer;
+begin
+  if Assigned(aStrs) then with aStrs^ do
+  begin
+    Clear;
+    Add(Pattern);
+    for i := 0 to FExpressions.Count - 1 do
+    begin
+      with FExpressions.Items[i]^ do
+        Add(Name+ '=' + Pattern);
+    end;
+  end;
 end;
 
 procedure TMeCustomRegExpr.SetPattern(const Value: RegExprString);

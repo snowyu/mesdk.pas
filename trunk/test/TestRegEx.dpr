@@ -18,7 +18,7 @@ uses
 
 
 var
-  r: PMeCustomRegExpr;
+  r: PMeRegExpr;
   em: PMeRegExprEnumerator;
   vStrs: PMeStrings;
 begin
@@ -44,6 +44,19 @@ begin
     Writeln('---------------------------');
     Writeln('The SubExprs Result:');
     Writeln(vStrs.Text);
+    Writeln('---------------------------');
+    r.SavePatternToStrs(vStrs);
+    Writeln(Trim(vStrs.Text));
+    Writeln('---------------------------');
+    r.LoadPatternFromStrs(vStrs);
+    r.InputString := 'this is not a Good <td>New</td>, but it is Better<td>New</td>. it is not Bad<td>New</td>.';
+    r.Name := 'root';
+    em.Reset;
+    while em.MoveNext() do
+    begin
+      if Assigned(r.RegExpr) then
+        writeln(em.Current.Name, ' found: ', r.RegExpr.Match[0]);
+    end;
   except
     on e: exception do writeln(e.ClassName, ' Exception:', e.message);
   end;

@@ -160,7 +160,6 @@ type
   protected
     procedure Resume;
     procedure Yield;
-    procedure Reset;
 
     { the CoRoutine itself. Override Execute to give the CoRoutine code. }
     procedure CoExecute; virtual; abstract;
@@ -188,6 +187,11 @@ type
       @return True if there is still an item, False if the enumerator is terminated
     }
     function MoveNext: Boolean;
+    {  Completely reset the CoRoutine
+      The CoRoutine must be terminated in order to call Reset (Terminated = True).
+      Reset can also be called if the CoRoutine is terminated due to an exception.
+    }
+    procedure Reset;
   end;
 
   TMeCoRoutine = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeCustomCoRoutine)
@@ -603,10 +607,6 @@ begin
   SwitchRunningFrame;
 end;
 
-{  Completely reset the CoRoutine
-  The CoRoutine must be terminated in order to call Reset (Terminated = True).
-  Reset can also be called if the CoRoutine is terminated due to an exception.
-}
 procedure TMeCustomCoRoutine.Reset;
 begin
   if coRunning in FStates then
