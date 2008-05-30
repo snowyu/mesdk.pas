@@ -10,6 +10,7 @@ uses
   {$ENDIF}
   Classes, SysUtils
   , uMeObject
+  , uMeStrUtils
   , RegExpr
   , uMeRegExpr
   , uMeRegExprCoRoutine
