@@ -1,11 +1,21 @@
 {
-  <(?:[^>'"]*|".*?"|'.*?')+>
+  <(?:[^>'"]*|".*?"|'.*?')>
   DIRegEx: test HTML.txt
     Run: Total Exectution time: 34,061 Time per match 10.
     found count:2759
-  RegEx:
+  RegEx 0.952:
   : Compile Time: 40
     Run: 1,691,376
+
+
+Celeron(M) CPU 420 1.60GHz 760M
+  RegEx 0.980(riceball):
+  : Compile Time: 121
+   Run: 24,321
+  DIRegEx: 
+  : Compile Time: 220
+   Run: 36,455
+
 }
 program TestRegEx;
 
@@ -20,7 +30,7 @@ uses
   Classes, SysUtils
   , uMeObject
   , uMeStrUtils
-  , RegExpr
+  , uRegExpr
   , uMeRegExpr
   , uMeRegExprCoRoutine
   //, uMeEnumerator
@@ -68,7 +78,7 @@ begin
     writeln('found count: ',c, ' time:', t2-t1);
     exit;
 
-    {$IFDEF SubExprName_Support}
+    {$IFDEF SubExprName_RegExpr}
     r.AddExpr('ListBegin', '/<td>(.+?):field:</td>/', 1);
     r.Pattern := '/(Good|Better|Bad):thing:[[ListBegin]]/:n';
     {$ELSE}

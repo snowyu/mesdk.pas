@@ -84,7 +84,7 @@ uses
 {$ENDIF}
   //TypInfo,
   SysUtils
-  , RegExpr
+  , uRegExpr
   , uMeConsts
   , uMeSystem
   , uMeObject

@@ -311,8 +311,8 @@ procedure TMeMemoryStream.LoadFromStream(const Stream: PMeStream);
 var
   Count: Longint;
 begin
-  Stream.Position := 0;
-  Count := Stream.Size;
+  Stream.SetPosition(0);
+  Count := Stream.GetSize;
   SetSize(Count);
   if Count <> 0 then Stream.ReadBuffer(FMemory^, Count);
   FPosition := 0;

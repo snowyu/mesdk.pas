@@ -1043,7 +1043,7 @@ begin
   New(vStream, Create);
   try
     vStream.Open(FileName, fmOpenRead or fmShareDenyNone);
-    FSourceSize := vStream.Size;
+    FSourceSize := vStream.GetSize;
     if FSourceSize <> 0 then
     begin
       ReallocMem(FSource, FSourceSize+1);
