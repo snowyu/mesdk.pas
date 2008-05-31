@@ -85,10 +85,12 @@ type
     procedure TestEmptyList;
     procedure TestClear;
     procedure TestAdd;
+    procedure TestAddCheck;
     procedure TestAddNamedPair;
   published
     procedure Test_Add;
     procedure Test_ValueNamePair;
+    procedure Test_LoadSave;
     procedure Test_InheritsFrom;override;
   end;
 
@@ -459,6 +461,20 @@ begin
     end;
   end;
 end;
+procedure TTest_MeStrings.TestAddCheck;
+var 
+  i: Integer;
+  j,k: Integer;
+begin
+  with PMeStrings(FMeObject)^ do
+  begin
+    CheckEquals(High(aStrList)-Low(aStrList)+1, Count, 'the Added MeStrings.Count is error.');
+    for i := Low(aStrList) to High(aStrList) do
+    begin
+      CheckEquals(aStrList[i], Items[i], 'the MeStrings['+IntToStr(i)+'].value is error.');
+    end;
+  end;
+end;
 
 procedure TTest_MeStrings.Test_Add;
 begin
@@ -471,6 +487,19 @@ procedure TTest_MeStrings.Test_InheritsFrom;
 begin
   Inherited;
   CheckEquals(True, FMeObject.InheritsFrom(TypeOf(TMeContainer)), 'the object should Inherit From TMeContainer.');
+end;
+
+procedure TTest_MeStrings.Test_LoadSave;
+begin
+  TestClear;
+  TestAdd;
+  with PMeStrings(FMeObject)^ do
+  begin
+    SaveToFile('dat\strings.txt');
+    Clear;
+    LoadFromFile('dat\strings.txt');
+  end;
+  TestAddCheck;
 end;
 
 procedure TTest_MeStrings.Test_ValueNamePair;

@@ -16,21 +16,17 @@
     * rights and limitations under the \license.
     * The Original Code is $RCSfile: uMeRegExpr.pas,v $.
     * The Initial Developers of the Original Code are Riceball LEE.
-    * Portions created by Andrey V. Sorokin, St.Petersburg, Russia is Copyright (C) 1999-2004
     * Portions created by Riceball LEE is Copyright (C) 2003-2008
     * All rights reserved.
 
     * Contributor(s):
-        Andrey V. Sorokin(RegExpr)
-                                http://RegExpStudio.com
-                                mailto:anso@mail.ru
 }
 unit uMeRegExpr;
 
 interface
 
 {$I MeSetting.inc}
-{.$DEFINE SubExprName_Support}
+{.$DEFINE SubExprName_RegExpr}
 
 uses
 {$IFDEF MSWINDOWS}
@@ -38,7 +34,7 @@ uses
 {$ENDIF}
   //TypInfo,
   SysUtils
-  , RegExpr
+  , uRegExpr
   , uMeConsts
   , uMeSystem
   , uMeObject
@@ -104,7 +100,7 @@ How to use the MatchResult?
 treat the RegExprResultItem as the record item.
   the record item includes the fields and values.
     the fields collects only the sub-expressions in the RegExpr.Match[1]...Match[SubExprMatchCount].
-    if the SubExprName_Support enabled, it will be format: "SubExprName=MatchValue" in the Strings.
+    if the SubExprName_RegExpr enabled, it will be format: "SubExprName=MatchValue" in the Strings.
 }
   PMeAbstractRegExpr = ^ TMeAbstractRegExpr;
   PMeCustomSimpleRegExpr = ^ TMeCustomSimpleRegExpr;
@@ -201,7 +197,7 @@ treat the RegExprResultItem as the record item.
   TMeCustomSimpleRegExpr = object(TMeAbstractRegExpr)
   protected
     procedure DoResultFound(const Sender: PMeCustomSimpleRegExpr);
-    function DoReplacePatternFunc(aRegExpr : TRegExpr): string;
+    function DoReplacePatternFunc(const aRegExpr : TRegExpr): RegExprString;
     //function GetRegExpr: TRegExpr;
     //function GetExpression: RegExprString; virtual;
     function GetAdjustedPattern: RegExprString;
@@ -459,7 +455,7 @@ begin
     try
       for i := 1 to SubExprMatchCount do
       begin
-      {$IFDEF SubExprName_Support}
+      {$IFDEF SubExprName_RegExpr}
         s := SubExprNames[i];
         if s <> '' then
           s := s + '=' + Match[i];
@@ -488,7 +484,7 @@ begin
   end;
 end;
 
-function TMeCustomSimpleRegExpr.DoReplacePatternFunc(aRegExpr : TRegExpr): string;
+function TMeCustomSimpleRegExpr.DoReplacePatternFunc(const aRegExpr : TRegExpr): RegExprString;
 var
   s: RegExprString;
 begin

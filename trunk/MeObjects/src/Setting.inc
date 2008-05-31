@@ -61,6 +61,7 @@ ALERT_jedi_inc_incompatible
 {$ELSE}
   {$HINTS OFF; WARNINGS OFF}
   {$D-,L-,Y-,Q-,W-}
+  {$OPTIMIZATION ON}
   {$IFNDEF FPC}
     {$IMAGEBASE $00400000}
   {$ENDIF}
@@ -83,6 +84,7 @@ ALERT_jedi_inc_incompatible
 {$ENDIF CLR}
 
 {$IFDEF FPC}
+ {$MODE DELPHI} // Delphi-compatible mode in FreePascal
  {$DEFINE PUREPASCAL}
 {$ENDIF FPC}
 

@@ -20,8 +20,13 @@
 {$DEFINE THREADSAFE_SUPPORT}
 {$DEFINE NamedThread}
 
-//-----------------MeRegExpr Compiler Options
-{.$DEFINE SubExprName_Support}
+//-----------------MeRegExpr Compiler Options---------------------
+{.$DEFINE UniCode_RegExpr} // Unicode support
+{.$DEFINE CapturingGroup_RegExpr} //Comments for speedup(u can use the named SubExpr to capture what u want)
+{$DEFINE SubExprName_RegExpr}
+{$DEFINE SplitMethod_RegExpr}
+{$DEFINE PCodeDump_RegExpr} // p-code dumping (see Dump method)
+{$DEFINE ComplexBraces_RegExpr} // support braces in complex cases
 
 {Include Common setting File}
 {$I Setting.inc}

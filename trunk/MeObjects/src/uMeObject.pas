@@ -433,9 +433,9 @@ type
     procedure AddItems(const aItems: array of Pointer);
     {$ENDIF}
     procedure LoadFromFile(const FileName: string);
-    procedure LoadFromStream(Stream: PMeStream);
+    procedure LoadFromStream(const aStream: PMeStream);
     procedure SaveToFile(const FileName: string);
-    procedure SaveToStream(Stream: PMeStream);
+    procedure SaveToStream(const aStream: PMeStream);
   public
     {Summary Returns count of items in the list. It is possible to delete a number
        of items at the end of the list, keeping only first Count items alive,
@@ -510,9 +510,9 @@ type
     }
     function Equals(Strings: PMeStrings): Boolean;
     procedure LoadFromFile(const FileName: string);
-    procedure LoadFromStream(Stream: PMeStream);
+    procedure LoadFromStream(const aStream: PMeStream);
     procedure SaveToFile(const FileName: string);
-    procedure SaveToStream(Stream: PMeStream);
+    procedure SaveToStream(const aStream: PMeStream);
   public
     {Summary Makes string list empty. }
     procedure Clear;
@@ -643,12 +643,9 @@ type
 
   TMeStream = object(TMeDynamicObject)
   private
-    function GetPosition: Int64;
-    procedure SetPosition(const Pos: Int64);
+    function GetSize64: Int64;
     procedure SetSize64(const NewSize: Int64);
   protected
-    function GetSize: Int64; virtual;
-    procedure SetSize(const NewSize: Int64); virtual;
   public
     function Read(var Buffer; Count: Longint): Longint; virtual; abstract;
     function Write(const Buffer; Count: Longint): Longint; virtual; abstract;
@@ -665,8 +662,16 @@ type
     procedure WriteResourceHeader(const ResName: string; out FixupInfo: Integer);
     procedure FixupResourceHeader(FixupInfo: Integer);
     procedure ReadResHeader;
-    property Position: Int64 read GetPosition write SetPosition;
-    property Size: Int64 read GetSize write SetSize64;
+
+    function GetPosition: Int64;
+    procedure SetPosition(const Pos: Int64);
+    function GetSize: Int64; virtual;
+    procedure SetSize(const NewSize: Int64); virtual;
+
+    //property Position: Int64 read GetPosition write SetPosition;
+    //can not usse this! report Access violation. PMeStream(aStream) := New(PFileStream, create);
+    //aStream.Size raise Access violation; PFileStream(aStream).Size is ok!!
+    //property Size: Int64 read GetSize64 write SetSize64; 
   end;
 
   PMeNamedObjects = ^ TMeNamedObjects;
@@ -2073,26 +2078,26 @@ end;
 
 procedure TMeList.LoadFromFile(const FileName: string);
 var
-  Stream: PMeFileStream;
+  vStream: PMeFileStream;
 begin
-  New(Stream, Create);
+  New(vStream, Create);
   try
-    Stream.Open(FileName, fmOpenRead or fmShareDenyWrite);
-    LoadFromStream(Stream);
+    vStream.Open(FileName, fmOpenRead or fmShareDenyWrite);
+    LoadFromStream(vStream);
   finally
-    Stream.Free;
+    vStream.Free;
   end;
 end;
 
-procedure TMeList.LoadFromStream(Stream: PMeStream);
+procedure TMeList.LoadFromStream(const aStream: PMeStream);
 var
   i: Integer;
 begin
   Clear;
-  Stream.ReadBuffer(i, SizeOf(i));
+  aStream.ReadBuffer(i, SizeOf(i));
   Count := i;
   for i := 0 to Count -1 do
-     Stream.ReadBuffer(List^[i], SizeOf(Pointer));
+     aStream.ReadBuffer(List^[i], SizeOf(Pointer));
 end;
 
 procedure TMeList.SaveToFile(const FileName: string);
@@ -2108,14 +2113,14 @@ begin
   end;
 end;
 
-procedure TMeList.SaveToStream(Stream: PMeStream);
+procedure TMeList.SaveToStream(const aStream: PMeStream);
 var
   i: Integer;
 begin
   i := Count;
-  Stream.WriteBuffer(i, SizeOf(i));
+  aStream.WriteBuffer(i, SizeOf(i));
   for i := 0 to Count -1 do
-     Stream.WriteBuffer(List^[i], SizeOf(Pointer));
+     aStream.WriteBuffer(List^[i], SizeOf(Pointer));
 end;
 
 
@@ -2406,25 +2411,26 @@ end;
 
 procedure TMeStrings.LoadFromFile(const FileName: string);
 var
-  Stream: PMeFileStream;
+  vStream: PMeFileStream;
 begin
-  New(Stream, Create);
+  New(vStream, Create);
   try
-    Stream.Open(FileName, fmOpenRead or fmShareDenyWrite);
-    LoadFromStream(Stream);
+    vStream.Open(FileName, fmOpenRead or fmShareDenyWrite);
+    LoadFromStream(vStream);
   finally
-    Stream.Free;
+    vStream.Free;
   end;
 end;
 
-procedure TMeStrings.LoadFromStream(Stream: PMeStream);
+procedure TMeStrings.LoadFromStream(const aStream: PMeStream);
 var
-  Size: Integer;
+  vSize: Integer;
   S: string;
 begin
-    Size := Stream.Size - Stream.Position;
-    SetString(S, nil, Size);
-    Stream.Read(Pointer(S)^, Size);
+    //writeln('L=',aStream.Size);
+    vSize := aStream.GetSize - aStream.GetPosition;
+    SetString(S, nil, vSize);
+    aStream.Read(PChar(S)^, vSize);
     SetTextStr(S);
 end;
 
@@ -2514,12 +2520,12 @@ begin
   end;
 end;
 
-procedure TMeStrings.SaveToStream(Stream: PMeStream);
+procedure TMeStrings.SaveToStream(const aStream: PMeStream);
 var
   S: string;
 begin
   S := GetTextStr;
-  Stream.WriteBuffer(Pointer(S)^, Length(S));
+  aStream.WriteBuffer(Pointer(S)^, Length(S));
 end;
 
 
@@ -2954,7 +2960,7 @@ end;
 
 function TMeStream.EOF: Boolean;
 begin
-  Result := Position >= Size;
+  Result := GetPosition >= GetSize;
 end;
 
 function TMeStream.GetPosition: Int64;
@@ -2974,6 +2980,11 @@ begin
   Pos := Seek(0, soCurrent);
   Result := Seek(0, soEnd);
   Seek(Pos, soBeginning);
+end;
+
+function TMeStream.GetSize64: Int64;
+begin
+  Result := GetSize;
 end;
 
 procedure TMeStream.SetSize64(const NewSize: Int64);
@@ -3046,8 +3057,8 @@ var
 begin
   if Count = 0 then
   begin
-    Source.Position := 0;
-    Count := Source.Size;
+    Source.SetPosition(0);
+    Count := Source.GetSize;
   end;
   Result := Count;
   if Count > MaxBufSize then BufSize := MaxBufSize else BufSize := Count;
@@ -3076,17 +3087,17 @@ begin
   Word((@Header[HeaderSize - 6])^) := $1030;
   Longint((@Header[HeaderSize - 4])^) := 0;
   WriteBuffer(Header, HeaderSize);
-  FixupInfo := Position;
+  FixupInfo := GetPosition;
 end;
 
 procedure TMeStream.FixupResourceHeader(FixupInfo: Integer);
 var
   ImageSize: Integer;
 begin
-  ImageSize := Position - FixupInfo;
-  Position := FixupInfo - 4;
+  ImageSize := GetPosition - FixupInfo;
+  SetPosition(FixupInfo - 4);
   WriteBuffer(ImageSize, SizeOf(Longint));
-  Position := FixupInfo + ImageSize;
+  SetPosition(FixupInfo + ImageSize);
 end;
 
 procedure TMeStream.ReadResHeader;
