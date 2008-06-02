@@ -64,6 +64,7 @@ type
     class function Protocols: string; virtual; abstract;
 
     //分析更新URL，当URL被改变赋值的时候被调用，如果返回为假，表示分析失败，那么URL将不会被改变。
+    //update the FURL property after the URL changed, return false means update failed, the URL is not chagned.
     function UpdateURL(Var Value: string): Boolean; virtual;
     //内部取文件资源的头信息，返回为0表示成功，后代必须重载
     function iGetHeader(const aInfo: PMeStrings): TMeResourceResult; virtual; abstract;
@@ -117,7 +118,7 @@ type
     property Timeout: Integer read FTimeout write FTimeout;
   end;
 
-  { Summary: the abstract local file resource. }
+  { Summary: the abstract local resource(file). }
   {
     the file resource MUST like this: "Protocol://[user:passwd@][/folder/../]filename:/folder/../rsource.txt"
     pack://user:pwd@/test/aFile.pak:/folder/test.txt
