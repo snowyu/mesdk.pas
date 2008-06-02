@@ -1,0 +1,417 @@
+= MeObjects Library V2 For Delphi =
+
+HomePage: http://dev.cqhot.cn/mesdk/
+Email: riceballl@hotmail.com
+Author: Riceball LEE
+V2 Purspose: 
+  * the TMeDynamicObject will be repalce into the System.pas(replace the TObject).
+  * Only the Record object use the object type.
+  * other MeObjects are derived from TObject directly via the class type.
+  * the MeObjects can use the PreProcessor to convert the MeObjects from class to object(switch to V1).
+
+MeObjects Library for Delphi is a light object extension to make object type small and powerful. It makes the object type
+supports the ClassType, InheritsFrom and ClassName like the Class Type, but it's mini and faster than the delphi class type.
+You can treat it as mini-class type.
+It is freeware and open source.
+
+== License ==
+This work is copyright MeSDK Software Development Kid Pty Ltd / Riceball LEE. It
+is released under a dual license, and you may choose to use it under either the
+Mozilla Public License 1.1 (MPL 1.1, available from http://www.mozilla.org/MPL/MPL-1.1.html) 
+or the GNU Lesser General Public License 2.1 (LGPL 2.1, available from
+http://www.opensource.org/licenses/lgpl-license.php). If you find MeObjects useful
+or you would like to support further development, a donation would be much
+appreciated
+
+== MeObjects ==
+
+the TMeDynamicObject will be repalce into the System.pas(replace the TObject).
+
+Now other MeObjects are derived from TObject directly via the class type.
+
+TMeDynamicObject Features:
+  * ClassType:  the address of virtual methods table of object
+  * InheritsFrom : Determines the relationship of two object types
+  * IsObject: replace 'is' operator, test whether is the same object.
+  * ClassParent: Return the VMT Address of parent
+  * InstanceSize: the size of the object instance.
+  * ClassName: PChar (optional enable MeRTTI_SUPPORT compiler directive in MeSetting.inc)
+  * Free(aFreeMemRequired: Boolean = True):  Free the Object. Disposes the memory allocated to an object if aFreeMemRequired.
+
+How to derived a new object from TMeDynamicObject?
+
+when you derived a new object from TMeDynamicObject:
+ * you should override(create) one virtual method at least, or it will share the parent's VMT.
+ * after it own its VMT you must set it's parent class in initialization section:
+    <code>
+      //set the TMeInterfacedObject's parent is TMeDynamicObject.
+      SetMeVirtualMethod(TypeOf(TMeInterfacedObject), ovtVmtParent, TypeOf(TMeDynamicObject));
+    </code>
+
+if you wanna the ClassName supports for the class derived from TMeDynamicObject:
+ * enable the MeRTTI_SUPPORT compiler directive(the default is on).
+ * and you must do this in initialization section:
+     <code>
+       const cMeInterfacedObjectClassName: PChar = 'TMeInterfacedObject';
+       SetMeVirtualMethod(TypeOf(TMeInterfacedObject), ovtVmtClassName, @cMeInterfacedObjectClassName);
+     </code>
+   * if u wanna hide the ClassName of some class you just need pass nil in it:
+     <code>
+       SetMeVirtualMethod(TypeOf(TMeInterfacedObject), ovtVmtClassName, nil);
+     </code>
+
+How to use the TMeDynamicObject as record object:
+  <code>
+  var
+    aObj: TMeList;
+    aObj.Create; //Init VMT Ptr to aObj
+    try
+    finally
+      aObj.Free(False); //Do NOT FREE the record memory, pass the False to Free 
+    end;
+  </code>
+
+=== Functions ===
+
+==== TypeOf(TMeObject) ==== 
+return the TMeClass(VMT) of the Object.
+the Object instance can use the ClassType method return the TMeClass(VMT).
+
+==== SizeOf(TMeObject) ==== 
+return the size of the object.
+the Object instance can use the InstanceSize method return the size of the object.
+
+==== function MeInheritsFrom(aClass: TMeClass; const aParentClass: TMeClass): Boolean; ==== 
+Determines the relationship of two object types.
+the Object instance can use the InheritsFrom method.
+
+==== procedure MeFreeAndNil(var Obj); ==== 
+Frees an object reference and replaces the reference with nil.
+
+Use FreeAndNil to ensure that a variable is nil (Delphi) or NULL (C++) after you free the object it references. Pass any variable that represents an object as the Obj parameter.
+
+Warning:	Obj must be an instance of a TMeDynamicObject descendant.
+
+==== function NewMeObject(const aClass: TMeClass): PMeDynamicObject; ==== 
+create an instance for the aClass type.
+
+==== function FindMeComponent(const Name: String): PMeComponent; ==== 
+==== function GComponentNameList: PMeList; ==== 
+
+==== function SetMeVirtualMethod(const aClass: TMeClass; const Offset: Integer; const Method: Pointer): Pointer; ==== 
+
+=== Objects ===
+
+==== TMeDynamicObject ====
+All MeObjects should be derived from TMeDynamicObject.
+
+====== function IsObject(pObj: Pointer): Boolean; ======
+replace 'is' operator, check whether is the same object.
+
+====== function ClassType: TMeClass; ====== 
+the Object instance can use the ClassType method return the TMeClass(VMT).
+
+====== function InstanceSize: Integer; ====== 
+the Object instance can use the InstanceSize method return the size of the object.
+
+====== function InheritsFrom(aClass: TMeClass): Boolean; ====== 
+the Object instance can use the InheritsFrom method to Determines the relationship of two object types.
+Use InheritsFrom to determine if a particular class type or object is an instance of a class or one of its descendants.
+InheritsFrom returns true if the object type specified in the aClass parameter is an ancestor of the object type or the
+
+====== procedure Init;virtual; ====== 
+Is called from a constructor to initialize created object instance
+filling its fields with 0. Can be overriden in descendant objects
+to add another initialization code there. (Main reason of intending
+is what constructors can not be virtual in poor objects).
+
+====== destructor Destroy; virtual; ====== 
+Disposes of an object instance.Do not call Destroy directly. Call Free instead. 
+       Free verifies that the object reference is not nil before calling Destroy.
+
+====== constructor Create; ====== 
+Constructor. Do not call it. Instead, use New(PMeDynamicObject, Create) function.
+
+====== procedure Free(aFreeMemRequired: Boolean); ======
+Free the Object. Disposes the memory allocated to an object if aFreeMemRequired.
+Before calling destructor of object, checks if passed pointer is not
+nil - similar what is done in VCL for TObject. It is ALWAYS recommended
+to use Free instead of Destroy.
+
+Note: It DOES NOT release huge strings, dynamic arrays and so on.
+you should be freeing in overriden the destructor - Destroy method.
+
+ * @param aFreeMemRequired whether free memory the default is true. only pointer object can free mem!!
+
+==== TMeComponent ====
+with name supports.
+
+====== property Name: String read FName write SetName; ====== 
+
+==== TMeInterfacedObject ====
+with RefCount and AddRef/Release Supports.
+
+====== procedure AddRef; ====== 
+Increments the reference count for this instance and returns the new reference count.
+
+====== procedure Release; ====== 
+Decrements reference count for this instance. If it is becoming <0, and Free
+method was already called, object is (self-) destroyed. Otherwise,
+Free method does not destroy object, but only sets flag
+"Free was called": Decrements reference count.
+
+Use AddRef..Release to provide a block of code, where
+object can not be destroyed by call of Free method.
+This makes code more safe from intersecting flows of processing,
+where some code want to destroy object, but others suppose that it
+is yet existing.
+
+If You want to release object at the end of block AddRef..Release,
+do it immediately BEFORE call of last Release (to avoid situation,
+when object is released in result of Release, and attempt to
+destroy it follow leads to AV exception).
+
+====== procedure AddDependent(Obj: PMeDynamicObject); ====== 
+Adds an object to the DependentList.that means this obj is relying on it. 
+the Objects in the the DependentList will be free when the object is destroyed. 
+
+表明 Obj 依赖于自己. 当自己被释放后, Obj 也将会被释放.
+
+====== procedure FreeNotification(Proc: TMeObjectMethod); ====== 
+This Notification Proc will be executed before the it is free.
+
+====== property RefCount: Integer read FRefCount; ====== 
+Indicates the number of instance pointers currently dependent upon the object.
+
+==== TMeContainer ====
+the abstract data Container.
+
+====== property Count: Integer read FCount write FCount; ====== 
+
+===== TMeList =====
+Simple list of pointers. It is used instead of standard VCL TList.
+TMeList stores any kind data (or pointers to these ones). Can be created
+calling function New(PMeList, Create) or use as the record object directly.
+
+====== procedure Clear; ====== 
+Makes Count equal to 0. Not responsible for freeing (or destroying)
+data, referenced by released pointers.
+
+====== function Add(Value: Pointer): Integer; ====== 
+Inserts a new item at the end of the list.Call Add to insert a new object at the end of the Items array.
+Add increments Count and, if necessary, allocates memory by increasing the value of Capacity.
+
+Note:	Add always inserts the Item pointer at the end of the Items array, even if the Items array contains nil (Delphi) or NULL (C++) pointers.
+
+====== procedure AddItems(const aItems: array of Pointer); ====== 
+Adds a list of items given by a dynamic array.
+
+====== function Popup: Pointer; ====== 
+popup the last item in the list or nil if list is empty. use the Add to push.
+
+====== procedure Insert(Index: Integer; Value: Pointer); ====== 
+Inserts pointer before given item. Returns Index, i.e. index of
+inserted item in the list. Indeces of items, located after insertion
+point, are increasing. To add item to the end of list, pass Count
+as index parameter. To insert item before first item, pass 0 there.
+
+====== function IndexOf(Value: Pointer): Integer; ====== 
+Searches first (from start) item pointer with given value and returns
+its index (zero-based) if found. If not found, returns -1.
+
+====== procedure Delete(Index: Integer); ====== 
+Deletes given (by index) pointer item from the list, shifting all
+follow item indeces up by one.
+
+====== procedure DeleteRange(Index, Len: Integer); ====== 
+Deletes Len items starting from Index.
+
+====== procedure Remove(Value: Pointer); ====== 
+Removes first entry of a Value in the list.
+
+====== function Last: Pointer; ====== 
+Returns the last item (or nil, if the list is empty).
+
+====== procedure Swap(Idx1, Idx2: Integer); ====== 
+Swaps two items in list directly (fast, but without testing of
+index bounds).
+
+====== procedure Move(CurIndex, NewIndex: Integer); ====== 
+
+====== procedure Pack; ====== 
+
+====== procedure FreePointers; ======
+Especially for lists of pointers to dynamically allocated memory.
+free all pointed memory blocks via FreeMem.
+
+====== procedure FreeMeObjects(aFreeMemRequired: Boolean = True); ====== 
+Especially for a list of objects derived from TMeDynamicObject.
+Calls Free for every of the object in the list.
+
+====== procedure Assign(SrcList: PMeList); ====== 
+
+====== procedure LoadFromFile(const FileName: string); ====== 
+====== procedure LoadFromStream(Stream: PMeStream); ====== 
+====== procedure SaveToFile(const FileName: string); ====== 
+====== procedure SaveToStream(Stream: PMeStream); ====== 
+
+====== property Count: Integer read FCount write SetCount; ====== 
+====== property Capacity: Integer read FCapacity write SetCapacity; ====== 
+====== property Items[Index: Integer]: Pointer read Get write Put; default; ====== 
+====== property List: PPointerList read FItems write SetList; ====== 
+====== property IsExternalList: Boolean read FIsExternalList write FIsExternalList default False; ====== 
+the List manage by self, or not. if not, u should assign these events: OnListGrow, OnListClear
+
+====== property OnListClear: TMeNotifyEvent read FOnListClear write FOnListClear; ====== 
+====== property OnListGrow:  TMeListGrowEvent read FOnListGrow write FOnListGrow; ====== 
+
+===== TMeStrings =====
+represent a list of strings. store and manipulate a list of strings.
+
+====== function Add(const S: String): Integer; ====== 
+{Summary Adds Ansi String to a list. }
+====== function AddObject(const S: String; Obj: LongWord): Integer; ====== 
+{Summary Adds Ansi String and correspondent object to a list. }
+====== function AddPChar(S: PChar): integer; ====== 
+{Summary Adds a string to list. }
+====== function AddPCharLen(S: PChar; Len: Integer): integer; ====== 
+{Summary Adds a string to list. The string can contain #0 characters. }
+====== procedure AddStrings(Strings: PMeStrings); ====== 
+{Summary Adds a group of strings to the list}
+{
+Call AddStrings to add the strings from another TStrings object to the list. If both the source and destination TStrings objects support objects associated with their strings, references to the associated objects will be added as well.
+}
+====== function AddPCharObject(S: PChar; Obj: LongWord): Integer; ====== 
+{Summary Adds string S (null-terminated) with associated object Obj. }
+====== function AddObjectLen(S: PChar; Len: Integer; Obj: LongWord): Integer; ====== 
+{Summary Adds string S of length Len with associated object Obj. }
+====== procedure InsertPCharObject(Idx: Integer; S: PChar; Obj: LongWord); ====== 
+{Summary Inserts string S (null-terminated) at position Idx in the list,
+   associating it with object Obj. }
+====== procedure InsertObjectLen( Idx: Integer; S: PChar; Len: Integer; Obj: LongWord ); ====== 
+{Summary Inserts string S of length Len at position Idx in the list,
+   associating it with object Obj. }
+
+====== function Equals(Strings: PMeStrings): Boolean; ====== 
+{Summary Compares the list of strings to the list from another TStrings object and returns true if the two lists match.}
+{
+Call Equals to compare the lists in two TStrings objects. Equals compares only the strings, not any references to associated objects. 
+Equals returns true if the lists for both TStrings objects have the same number of strings and the strings in each list match when 
+compared using the protected CompareStrings method. Equals returns false if the lists are different in length, if they contain different 
+strings, or if the order of the strings in the two lists differ.
+}
+====== procedure LoadFromFile(const FileName: string); ====== 
+====== procedure LoadFromStream(Stream: PMeStream); ====== 
+====== procedure SaveToFile(const FileName: string); ====== 
+====== procedure SaveToStream(Stream: PMeStream); ====== 
+
+====== procedure Clear; ====== 
+{Summary Makes string list empty. }
+====== procedure Delete(Idx: integer); ====== 
+{Summary Deletes string with given index (it *must* exist). }
+====== function IndexOf(const S: string): integer; ====== 
+{Summary Returns index of first string, equal to given one. }
+====== function IndexOfObject(const aObj: LongWord): integer; ====== 
+{Summary Returns index of object, equal to given one. }
+====== function IndexOf_NoCase(const S: string): integer; ====== 
+{Summary Returns index of first string, equal to given one (while comparing it
+without case sensitivity). }
+====== function IndexOfStrL_NoCase( Str: PChar; L: Integer ): integer; ====== 
+{Summary Returns index of first string, equal to given one (while comparing it
+without case sensitivity). }
+====== function IndexOfName(AName: PChar): Integer; ====== 
+{Summary Searches string starting from 'AName=' in string list like ini-file. }
+====== function Find(const S: String; var Index: Integer): Boolean; ====== 
+{Summary Returns Index of the first string, equal or greater to given pattern, but
+works only for sorted TMeStrings object. Returns TRUE if exact string found,
+otherwise nearest (greater then a pattern) string index is returned,
+and the result is FALSE. }
+====== procedure Insert(Idx: integer; const S: String); ====== 
+{Summary Inserts ANSI string before one with given index. }
+====== procedure InsertObject(Idx: integer; const S: String; Obj: LongWord); ====== 
+{Summary Inserts ANSI string before one with given index. }
+====== procedure InsertPChar(Idx: integer; S: PChar); ====== 
+{Summary Inserts string before one with given index. }
+====== procedure InsertPCharLen( Idx: Integer; S: PChar; Len: Integer ); ====== 
+{Summary Inserts string from given PChar. It can contain #0 characters. }
+====== procedure Move(CurIndex, NewIndex: integer); ====== 
+{Summary Moves string to another location. }
+====== procedure SetText(const S: string; Append2List: boolean); ====== 
+{Summary Allows to set strings of string list from given string (in which
+strings are separated by $0D,$0A or $0D characters). Text can
+contain #0 characters. Works very fast. This method is used in
+all others, working with text arrays (LoadFromFile, MergeFromFile,
+Assign, AddStrings). }
+====== function Last: String; ====== 
+{Summary Last item (or '', if string list is empty). }
+====== procedure Swap(Idx1, Idx2 : Integer); ====== 
+{Summary Swaps to strings with given indeces. }
+====== procedure Sort(CaseSensitive: Boolean); ====== 
+{Summary Call it to sort string list. }
+
+
+====== FastClear: Boolean; ====== 
+{Summary the Clear method only clear FList.count to zero if true.}
+
+====== property Objects[Idx: Integer]: LongWord read GetObject write SetObject; ====== 
+{Summary Access to objects associated with strings in the list. }
+====== property Values[Name: PChar]: PChar read GetValue; ====== 
+{Summary Returns a value correspondent to the Name an ini-file-like string list
+(having Name1=Value1 Name2=Value2 etc. in each string). }
+====== property Names[const index: Integer]: string read GetName; ====== 
+====== property Count: integer read fCount; ====== 
+{Summary Number of strings in a string list. }
+====== property Items[Idx: integer]: string read Get write Put; default; ====== 
+{Summary Strings array items. If item does not exist, empty string is returned.
+But for assign to property, string with given index *must* exist. }
+====== property ItemPtrs[Idx: Integer]: PChar read GetPChars; ====== 
+{Summary Fast access to item strings as PChars. }
+====== property ItemLen[Idx: Integer]: Integer read GetItemLen; ====== 
+{Summary Length of string item. }
+====== property Text: string read GetTextStr write SetTextStr; ====== 
+{Summary Content of string list as a single string (where strings are separated
+by characters $0D,$0A). }
+
+==== TMeDynamicMemory ====
+the Dynamic Memory can add data and auto increase the memory size
+
+====== procedure Clear; ====== 
+====== procedure AddInt(const aValue: Integer); ====== 
+====== procedure AddDouble(const aValue: Double); ====== 
+====== procedure AddByte(const aValue: Byte); ====== 
+====== procedure AddWord(const aValue: Word); ====== 
+====== procedure AddPChar(const aValue: string); ====== 
+====== procedure AddBuffer(const aValue; aSize: Integer); ====== 
+====== procedure Align; ====== 
+====== procedure AllocSpace(const aSize: Integer); ====== 
+====== procedure Assign(const aMem: PMeDynamicMemory); ====== 
+
+====== property HoldMem: Boolean read FHoldMem write FHoldMem; ====== 
+{Summary do not free the Memory if true.}
+====== property Memory: Pointer read FMemory; ====== 
+====== property Size: Integer read FSize write SetSize; ====== 
+the total memory size
+====== property UsedSize: Integer read FUsedSize write SetUsedSize; ====== 
+the current used memory size
+
+==== TMeStream ====
+the abstract stream class.
+
+====== function Read(var Buffer; Count: Longint): Longint; virtual; abstract; ====== 
+====== function Write(const Buffer; Count: Longint): Longint; virtual; abstract; ====== 
+====== function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; virtual; ====== 
+====== procedure ReadBuffer(var Buffer; Count: Longint); ====== 
+====== procedure WriteBuffer(const Buffer; Count: Longint); ====== 
+====== function EOF: Boolean; ====== 
+the position is End Of Stream
+====== function CopyFrom(Source: PMeStream; Count: Int64): Int64; ====== 
+====== procedure WriteResourceHeader(const ResName: string; out FixupInfo: Integer); ====== 
+====== procedure FixupResourceHeader(FixupInfo: Integer); ====== 
+====== procedure ReadResHeader; ====== 
+====== property Position: Int64 read GetPosition write SetPosition; ====== 
+====== property Size: Int64 read GetSize write SetSize64; ====== 
+
+== MeObject History ==
+
+V1.0 - First Released [2007-9-16]
+
