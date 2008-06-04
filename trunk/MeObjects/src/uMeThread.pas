@@ -1703,6 +1703,7 @@ var
   c: Integer;
   vEndTick : LongWord;
 begin
+  vEndTick := 0;
   while FActiveThreads.Count > 0 do
   begin
     c := FThreadPool.Count;
@@ -1713,6 +1714,7 @@ begin
     SendDebug({$IFDEF NamedThread}v.FName+{$ENDIF}'.Stopped= '+IntToStr(Integer(v.GetStopped)));
     {$ENDIF}
     //Sleep(50);
+
     if FTerminatingTimeout <> INFINITE then
     try
       vEndTick := GetTickCount + FTerminatingTimeout;
