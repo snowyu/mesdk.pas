@@ -184,11 +184,18 @@ Range头域可以请求实体的一个或者多个子范围。例如，
    {$ifdef UseOpenSsl}
     FIOSSL : TIdSSLIOHandlerSocketOpenSSL;
    {$endif}
-    FOnStatus: TIdStatusEvent;
     FHasException: Boolean;
+
+    FOnStatus: TIdStatusEvent;
+    FOnWork: TWorkEvent;
+    FOnWorkBegin: TWorkBeginEvent;
+    FOnWorkEnd: TWorkEndEvent;
 
     procedure DoHeadersAvailable(Sender: TObject; aHeaders: TIdHeaderList; var vContinue: Boolean);
     procedure DoStatus(ASender: TObject; const AStatus: TIdStatus; const AStatusText: string);
+    procedure DoWorkBegin(ASender: TObject; AWorkMode: TWorkMode; AWorkCountMax: Int64);
+    procedure DoWorkEnd(ASender: TObject; AWorkMode: TWorkMode);
+    procedure DoWork(ASender: TObject; AWorkMode: TWorkMode; AWorkCount: Int64);
 
     procedure BeforeRun; virtual; //override
     function Run: Boolean; virtual; //override
@@ -198,12 +205,17 @@ Range头域可以请求实体的一个或者多个子范围。例如，
     destructor Destroy; virtual; //override
     property HasException: Boolean read FHasException;
     property OnStatus: TIdStatusEvent read FOnStatus write FOnStatus;
+    property OnWork: TWorkEvent read FOnWork write FOnWork;
+    property OnWorkBegin: TWorkBeginEvent read FOnWorkBegin write FOnWorkBegin;
+    property OnWorkEnd: TWorkEndEvent read FOnWorkEnd write FOnWorkEnd;
   end;
 
   TMeHttpDownloadSimpleTask = object(TMeHttpDownloadPartTask)
   protected
     //procedure Init; virtual; //override
     procedure SetURL(const Value: string);
+    procedure BeforeRun; virtual; //override
+    function Run: Boolean; virtual; //override
   public
     constructor Create(const aURL: string; const aStream: TStream);
     destructor Destroy; virtual; //override
@@ -338,6 +350,9 @@ begin
   FHTTP.OnHeadersAvailable := DoHeadersAvailable;
   FHTTP.Request.UserAgent := cDefaultUserAgent;
   FHTTP.OnStatus := DoStatus;
+  FHTTP.OnWorkBegin := DoWorkBegin;
+  FHTTP.OnWork := DoWork;
+  FHTTP.OnWorkEnd := DoWorkEnd;
 end;
 
 destructor TMeHttpDownloadPartTask.Destroy;
@@ -398,7 +413,26 @@ end;
 procedure TMeHttpDownloadPartTask.DoStatus(ASender: TObject; const AStatus: TIdStatus; const AStatusText: string);
 begin
   //IdStati[AStatus] + ':' + AStatusText 
-  FOnStatus(ASender, AStatus, AStatusText);
+  if Assigned(FOnStatus) then
+    FOnStatus(ASender, AStatus, AStatusText);
+end;
+
+procedure TMeHttpDownloadPartTask.DoWorkBegin(ASender: TObject; AWorkMode: TWorkMode; AWorkCountMax: Int64);
+begin
+  if Assigned(FOnWorkBegin) then
+    FOnWorkBegin(ASender, AWorkMode, AWorkCountMax);
+end;
+
+procedure TMeHttpDownloadPartTask.DoWorkEnd(ASender: TObject; AWorkMode: TWorkMode);
+begin
+  if Assigned(FOnWorkEnd) then
+    FOnWorkEnd(ASender, AWorkMode);
+end;
+
+procedure TMeHttpDownloadPartTask.DoWork(ASender: TObject; AWorkMode: TWorkMode; AWorkCount: Int64);
+begin
+  if Assigned(FOnWork) then
+    FOnWork(ASender, AWorkMode, AWorkCount);
 end;
 
 procedure TMeHttpDownloadPartTask.HandleRunException(const Sender: PMeCustomThread; const aException: Exception; var aProcessed: Boolean);
@@ -412,7 +446,7 @@ end;
 function TMeHttpDownloadPartTask.Run: Boolean;
 begin
   FHttp.Get(FURL, FStream);
-  Result := False;
+  Result := False; //stop.
 end;
 
 { TMeHttpDownloadSimpleTask }
@@ -428,6 +462,42 @@ destructor TMeHttpDownloadSimpleTask.Destroy;
 begin
   MeFreeAndNil(FDownInfo);
   inherited;
+end;
+
+procedure TMeHttpDownloadSimpleTask.BeforeRun;
+begin
+  if FStream.Position > 0 then
+  begin
+    if Assigned(FDownInfo) and not FDownInfo.FHeaderInited then
+      FHttp.Head(FURL);
+    if Assigned(FDownInfo) and FDownInfo.FHeaderInited and FDownInfo.FCanResume then
+    begin
+      FContentRangeStart := FStream.Position;
+      FContentRangeEnd := FDownInfo.FContentLength;
+    end
+  end;
+  inherited;
+end;
+
+function TMeHttpDownloadSimpleTask.Run: Boolean;
+var
+  vStream: TStream;
+  vBackup: TStream;
+begin
+  if (FStream.Position > 0) and Assigned(FDownInfo) and FDownInfo.FHeaderInited and FDownInfo.FCanResume then
+  begin
+    vBackup := FStream;
+    FStream := TMemoryStream.Create;
+  end
+  else
+    vBackup := nil;
+  Result := inherited Run;
+  if Assigned(vBackup) then
+  begin
+    vBackup.CopyFrom(FStream, FStream.Size);
+    FStream.Free;
+    FStream := vBackup;
+  end;
 end;
 
 procedure TMeHttpDownloadSimpleTask.SetURL(const Value: string);

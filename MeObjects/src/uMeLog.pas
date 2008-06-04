@@ -161,7 +161,9 @@ type
     procedure Error(const aMsg: string);
     procedure Audit(const aMsg: string);
     procedure Warn(const aMsg: string);
-    procedure Info(const aMsg: string);
+    procedure Info(const aMsg: string);{$IFDEF SUPPORTS_OVERLOAD} overload;
+    procedure Info(const aMsg: string; const Args: array of const);overload;{$ENDIF}
+    procedure InfoFmt(const aMsg: string; const Args: array of const);
     procedure Verbose(const aMsg: string);
     procedure Debug(const aMsg: string);
     { Summary : record the log message of the specified level. }
@@ -494,6 +496,18 @@ end;
 procedure TMeRootLogger.Info(const aMsg: string);
 begin
   Log(vlInfo, aMsg);
+end;
+
+{$IFDEF SUPPORTS_OVERLOAD} 
+procedure TMeRootLogger.Info(const aMsg: string; const Args: array of const);
+begin
+  InfoFmt(aMsg, Args);
+end;
+{$ENDIF}
+
+procedure TMeRootLogger.InfoFmt(const aMsg: string; const Args: array of const);
+begin
+  LogFmt(vlInfo, aMsg, Args);
 end;
 
 procedure TMeRootLogger.Verbose(const aMsg: string);

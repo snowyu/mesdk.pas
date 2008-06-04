@@ -77,7 +77,7 @@ procedure RemoveFreeNotification(const aInstance : TObject; const aProc : TFreeN
 
 //the thread safe version:
 function FormatDateTimeS(const Format: string; aDateTime: TDateTime): string;
-function FormatS(const Format: string; const Args: array of const): string;
+function FormatS(const aFormat: string; const Args: array of const): string;
 function TimeToStrS(const aTime: TDateTime): string;
 function DateToStrS(const aDate: TDateTime): string;
 function DateTimeToStrS(const aDateTime: TDateTime): string;
@@ -147,12 +147,12 @@ begin
   Result := Now - OffsetFromUTC;
 end;
 
-function FormatS(const Format: string; const Args: array of const): string;
+function FormatS(const aFormat: string; const Args: array of const): string;
 var
   vFormatSettings:  TFormatSettings;
 begin
   GetDefaultFormatSettings(vFormatSettings);
-  SysUtils.Format(Format, Args, vFormatSettings);
+  Result := SysUtils.Format(aFormat, Args, vFormatSettings);
 end;
 
 function FormatDateTimeS(const Format: string; aDateTime: TDateTime): string;
@@ -626,6 +626,8 @@ procedure GetDefaultFormatSettings(var Result: TFormatSettings);
 var
   i: Integer;
 begin
+  //GetLocaleFormatSettings(LOCALE_SYSTEM_DEFAULT, Result);
+  
   with Result do
   begin
     CurrencyFormat:= SysUtils.CurrencyFormat;
@@ -655,7 +657,7 @@ begin
       LongDayNames[i]:= SysUtils.LongDayNames[i];
     end;
     TwoDigitYearCenturyWindow:= SysUtils.TwoDigitYearCenturyWindow;
-  end;
+  end; //}
 end;
 
 initialization

@@ -101,14 +101,14 @@ type
     property LocalBaseDir: string read FLocalBaseDir write FLocalBaseDir;
   end;
 
-  TMeResourceAccessorTask = object(TMeTask)
+  {TMeResourceAccessorTask = object(TMeTask)
   protected
     procedure AfterRun; virtual; //override
     procedure BeforeRun; virtual; //override
     function Run: Boolean; virtual; //override
     procedure HandleException(const aException: Exception); virtual;//override
   public
-  end;
+  end;//}
 
   PMeResourceAccessorAsyn = ^ TMeResourceAccessorAsyn;
   TMeResourceAccessorAsyn = object(TMeResourceAccessor)
@@ -116,6 +116,12 @@ type
     FTimeout: Integer;
   public
     property Timeout: Integer read FTimeout write FTimeout;
+  end;
+
+  { Summary: the abstract remote resource. }
+  TMeCustomRemoteAccessor = object(TMeResourceAccessor)
+  protected
+  public
   end;
 
   { Summary: the abstract local resource(file). }

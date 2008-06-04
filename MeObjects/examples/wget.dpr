@@ -45,6 +45,31 @@ begin
   GLogger.info(AStatusText);
 end;
 
+const
+  cWorkModeStr : array[TWorkMode] of string =
+  (
+    'Read'
+    , 'Write'
+  );
+procedure DoWorkBegin(const Self: TObject; ASender: TObject; AWorkMode: TWorkMode; AWorkCountMax: Int64);
+begin
+  //writeln('DoWorkBegin');
+  //writeln(Format(cWorkModeStr[AWorkMode]+ ' WorkBegin: %d bytes', [AWorkCountMax]));
+  GLogger.info(cWorkModeStr[AWorkMode]+ ' WorkBegin: %d bytes', [AWorkCountMax]);
+end;
+
+procedure DoWorkEnd(const Self: TObject; ASender: TObject; AWorkMode: TWorkMode);
+begin
+  //writeln((cWorkModeStr[AWorkMode]+ ' WorkEnd'));
+  GLogger.info(cWorkModeStr[AWorkMode]+ ' WorkEnd');
+end;
+
+procedure DoWork(const Self: TObject; ASender: TObject; AWorkMode: TWorkMode; AWorkCount: Int64);
+begin
+  //writeln(Format(cWorkModeStr[AWorkMode]+ ' Current: %d', [AWorkCount]));
+  GLogger.info(cWorkModeStr[AWorkMode]+ ' Current: %d', [AWorkCount]);
+end;
+
 {procedure DoRedirect(const Self: TObject; Sender: TObject; var dest: string; var NumRedirect: Integer; var Handled: boolean; var VMethod: TIdHTTPMethod);
 begin
   handled := true;
@@ -82,6 +107,9 @@ begin
   try
     vThread.OnException := TMeExceptionThreadEvent(ToMethod(@DoException));
     vTask.OnStatus := TIdStatusEvent(ToMethod(@DoStatus));
+    vTask.OnWorkBegin := TWorkBeginEvent(ToMethod(@DoWorkBegin));
+    vTask.OnWork := TWorkEvent(ToMethod(@DoWork));
+    vTask.OnWorkEnd := TWorkEndEvent(ToMethod(@DoWorkEnd));
     vBegin := GetTickCount;
     //vHttp.Get(vURL, vStream);
     vThread.Start;
