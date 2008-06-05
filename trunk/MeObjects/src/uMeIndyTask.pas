@@ -71,7 +71,7 @@ type
   protected
     // the header properties is inited or not.
     FHeaderInited: Boolean;
-    FURI: PMeURI;
+    FURI: string;
     FContentLength: Int64;
     FHasContentLength: Boolean;
     //the response to tell the client it can be resume by unit:
@@ -108,6 +108,7 @@ type
     procedure Init; virtual; //override
   public
     destructor Destroy; virtual; //override
+    procedure Assign(const aSource: PMeDownloadInfo);
 
     property ConnectTimeout: Integer read FConnectTimeout write FConnectTimeout;
     property ReadTimeout: Integer read FReadTimeout write FReadTimeout;
@@ -184,6 +185,7 @@ Range头域可以请求实体的一个或者多个子范围。例如，
    {$ifdef UseOpenSsl}
     FIOSSL : TIdSSLIOHandlerSocketOpenSSL;
    {$endif}
+    //the exception occur when execute the task, this will be true.
     FHasException: Boolean;
 
     FOnStatus: TIdStatusEvent;
@@ -256,7 +258,7 @@ var
 procedure TMeDownloadInfo.Init;
 begin
   inherited;
-  New(FURI, Create);
+  //New(FURI, Create);
   FContentLength := -1;
   FReadTimeout := IdTimeoutDefault;
   FConnectTimeout := IdTimeoutDefault;
@@ -264,10 +266,30 @@ end;
 
 destructor TMeDownloadInfo.Destroy;
 begin
-  MeFreeAndNil(FURI);
+  //MeFreeAndNil(FURI);
+  FURI := '';
   FRevision := '';
   FAcceptRanges := '';
   inherited;
+end;
+
+procedure TMeDownloadInfo.Assign(const aSource: PMeDownloadInfo);
+begin
+  if Assigned(aSource) then
+  begin
+    FURI := aSource.FURI;
+    FRevision := aSource.FRevision;
+    FAcceptRanges := aSource.FAcceptRanges;
+    FConnectTimeout := aSource.FConnectTimeout;
+    FReadTimeout := aSource.FReadTimeout;
+    FContentLength := aSource.FContentLength;
+    FExpires := aSource.FExpires;
+    FLastModified := aSource.FLastModified;
+    FCanResume := aSource.FCanResume;
+    FDate := aSource.FDate;
+    FHeaderInited := aSource.FHeaderInited;
+    FHasContentLength := aSource.FHasContentLength;
+  end;
 end;
 
 { TMeDownloadTask }
@@ -303,9 +325,9 @@ Begin
   FDownInfo := aDownInfo;
   FStream := aStream;
   Assert(FStream <> nil, 'no stream assigned error!');
-  if (FURL = '') and Assigned(FDownInfo) and not FDownInfo.FURI.Empty then
+  if (FURL = '') and Assigned(FDownInfo) and (FDownInfo.FURI <> '') then
   begin
-    FURL := FDownInfo.FURI.URI;
+    FURL := FDownInfo.FURI;
   end;
 end;
 
@@ -454,7 +476,7 @@ constructor TMeHttpDownloadSimpleTask.Create(const aURL: string; const aStream: 
 begin
   inherited Create(New(PMeDownloadInfo, Create), aStream);
   FURL := aURL;
-  FDownInfo.FURI.URI := aURL;
+  FDownInfo.FURI := aURL;
   FHttp.Compressor := LCompressor;
 end;
 
@@ -472,8 +494,13 @@ begin
       FHttp.Head(FURL);
     if Assigned(FDownInfo) and FDownInfo.FHeaderInited and FDownInfo.FCanResume then
     begin
-      FContentRangeStart := FStream.Position;
-      FContentRangeEnd := FDownInfo.FContentLength;
+      if FStream.Position < FDownInfo.FContentLength then
+      begin
+        FContentRangeStart := FStream.Position;
+        FContentRangeEnd := FDownInfo.FContentLength;
+      end
+      else
+        FStream.Size := 0;
     end
   end;
   inherited;

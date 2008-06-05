@@ -155,17 +155,30 @@ type
     { Summary : record the log message of the specified level. }
     procedure Lock;
     procedure UnLock;
-    procedure Log(const aLevel: TMeLogLevel; const aMsg: string);
+    procedure Log(const aLevel: TMeLogLevel; const aMsg: string);{$IFDEF SUPPORTS_OVERLOAD} overload;
+    procedure Log(const aLevel: TMeLogLevel; const aFmt: string; const Args: array of const);overload;{$ENDIF}
     procedure LogFmt(const aLevel: TMeLogLevel; const aFmt: string; const Args: array of const);
-    procedure Fatal(const aMsg: string);
-    procedure Error(const aMsg: string);
-    procedure Audit(const aMsg: string);
-    procedure Warn(const aMsg: string);
+    procedure Fatal(const aMsg: string);{$IFDEF SUPPORTS_OVERLOAD} overload;
+    procedure Fatal(const aMsg: string; const Args: array of const);overload;{$ENDIF}
+    procedure FatalFmt(const aMsg: string; const Args: array of const);
+    procedure Error(const aMsg: string);{$IFDEF SUPPORTS_OVERLOAD} overload;
+    procedure Error(const aMsg: string; const Args: array of const);overload;{$ENDIF}
+    procedure ErrorFmt(const aMsg: string; const Args: array of const);
+    procedure Audit(const aMsg: string);{$IFDEF SUPPORTS_OVERLOAD} overload;
+    procedure Audit(const aMsg: string; const Args: array of const);overload;{$ENDIF}
+    procedure AuditFmt(const aMsg: string; const Args: array of const);
+    procedure Warn(const aMsg: string);{$IFDEF SUPPORTS_OVERLOAD} overload;
+    procedure Warn(const aMsg: string; const Args: array of const);overload;{$ENDIF}
+    procedure WarnFmt(const aMsg: string; const Args: array of const);
     procedure Info(const aMsg: string);{$IFDEF SUPPORTS_OVERLOAD} overload;
     procedure Info(const aMsg: string; const Args: array of const);overload;{$ENDIF}
     procedure InfoFmt(const aMsg: string; const Args: array of const);
-    procedure Verbose(const aMsg: string);
-    procedure Debug(const aMsg: string);
+    procedure Verbose(const aMsg: string);{$IFDEF SUPPORTS_OVERLOAD} overload;
+    procedure Verbose(const aMsg: string; const Args: array of const);overload;{$ENDIF}
+    procedure VerboseFmt(const aMsg: string; const Args: array of const);
+    procedure Debug(const aMsg: string);{$IFDEF SUPPORTS_OVERLOAD} overload;
+    procedure Debug(const aMsg: string; const Args: array of const);overload;{$ENDIF}
+    procedure DebugFmt(const aMsg: string; const Args: array of const);
     { Summary : record the log message of the specified level. }
     procedure LogEx(const aLevel: TMeLogLevel; const aSubject, aMsg: string);
     { Summary : Open to record Log. }
@@ -478,19 +491,67 @@ begin
   Log(vlFatal, aMsg);
 end;
 
+{$IFDEF SUPPORTS_OVERLOAD}
+procedure TMeRootLogger.Fatal(const aMsg: string; const Args: array of const);
+begin
+  FatalFmt(aMsg, Args);
+end;
+{$ENDIF}
+
+procedure TMeRootLogger.FatalFmt(const aMsg: string; const Args: array of const);
+begin
+  LogFmt(vlFatal, aMsg, Args);
+end;
+
+{$IFDEF SUPPORTS_OVERLOAD}
+procedure TMeRootLogger.Error(const aMsg: string; const Args: array of const);
+begin
+  ErrorFmt(aMsg, Args);
+end;
+{$ENDIF}
+
 procedure TMeRootLogger.Error(const aMsg: string);
 begin
   Log(vlError, aMsg);
 end;
+
+procedure TMeRootLogger.ErrorFmt(const aMsg: string; const Args: array of const);
+begin
+  LogFmt(vlError, aMsg, Args);
+end;
+
+{$IFDEF SUPPORTS_OVERLOAD}
+procedure TMeRootLogger.Audit(const aMsg: string; const Args: array of const);
+begin
+  AuditFmt(aMsg, Args);
+end;
+{$ENDIF}
 
 procedure TMeRootLogger.Audit(const aMsg: string);
 begin
   Log(vlAudit, aMsg);
 end;
 
+procedure TMeRootLogger.AuditFmt(const aMsg: string; const Args: array of const);
+begin
+  LogFmt(vlAudit, aMsg, Args);
+end;
+
+{$IFDEF SUPPORTS_OVERLOAD}
+procedure TMeRootLogger.Warn(const aMsg: string; const Args: array of const);
+begin
+  WarnFmt(aMsg, Args);
+end;
+{$ENDIF}
+
 procedure TMeRootLogger.Warn(const aMsg: string);
 begin
   Log(vlWarning, aMsg);
+end;
+
+procedure TMeRootLogger.WarnFmt(const aMsg: string; const Args: array of const);
+begin
+  LogFmt(vlWarning, aMsg, Args);
 end;
 
 procedure TMeRootLogger.Info(const aMsg: string);
@@ -510,14 +571,38 @@ begin
   LogFmt(vlInfo, aMsg, Args);
 end;
 
+{$IFDEF SUPPORTS_OVERLOAD} 
+procedure TMeRootLogger.Verbose(const aMsg: string; const Args: array of const);
+begin
+  VerboseFmt(aMsg, Args);
+end;
+{$ENDIF}
+
 procedure TMeRootLogger.Verbose(const aMsg: string);
 begin
   Log(vlVerbose, aMsg);
 end;
 
+procedure TMeRootLogger.VerboseFmt(const aMsg: string; const Args: array of const);
+begin
+  LogFmt(vlVerbose, aMsg, Args);
+end;
+
+{$IFDEF SUPPORTS_OVERLOAD} 
+procedure TMeRootLogger.Debug(const aMsg: string; const Args: array of const);
+begin
+  LogFmt(vlDebug, aMsg, Args);
+end;
+{$ENDIF}
+
 procedure TMeRootLogger.Debug(const aMsg: string);
 begin
   Log(vlDebug, aMsg);
+end;
+
+procedure TMeRootLogger.DebugFmt(const aMsg: string; const Args: array of const);
+begin
+  LogFmt(vlDebug, aMsg, Args);
 end;
 
 procedure TMeRootLogger.Log(const aLevel: TMeLogLevel; const aMsg: string);
@@ -535,6 +620,13 @@ begin
     raise;
   end;
 end;
+
+{$IFDEF SUPPORTS_OVERLOAD}
+procedure TMeRootLogger.Log(const aLevel: TMeLogLevel; const aFmt: string; const Args: array of const);
+begin
+  Log(aLevel, FormatS(aFmt, Args));
+end;
+{$ENDIF}
 
 procedure TMeRootLogger.LogFmt(const aLevel: TMeLogLevel; const aFmt: string; const Args: array of const);
 begin
@@ -743,4 +835,5 @@ initialization
   SetMeVirtualMethod(TypeOf(TMeDebugLogger), ovtVmtParent, TypeOf(TMeCustomLogger));
   SetMeVirtualMethod(TypeOf(TMeStreamLogger), ovtVmtParent, TypeOf(TMeCustomLogger));
 finalization
+  MeFreeAndNil(FLogger);
 end.
