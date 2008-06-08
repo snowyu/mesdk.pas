@@ -114,7 +114,7 @@ begin
   Result := IndexOfName(aName);
   if Result >= 0 then
   begin
-    vItem := List[Result];
+    vItem := Get(Result);
     LoadParamsFromStream(vItem, aIn);
     vItem.Execute;
     SaveParamsToStream(vItem, aOut);
@@ -130,11 +130,16 @@ function TMeRemmoteFunctions.IndexOf(const aMethod: TMethod): Integer;
 var
   vItem: PMeRemmoteFunction;
 begin
+  with LockList^ do
+  try
   for Result := 0 to Count - 1 do
   begin
     vItem := List[Result];
     if (vItem.FInstance = aMethod.Data) and (vItem.FProc = aMethod.Code) then
       exit;
+  end;
+  finally
+    UnlockList;
   end;
   Result := -1;
 end;
@@ -143,11 +148,16 @@ function TMeRemmoteFunctions.IndexOfName(const aName: string): Integer;
 var
   vItem: PMeRemmoteFunction;
 begin
+  with LockList^ do
+  try
   for Result := 0 to Count - 1 do
   begin
-    vItem := List[Result];
+    vItem := Items[Result];
     if (vItem.FName = aName) then
       exit;
+  end;
+  finally
+    UnlockList;
   end;
   Result := -1;
 end;
@@ -157,15 +167,19 @@ var
   vItem: PMeRemmoteFunction;
 begin
   Result :=  (aName <> '') and Assigned(aMethod.Code);
-  if Result then
-  for Integer(Result) := 0 to Count - 1 do
-  begin
-    vItem := List[Integer(Result)];
-    if (vItem.FName = aName) or ((vItem.FInstance = aMethod.Data) and (vItem.FProc = aMethod.Code)) then
+  if Result then with LockList^ do
+  try
+    for Integer(Result) := 0 to Count - 1 do
     begin
-      Result := False;
-      exit;
+      vItem := Items[Integer(Result)];
+      if (vItem.FName = aName) or ((vItem.FInstance = aMethod.Data) and (vItem.FProc = aMethod.Code)) then
+      begin
+        Result := False;
+        exit;
+      end;
     end;
+  finally
+    UnlockList;
   end;
   Result := True;
 end;
