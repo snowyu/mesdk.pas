@@ -462,6 +462,9 @@ type
   end;
 //[END OF TMeList DEFINITION]
 
+  TStringsDefined = set of (sdDelimiter, sdQuoteChar, sdNameValueSeparator,
+    sdLineBreak, sdStrictDelimiter);
+
   PMeStrings = ^TMeStrings;
   TMeStrings = object(TMeContainer)
   private
@@ -473,6 +476,12 @@ type
   protected
     procedure Init; virtual; {override}
   protected
+    FDefined: TStringsDefined;
+    FDelimiter: Char;
+    FLineBreak: string[2];
+    FQuoteChar: Char;
+    FNameValueSeparator: Char;
+    FStrictDelimiter: Boolean;
     FList: PMeList;
     FCaseSensitiveSort: Boolean;
     FTextBuf: PChar;
@@ -485,6 +494,8 @@ type
     procedure Put(Idx: integer; const Value: string);
     procedure SetTextStr(const Value: string);
     function GetPChars( Idx: Integer ): PChar;
+    function GetStrictDelimiter: Boolean;
+    procedure SetStrictDelimiter(const Value: Boolean);
 
     destructor Destroy; virtual;(*override;*)
   public
@@ -558,6 +569,7 @@ type
     {Summary Call it to sort string list. }
     procedure Sort(CaseSensitive: Boolean);
   public
+    procedure AddDelimitedText(const Value: string; aDelimiter: Char = #0);
     {Summary Adds string S (null-terminated) with associated object Obj. }
     function AddPCharObject(S: PChar; Obj: LongWord): Integer;
     {Summary Adds string S of length Len with associated object Obj. }
@@ -599,6 +611,7 @@ type
     {Summary Content of string list as a single string (where strings are separated
        by characters $0D,$0A). }
     property Text: string read GetTextStr write SetTextStr;
+    property StrictDelimiter: Boolean read GetStrictDelimiter write SetStrictDelimiter;
   end;
 
   {Summary the Dynamic Memory can auto increase the memory size}
@@ -2144,6 +2157,67 @@ begin
   Result := AddObjectLen( PChar( S ), Length( S ), 0 );
 end;
 
+procedure TMeStrings.AddDelimitedText(const Value: string; aDelimiter: Char);
+var
+  P, P1: PChar;
+  S: string;
+begin
+  if aDelimiter = #0 then
+    aDelimiter := FDelimiter;
+    P := PChar(Value);
+    if not FStrictDelimiter then
+      while P^ in [#1..' '] do
+      {$IFDEF MSWINDOWS}
+        P := CharNext(P);
+      {$ELSE}
+        Inc(P);
+      {$ENDIF}
+    while P^ <> #0 do
+    begin
+      if P^ = FQuoteChar then
+        S := AnsiExtractQuotedStr(P, FQuoteChar)
+      else
+      begin
+        P1 := P;
+        while ((not FStrictDelimiter and (P^ > ' ')) or
+              (FStrictDelimiter and (P^ <> #0))) and (P^ <> aDelimiter) do
+        {$IFDEF MSWINDOWS}
+          P := CharNext(P);
+        {$ELSE}
+          Inc(P);
+        {$ENDIF}
+        SetString(S, P1, P - P1);
+      end;
+      Add(S);
+      if not FStrictDelimiter then
+        while P^ in [#1..' '] do
+        {$IFDEF MSWINDOWS}
+          P := CharNext(P);
+        {$ELSE}
+          Inc(P);
+        {$ENDIF}
+
+      if P^ = aDelimiter then
+      begin
+        P1 := P;
+        {$IFDEF MSWINDOWS}
+        if CharNext(P1)^ = #0 then
+        {$ELSE}
+        Inc(P1);
+        if P1^ = #0 then
+        {$ENDIF}
+          Add('');
+        repeat
+          {$IFDEF MSWINDOWS}
+          P := CharNext(P);
+          {$ELSE}
+          Inc(P);
+          {$ENDIF}
+        until not (not FStrictDelimiter and (P^ in [#1..' ']));
+      end;
+    end;
+end;
+
 function TMeStrings.AddObject(const S: String; Obj: LongWord): Integer;
 begin
   Result := AddObjectLen( PChar( S ), Length( S ), Obj );
@@ -2294,6 +2368,13 @@ begin
   else Result := nil;
 end;
 
+function TMeStrings.GetStrictDelimiter: Boolean;
+begin
+  if not (sdStrictDelimiter in FDefined) then
+    FStrictDelimiter := False;
+  Result := FStrictDelimiter;
+end;
+
 function TMeStrings.GetTextStr: string;
 var L, i: Integer;
     p: PChar;
@@ -2354,6 +2435,8 @@ procedure TMeStrings.Init;
 begin
   FList := NewList;
   FastClear := TRUE;
+  FQuoteChar := '''';
+  FDelimiter := ',';
 end;
 
 procedure TMeStrings.Insert(Idx: integer; const S: String);
@@ -2537,6 +2620,15 @@ begin
     AddObjectLen( nil, 0, 0 );
   Dest := PLongWord( LongWord( FTextBuf ) + LongWord( FList.Items[ Idx ] ) );
   Dest^ := Value;
+end;
+
+procedure TMeStrings.SetStrictDelimiter(const Value: Boolean);
+begin
+  if (FStrictDelimiter <> Value) or not (sdStrictDelimiter in FDefined) then
+  begin
+    Include(FDefined, sdStrictDelimiter);
+    FStrictDelimiter := Value;
+  end
 end;
 
 procedure TMeStrings.SetText(const S: string; Append2List: boolean);

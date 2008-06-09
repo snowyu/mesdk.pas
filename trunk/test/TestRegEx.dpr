@@ -52,7 +52,9 @@ begin
   vs := TStringList.Create;
   r1 := TRegExpr.Create;
   try try 
+    {
     r.Pattern := '/<([^>''"]*|".*?"|''.*?'')>/:n';
+
     r1.Expression :=  '<([^>''"]*|".*?"|''.*?'')>';
     QueryPerformanceCounter(t1);
     r1.Compile;
@@ -60,7 +62,6 @@ begin
     writeln('Compile time: ', t2-t1);
     vs.LoadFromFile(ExtractFilePath(ParamStr(0))+'html.txt');
     r1.InputString := trim(vs.Text);
-    r.Name := 'root';
     c := 1;
     QueryPerformanceCounter(t1);
     if r1.Exec then
@@ -77,16 +78,18 @@ begin
     QueryPerformanceCounter(t2);
     writeln('found count: ',c, ' time:', t2-t1);
     exit;
+    //}
 
     {$IFDEF SubExprName_RegExpr}
-    r.AddExpr('ListBegin', '/<td>(.+?):field:</td>/', 1);
+    r.AddExpr('ListBegin', '/<td>(.+?):field:</td>$[:ATag{URI=MyURI,Name=myName}:]/', 1);
     r.Pattern := '/(Good|Better|Bad):thing:[[ListBegin]]/:n';
     {$ELSE}
     r.AddExpr('ListBegin', '/<td>(.+?)</td>/', 1);
     r.Pattern := '/(Good|Better|Bad)[[ListBegin]]/:n';
     {$ENDIF}
-    r.InputString := 'this is not a Good <td>New</td>, but it is Better<td>New</td>. it is not Bad<td>New</td>.';
+    r.InputString := 'this is not a Good <td>New</td><a href="http://dd.com/hi">Hello</a>, but it is Better<td>New</td>. it is not Bad<td>New</td>.';
     r.Name := 'root';
+    r.Macros.Add('ATag=<a\s+href=([''|"])(?<URI>.+?)(\1).?>(?<Name>.+?)</a>');
     while em.MoveNext() do
     begin
       if Assigned(r.RegExpr) then
@@ -101,7 +104,7 @@ begin
     Writeln(Trim(vStrs.Text));
     Writeln('---------------------------');
     r.LoadPatternFromStrs(vStrs);
-    r.InputString := 'this is not a Good <td>New</td>, but it is Better<td>New</td>. it is not Bad<td>New</td>.';
+    r.InputString := 'this is not a Good <td>New</td><a href="http://dd.com/hi">Hello</a>, but it is Better<td>New</td>. it is not Bad<td>New</td>.';
     r.Name := 'root';
     em.Reset;
     while em.MoveNext() do
