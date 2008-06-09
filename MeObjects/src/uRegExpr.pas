@@ -1958,9 +1958,16 @@ function TRegExpr.ParseReg (paren : integer; var flagp : integer) : PRegExprChar
   //added by riceball 2003-12-17
   //Error(reeSubExprNameMisMatch+ '='+ regparse^);
   //Raise exception.Create('='+ regparse^);
-  If regparse^ = ':'  Then
+  If (paren <> 0) and (regparse^ = ':')  Then
   Begin
     inc(regparse);
+    {
+      FSubExprNames[parNo] := '';
+      While (regparse^ <> #0) and (regparse^ <> ':') Do
+      Begin
+        FSubExprNames[parNo] := FSubExprNames[parNo] + regparse^;
+        inc(regparse);
+      End; // While}
     if regcode <> @regdummy then
     begin
       FSubExprNames[parNo] := '';
@@ -1974,9 +1981,12 @@ function TRegExpr.ParseReg (paren : integer; var flagp : integer) : PRegExprChar
       While (regparse^ <> #0) and (regparse^ <> ':') Do
       Begin
         inc(regparse);
-      End; // While
+      End; // While }
+
     If regparse^ = #0 Then
+    begin
       Error(reeSubExprNameMisMatch);
+    end;
     inc(regparse);
   End; // If
   {$ENDIF}

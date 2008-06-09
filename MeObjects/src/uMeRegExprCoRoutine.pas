@@ -104,14 +104,14 @@ type
   TMeRegExprEnumerator = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeCustomCoRoutine)
   protected
     FRegExpr: PMeCustomRegExpr;
-    FCurrent: PMeCustomSimpleRegExpr; //only available on the execution time.
+    FCurrent: PMeAbstractRegExpr; //only available on the execution time.
 
-    procedure DoFound(const Sender: PMeCustomSimpleRegExpr);
+    procedure DoFound(const Sender: PMeAbstractRegExpr; const aResult: PMeRegExprResultItem);
     //##CoRoutine
     procedure CoExecute; {$IFDEF YieldClass_Supports}override{$ELSE}virtual{$ENDIF};
   public
     constructor Create(const aRegExpr: PMeCustomRegExpr);
-    property Current: PMeCustomSimpleRegExpr read FCurrent;
+    property Current: PMeAbstractRegExpr read FCurrent;
   end;
 
 implementation
@@ -133,7 +133,7 @@ begin
   end;
 end;
 
-procedure TMeRegExprEnumerator.DoFound(const Sender: PMeCustomSimpleRegExpr);
+procedure TMeRegExprEnumerator.DoFound(const Sender: PMeAbstractRegExpr; const aResult: PMeRegExprResultItem);
 begin
   FCurrent := Sender;
   Yield;

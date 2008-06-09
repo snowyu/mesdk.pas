@@ -90,18 +90,23 @@ if not found "$[ListBegin.Sex]" then use ListBegin.Sex as FiledName.
 
 
 
-Defines:
-  SubExpression: [[SearchListBegin]]
-  SubField: $[SubField]
-  Macro(inline): $[:Macro:]
-    the macro is pure Regular expression!
-
 How to use the MatchResult?
 treat the RegExprResultItem as the record item.
   the record item includes the fields and values.
     the fields collects only the sub-expressions in the RegExpr.Match[1]...Match[SubExprMatchCount].
     if the SubExprName_RegExpr enabled, it will be format: "SubExprName=MatchValue" in the Strings.
 }
+(*
+Defines:
+  SubExpression: [[SearchListBegin]]
+  SubField: $[SubField]
+  Macro(inline): $[:Macro{Param1=XX1,Param2=XX2}:]
+    the macro is pure Regular expression! the "{Param1=XX1, Param2=XX2}" is optional.
+    eg: 
+    Macro: ATag= <a href=(['|"])(?<URI>.*?)(\1).*>(?<Name>.*?)</a>
+      List=/$[:ATag{URI=MyURI,Name=MName}:]/:n
+
+*)
   PMeAbstractRegExpr = ^ TMeAbstractRegExpr;
   PMeCustomSimpleRegExpr = ^ TMeCustomSimpleRegExpr;
   PMeSimpleRegExpr = ^ TMeSimpleRegExpr;
@@ -111,7 +116,7 @@ treat the RegExprResultItem as the record item.
   PMeRegExprResultItem = ^ TMeRegExprResultItem;
   PMeRegExprResult = ^ TMeRegExprResult;
 
-  TMeRegExprFoundEvent = procedure(const Sender: PMeCustomSimpleRegExpr) of object;
+  TMeRegExprFoundEvent = procedure(const Sender: PMeAbstractRegExpr; const aResult: PMeRegExprResultItem) of object;
 
   TMeRegExprResultItem = object(TMeDynamicObject)
   protected
@@ -196,7 +201,7 @@ treat the RegExprResultItem as the record item.
 
   TMeCustomSimpleRegExpr = object(TMeAbstractRegExpr)
   protected
-    procedure DoResultFound(const Sender: PMeCustomSimpleRegExpr);
+    procedure DoResultFound(const Sender: PMeAbstractRegExpr);
     function DoReplacePatternFunc(const aRegExpr : TRegExpr): RegExprString;
     //function GetRegExpr: TRegExpr;
     //function GetExpression: RegExprString; virtual;
@@ -442,7 +447,7 @@ begin
   end;
 end;
 
-procedure TMeCustomSimpleRegExpr.DoResultFound(const Sender: PMeCustomSimpleRegExpr);
+procedure TMeCustomSimpleRegExpr.DoResultFound(const Sender: PMeAbstractRegExpr);
 var
   vItem: PMeRegExprResultItem;
   i: Integer;
@@ -472,21 +477,24 @@ begin
         MatchResult.Add(vItem);
       end
       else
-        vItem.Free;
+        MeFreeAndNil(vItem);
     end; //try-finally
-    //Writeln('DoResultFound:', FRoot.Name);
     
-    //MatchResult.Add(vStrs);
-    if Assigned(FOnFound) then
-      FOnFound(Sender)
-    else if Assigned(FRoot) and Assigned(FRoot.FOnFound) then
-      FRoot.FOnFound(Sender);
+    if Assigned(vItem) then
+    begin
+      if Assigned(FOnFound) then
+        FOnFound(Sender, vItem)
+      else if Assigned(FRoot) and Assigned(FRoot.FOnFound) then
+        FRoot.FOnFound(Sender, vItem);
+    end;
   end;
 end;
 
 function TMeCustomSimpleRegExpr.DoReplacePatternFunc(const aRegExpr : TRegExpr): RegExprString;
 var
   s: RegExprString;
+  i: Integer;
+  vParams: PMeStrings;
 begin
   with aRegExpr do
   begin
@@ -494,14 +502,33 @@ begin
     if (Length(s) >= 3) and (s[1] =':') and (s[Length(s)]=':') then 
     begin
       //Is Macro
-      s := Copy(s, 2, Length(s)-2);
-      s := Macros.Values[PChar(s)];
-      if s = '' then
-        s := Trim(Match[1]);
+      New(vParams, Create);
+      try
+        s := Trim(Copy(s, 2, Length(s)-2));
+        if (Length(s) > 3) and (s[Length(s)] = '}') then //have params
+        begin
+          i := AnsiPos(RegExprString('{'), s);
+          vParams.AddDelimitedText(Copy(s, i+1, Length(s)-i-1));
+          s := Copy(s, 1, i-1);
+        end;
+        s := Macros.Values[PChar(s)];
+        if (s <> '') then
+        begin
+          for i := 0 to vParams.Count - 1 do
+          begin
+            s := StringReplace(s, vParams.Names[i], vParams.GetValueByIndex(i), [rfReplaceAll]);
+          end;
+        end
+        else //can not find in the Macros, restore it.
+          s := Trim(Match[1]);
+      finally
+        MeFreeAndNil(vParams);
+      end;
     end;
     Result := MatchResult.ValueOf(s);
     if Result = '' then
       Result := s;
+    writeln(' replacePattern:', Result);
   end;
 end;
 
@@ -512,6 +539,7 @@ begin
   try
     Expression := cMeFieldNamePattern;
     Result := ReplaceEx(Result, DoReplacePatternFunc);
+    //writeln('GetAdjustedPattern=', Result);
   finally
     Free;
   end;
