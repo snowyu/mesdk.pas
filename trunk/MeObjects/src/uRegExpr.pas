@@ -41,6 +41,7 @@
       it do not assigned the InputString, just point it directly. so u must do not free the string(be careful)!!
   + keep the more compatible with the Perl RegExpr: (?:....)
       the non-capuring Group, but not whole impl it.
+  ! EscChar can use SubExprName.
   ! get rid of the comment RegOp.
   ! continue to CapturingGroup feature: skiped group: (?:...) 
   ! add more compatible with the Perl RegExpr:  (?<name>...) or (?'name'...)
