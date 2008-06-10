@@ -41,6 +41,9 @@
       it do not assigned the InputString, just point it directly. so u must do not free the string(be careful)!!
   + keep the more compatible with the Perl RegExpr: (?:....)
       the non-capuring Group, but not whole impl it.
+  + \-[1..9]: means prev SubExpr in Expression.
+    (['|"])\S+\-1
+    match: 'dddd', "word".
   ! EscChar can use SubExprName.
   ! get rid of the comment RegOp.
   ! continue to CapturingGroup feature: skiped group: (?:...) 
@@ -2734,6 +2737,21 @@ function TRegExpr.ParseAtom (var flagp : integer) : PRegExprChar;
               else ret := EmitNode (BSUBEXP);
              EmitC (REChar (ord (regparse^) - ord ('0')));
              flagp := flagp or HASWIDTH or SIMPLE;
+            end;
+            '-': begin
+              if ((regparse+1)^ in ['1'..'9'])  then
+              begin
+                inc (regparse);
+                if (fCompModifiers and MaskModI) <> 0
+                then ret := EmitNode (BSUBEXPCI)
+                else ret := EmitNode (BSUBEXP);
+                //writeln('regpa1:', regnpar);
+                //writeln('regpa:', regnpar - (ord (regparse^) - ord ('0')));
+                EmitC (REChar (regnpar  - (ord (regparse^) - ord ('0'))));
+                flagp := flagp or HASWIDTH or SIMPLE;
+              end
+              else
+                EmitExactly (UnQuoteChar (regparse));
             end;
           else EmitExactly (UnQuoteChar (regparse));
          end; { of case}
