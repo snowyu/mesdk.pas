@@ -20,7 +20,7 @@
   你才能撤销注入！！
 
    @author  Riceball LEE(riceballl@hotmail.com)
-   @version Revision: 1.$Rev$
+   @version $Revision: 1.5 $
 
   License:
     * The contents of this file are released under a dual \license, and
