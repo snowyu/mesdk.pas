@@ -3,7 +3,7 @@
 {Summary Enumerator Pattern -- MeYield..}
 {
    @author  Riceball LEE<riceballl@hotmail.com>
-   @version $Revision: 1.00 $
+   @version $Revision$
 
 usage
   just a demo for YieldClass_Supports D2007.

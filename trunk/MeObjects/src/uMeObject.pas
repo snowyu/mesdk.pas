@@ -2,7 +2,7 @@
 {Summary MeObject - the MeSDK Core - the abstract mini class(dynamic) - PMeDynamicObject.}
 {
    @author  Riceball LEE(riceballl@hotmail.com)
-   @version $Revision: 1.2 $
+   @version $Revision$
 
 if you wanna the ClassParent supports for the class derived from TMeDynamicObject:
 

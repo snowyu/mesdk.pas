@@ -1,7 +1,7 @@
 { Summary : MeObject Logging of Application Class. }
 { Description
    @author  Riceball LEE(riceballl@hotmail.com)
-   @version $Revision: 1.00 $
+   @version $Revision$
 
 
   License:
@@ -81,7 +81,7 @@ const
   //EOL = sLineBreak;
 
 const
-  cLoggerRevision = '$Revision: 1.00 $';
+  cLoggerRevision = '$Revision$';
 
 resourcestring
   RSLogEOL = '<EOL>'; //End of Line

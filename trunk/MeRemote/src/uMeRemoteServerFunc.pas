@@ -3,7 +3,7 @@
 {Summary MeRemote Server Function Invoker.}
 {
    @author  Riceball LEE(riceballl@hotmail.com)
-   @version $Revision: 1.00 $
+   @version $Revision$
 
 
   License:

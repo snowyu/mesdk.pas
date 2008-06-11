@@ -1,7 +1,7 @@
 {Summary the MeRegExpr extension object .}
 {
    @author  Riceball LEE(riceballl@hotmail.com)
-   @version $Revision: 0.98 $
+   @version $Revision$
 
   License:
     * The contents of this file are released under a dual \license, and

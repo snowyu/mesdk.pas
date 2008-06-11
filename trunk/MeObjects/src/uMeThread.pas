@@ -1,7 +1,7 @@
 {Summary MeThread - the Thread object for the MeSDK Core.}
 {
    @author  Riceball LEE(riceballl@hotmail.com)
-   @version $Revision: 1.15 $
+   @version $Revision$
 
   License:
     * The contents of this file are released under a dual \license, and

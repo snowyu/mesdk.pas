@@ -1,7 +1,7 @@
 
 {
    @author  Riceball LEE(riceballl@hotmail.com)
-   @version $Revision: 1.12 $
+   @version $Revision$
 
   License:
     * The contents of this file are released under a dual \license, and
