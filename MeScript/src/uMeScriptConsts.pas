@@ -3,7 +3,7 @@
 {Summary MeScript types and constants- the MeSDK Script Engine Core.}
 {
    @author  Riceball LEE(riceballl@hotmail.com)
-   @version $Revision: 1.40 $
+   @version $Revision$
 
 
   License:

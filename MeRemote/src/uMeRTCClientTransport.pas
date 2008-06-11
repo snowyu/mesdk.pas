@@ -5,7 +5,7 @@
 {Summary RTC Client MeTransport class.}
 {
    @author  Riceball LEE(riceballl@hotmail.com)
-   @version $Revision: 1.00 $
+   @version $Revision$
 
 HTTP Method   CRUD Action   Description
 POST          CREATE        Create a new resource

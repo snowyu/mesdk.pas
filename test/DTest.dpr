@@ -27,7 +27,7 @@
     Copyright(C) 2006-2008 by Riceball LEE
 
   Current Version
-    $Revision: 1.3 $
+    $Revision$
 
   History
     °æ±¾ÀúÊ·¡£
@@ -223,7 +223,7 @@ end.
 {.$R *.RES}
 
 const
-  rcs_id :string = '#(@)$Id: DTest.dpr,v 1.3 2008/02/08 16:31:06 riceball Exp $';
+  rcs_id :string = '#(@)$Id$';
   SwitchChars = ['-','/'];
 
 procedure RunInConsoleMode;

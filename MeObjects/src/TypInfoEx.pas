@@ -4,7 +4,7 @@
   Author
   Riceball LEE(riceballl@hotmail.com)
   Version
-  \$Revision: 1.40 $
+  \$Revision$
   Description
   Type TNumber = (one, two, three);
   

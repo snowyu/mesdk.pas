@@ -4,7 +4,7 @@
 Description
 
    @author  Riceball LEE(riceballl@hotmail.com)
-   @version $Revision: 1.21 $
+   @version $Revision$
 
 分析
    Token 类型分为两类， 
