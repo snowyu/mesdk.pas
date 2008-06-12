@@ -89,11 +89,17 @@ begin
     {$ENDIF}
     r.InputString := 'this is not a Good <td>New</td><a href="http://dd.com/hi">Hello</a>, but it is Better<td>New</td>. it is not Bad<td>New</td>.';
     r.Name := 'root';
-    r.Macros.Add('ATag=<a\s+href=([''|"])(?<URI>.+?)(\1).?>(?<Name>.+?)</a>');
+    r.Macros.Add('ATag=<a\s+href=([''|"])(?<URI>.+?)\-2.?>(?<Name>.+?)</a>');
     while em.MoveNext() do
     begin
       if Assigned(r.RegExpr) then
+      begin
         writeln(em.Current.Name, ' found: ', r.RegExpr.Match[0]);
+        if Assigned(em.Result) then
+          writeln('SubExpr={', em.Result.Fields.Text,'}')
+        else 
+          writeln('no SubExpr');
+      end;
     end;
     r.GetMatchResult(vStrs);
     Writeln('---------------------------');
@@ -110,7 +116,13 @@ begin
     while em.MoveNext() do
     begin
       if Assigned(r.RegExpr) then
+      begin
         writeln(em.Current.Name, ' found: ', r.RegExpr.Match[0]);
+        if Assigned(em.Result) then
+          writeln('SubExpr={', em.Result.Fields.Text,'}')
+        else 
+          writeln('no SubExpr');
+      end;
     end;
   except
     on e: exception do writeln(e.ClassName, ' Exception:', e.message);
