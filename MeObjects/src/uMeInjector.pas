@@ -95,7 +95,7 @@ type
     FMethodClass: TClass;
     // for virtual method(Index) or dynamic method(Slot) 
     // or published method(PPublishedMethodEntry)
-    // or static method(procedure) it is the drecitve: JMP or CALL
+    // or static method(procedure) it is the directive: JMP or CALL
     FMethodIndex: Integer; 
 
     procedure SetEnabled(Value: Boolean);
@@ -134,7 +134,7 @@ type
     function InjectDynamicMethod(aClass: TClass; aSlot: Integer; aNewLocation: Pointer): Boolean;
     { Summary Inject the aNewLocation to the PMT.}
     function InjectPublishedMethod(aClass: TClass; aEntry: PPublishedMethodEntry; aNewLocation: Pointer): Boolean;
-    //the gernal inject method
+    //the general inject method
     {
     Inject the procedure : Inject(@aProc, @MyNewProc);
     Inject the method : Inject(@TAClass.Method, @MyNewMethod, TAClass [, mtVirtual]);
@@ -147,7 +147,7 @@ type
     function Inject(aPatchLocation: Pointer; aNewLocation: Pointer
       ; aClass: TClass = nil
       ; aMethodType: TMethodType=mtUnknown): Boolean;overload;
-    { Summay Inject the Published method of the class by InjectStaticMethod!} 
+    { Summary: Inject the Published method of the class by InjectStaticMethod!} 
     { Note: the published method can be the abstract method!
        Inject('MyMethodName', @MyNewMethodProc, TMyClass);
       See Also InjectStaticMethod
