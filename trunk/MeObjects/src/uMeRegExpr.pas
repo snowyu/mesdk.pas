@@ -116,6 +116,7 @@ Defines:
   PMeRegExprResultItem = ^ TMeRegExprResultItem;
   PMeRegExprResult = ^ TMeRegExprResult;
 
+  //if no SubExpr Defined then aResult is nil.
   TMeRegExprFoundEvent = procedure(const Sender: PMeAbstractRegExpr; const aResult: PMeRegExprResultItem) of object;
 
   TMeRegExprResultItem = object(TMeDynamicObject)
@@ -480,7 +481,7 @@ begin
         MeFreeAndNil(vItem);
     end; //try-finally
     
-    if Assigned(vItem) then
+    //if Assigned(vItem) then
     begin
       if Assigned(FOnFound) then
         FOnFound(Sender, vItem)
@@ -528,7 +529,7 @@ begin
     Result := MatchResult.ValueOf(s);
     if Result = '' then
       Result := s;
-    writeln(' replacePattern:', Result);
+    //writeln(' replacePattern:', Result);
   end;
 end;
 
