@@ -234,7 +234,7 @@ type
     {$ENDIF}
   end;
 
-  {Summary the abstract dynamic object. }
+  {Summary the abstract dynamic object --- the mini-class. }
   TMeDynamicObject = object(TMeVMTHelper)
   public //methods
      {Summary Disposes the memory allocated to an object }
@@ -262,6 +262,7 @@ type
   end;
 
   PMeNamedObject = ^TMeNamedObject;
+  { Summary: add the name property and assign virtual method. }
   TMeNamedObject = object(TMeDynamicObject)
   protected //private
     FName: String;
@@ -273,6 +274,7 @@ type
   end;
 
   PMeComponent = ^TMeComponent;
+  { Summary: set the name property will be added to GComponentNameList. }
   TMeComponent = object(TMeDynamicObject)
   protected //##private
     FName: String;
@@ -286,6 +288,7 @@ type
   end;
 
   PMeInterfacedObject = ^TMeInterfacedObject;
+  { Summary: supports the FreeNotifies and Destroyed only when reference count < 0  }
   TMeInterfacedObject = object(TMeDynamicObject)
   protected
     FOnDestroy: TMeNotifyEvent;
@@ -343,6 +346,7 @@ type
   end;
 
   PMeContainer = ^ TMeContainer;
+  { Summary: abstract data Container }
   TMeContainer = Object(TMeDynamicObject)
   protected
     FCount: Integer;
@@ -466,6 +470,7 @@ type
     sdLineBreak, sdStrictDelimiter);
 
   PMeStrings = ^TMeStrings;
+  { Summary: maintains a list of strings.}
   TMeStrings = object(TMeContainer)
   private
     function GetItemLen(Idx: Integer): Integer;
@@ -654,6 +659,7 @@ type
     property UsedSize: Integer read FUsedSize write SetUsedSize;
   end;
 
+  { Summary: the base class type for stream objects that can read from or write to various kinds of storage media, such as disk files, dynamic memory, and so on. }
   TMeStream = object(TMeDynamicObject)
   private
     function GetSize64: Int64;
@@ -688,6 +694,7 @@ type
   end;
 
   PMeNamedObjects = ^ TMeNamedObjects;
+  { Summary: maintains the PMeNamedObject list }
   TMeNamedObjects = object(TMeList)
   protected
     function GetItem(Index: Integer): PMeNamedObject;
@@ -715,7 +722,7 @@ function NewList: PMeList;
 function NewStrings: PMeStrings;
 { create an instance for the aClass }
 { 
-  I got the idea.
+  @param aClass  you can use the TypeOf(TMeXXX) pass it.
   Limits: all class constructor Create method Must be no parameters.
 }
 function NewMeObject(const aClass: TMeClass): PMeDynamicObject;
@@ -742,8 +749,10 @@ procedure MeFreeAndNil(var Obj); {$IFDEF SUPPORTS_INLINE}inline;{$ENDIF}
   It Should cast the aObj directly !! the MeTypeOf is not useful!
 }
 function MeTypeOf(const aObj: TMeVMTHelper): TMeClass; {$IFDEF PUREPASCAL}{$IFDEF SUPPORTS_INLINE}inline;{$ENDIF}{$ENDIF}
+{Summary: return the size of aObj.}
 function MeSizeOf(const aObj: TMeVMTHelper): Integer; {$IFDEF PUREPASCAL}{$IFDEF SUPPORTS_INLINE}inline;{$ENDIF}{$ENDIF}
 
+{Summary: replace the VirtualMethod of the MeObject to new Method Pointer. return the original method entry pointer.}
 function SetMeVirtualMethod(const aClass: TMeClass; const Offset: Integer; const Method: Pointer): Pointer;
 
 //##[String FUNCTIONS DECLARATIONS]
@@ -777,7 +786,7 @@ function StrLComp_NoCase(const Str1, Str2: PChar; MaxLen: Cardinal): Integer;
 type
   {Summary Event type to define comparison function between two elements of an array.
      This event handler must return -1 or +1 (correspondently for cases e1 less than e2
-     and e2 greater than e2). Items are enumerated from 0 to uNElem. }
+     and e2 greater than e2). Items are enumerated from 0 to aCount-1. }
   TCompareEvent = function (const Data: Pointer; const e1,e2 : LongWord) : Integer;
   {Summary Event type to define swap procedure which is swapping two elements of an
      array. }
@@ -789,8 +798,8 @@ type
    and procedure to perform custom compare and swap operations.
    First procedure parameter is to pass it to callback function
    CompareFun and procedure SwapProc. Items are enumerated from
-   0 to uNElem-1. }
-procedure SortData(const Data: Pointer; const uNElem: LongWord;
+   0 to aCount-1. }
+procedure SortData(const Data: Pointer; const aCount: LongWord;
                     const CompareFun: TCompareEvent;
                     const SwapProc: TSwapEvent);
 
@@ -804,6 +813,14 @@ procedure SortIntegerArray(var A : array of Integer);
 {Summary Procedure to sort array of unsigned 32-bit integers.}
 procedure SortDwordArray(var A : array of LongWord);
 
+{Summary: Determines the relationship of two object types.}
+{Description
+Use InheritsFrom to determine if a particular class type or object is an instance of a class or one of its descendants. 
+MeInheritsFrom returns true if the object type specified in the aClass parameter is an ancestor of the object type or the type of the object itself. Otherwise, it returns false.
+
+Note: first you must set the proper parent class type via SetMeVirtualMethod in the initiliazation section.
+  SetMeVirtualMethod(TypeOf(TMeInterfacedObject), ovtVmtParent, TypeOf(TMeDynamicObject));
+}
 function MeInheritsFrom(aClass: TMeClass; const aParentClass: TMeClass): Boolean;
 
 implementation
@@ -3319,11 +3336,11 @@ end {$IFDEF FPC} [ 'EAX', 'EDX', 'ECX' ] {$ENDIF};
 { -- qsort -- }
 
 //[PROCEDURE SortData]
-procedure SortData( const Data: Pointer; const uNElem: LongWord;
+procedure SortData( const Data: Pointer; const aCount: LongWord;
                     const CompareFun: TCompareEvent;
                     const SwapProc: TSwapEvent );
 {$IFDEF PUREPASCAL}
-{ uNElem - number of elements to sort }
+{ aCount - number of elements to sort }
 
   function Compare( const e1, e2 : LongWord ) : Integer;
   begin
@@ -3442,8 +3459,8 @@ procedure SortData( const Data: Pointer; const uNElem: LongWord;
     end; {qSortHelp }
 
 begin
-  if (uNElem < 2) then  exit; { nothing to sort }
-  qSortHelp(1, uNElem);
+  if (aCount < 2) then  exit; { nothing to sort }
+  qSortHelp(1, aCount);
 end;
 {$ELSE } //ASM
 asm // translated to BASM by Kladov Vladimir

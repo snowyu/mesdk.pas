@@ -124,18 +124,18 @@ type
       @param aDirective the inject directive: near CALL or JMP.
                         the default is the near JMP directive used.
     }
-    function InjectProcedure(aPatchLocation: Pointer; aNewLocation: Pointer; const aDirective: Integer = DefaultInjectDirective): Boolean;
+    function InjectProcedure(const aPatchLocation: Pointer; const aNewLocation: Pointer; const aDirective: Integer = DefaultInjectDirective): Boolean;
     { Summay: Inject the static method }
-    function InjectStaticMethod(aClass: TClass; aPatchLocation: Pointer; aNewLocation: Pointer; const aDirective: Integer = DefaultInjectDirective): Boolean;
+    function InjectStaticMethod(const aClass: TClass; const aPatchLocation: Pointer; const aNewLocation: Pointer; const aDirective: Integer = DefaultInjectDirective): Boolean;
     { Summary Inject the aNewLocation to the VMT.}
     {NOTE: if you insert a new virtual method the index number may be changed.}
-    function InjectVirtualMethod(aClass: TClass; aIndex: Integer; aNewLocation: Pointer): Boolean;
+    function InjectVirtualMethod(const aClass: TClass; const aIndex: Integer; const aNewLocation: Pointer): Boolean;
     { Summary Inject the aNewLocation to the DMT.}
-    function InjectDynamicMethod(aClass: TClass; aSlot: Integer; aNewLocation: Pointer): Boolean;
+    function InjectDynamicMethod(const aClass: TClass; const aSlot: Integer; const aNewLocation: Pointer): Boolean;
     { Summary Inject the aNewLocation to the PMT.}
-    function InjectPublishedMethod(aClass: TClass; aEntry: PPublishedMethodEntry; aNewLocation: Pointer): Boolean;
-    //the general inject method
-    {
+    function InjectPublishedMethod(const aClass: TClass; const aEntry: PPublishedMethodEntry; const aNewLocation: Pointer): Boolean;
+    { Summary: the general inject method }
+    { Description
     Inject the procedure : Inject(@aProc, @MyNewProc);
     Inject the method : Inject(@TAClass.Method, @MyNewMethod, TAClass [, mtVirtual]);
       Note:
@@ -144,9 +144,9 @@ type
             you should call the InjectVirtualMethod or InjectDynamicMethod directly 
             if you wanna inject an abstract method 
     } 
-    function Inject(aPatchLocation: Pointer; aNewLocation: Pointer
-      ; aClass: TClass = nil
-      ; aMethodType: TMethodType=mtUnknown): Boolean;overload;
+    function Inject(const aPatchLocation: Pointer; const aNewLocation: Pointer
+      ; const aClass: TClass = nil
+      ; const aMethodType: TMethodType=mtUnknown): Boolean;overload;
     { Summary: Inject the Published method of the class by InjectStaticMethod!} 
     { Note: the published method can be the abstract method!
        Inject('MyMethodName', @MyNewMethodProc, TMyClass);
@@ -154,9 +154,9 @@ type
       Why do I inject it as StaticMethod?
         I wanna the return address via CALL. 
     }
-    function Inject(const aMethodName: string; aNewLocation: Pointer
-      ; aClass: TClass
-      ; aMethodType: TMethodType=mtPublished
+    function Inject(const aMethodName: string; const aNewLocation: Pointer
+      ; const aClass: TClass
+      ; const aMethodType: TMethodType=mtPublished
       ; const aDirective: Integer = DefaultInjectDirective): Boolean;overload;
     //set enabled to false will restore the Original method(procedure)
     //set enabled to true will patch the NewLocation again if NewLocation <> nil.
@@ -223,7 +223,7 @@ begin
   end;
 end;
 
-function TMeInjector.InjectProcedure(aPatchLocation: Pointer; aNewLocation: Pointer; const aDirective: Integer): Boolean;
+function TMeInjector.InjectProcedure(const aPatchLocation: Pointer; const aNewLocation: Pointer; const aDirective: Integer): Boolean;
 begin
   Result := not Enabled; 
   if Result then
@@ -242,8 +242,8 @@ begin
   end; 
 end;
 
-function TMeInjector.InjectStaticMethod(aClass: TClass; aPatchLocation: Pointer
-  ; aNewLocation: Pointer; const aDirective: Integer): Boolean;
+function TMeInjector.InjectStaticMethod(const aClass: TClass; const aPatchLocation: Pointer
+  ; const aNewLocation: Pointer; const aDirective: Integer): Boolean;
 begin
   Result := aClass <> nil;
   if Result then
@@ -257,7 +257,7 @@ begin
   end;
 end;
 
-function TMeInjector.InjectPublishedMethod(aClass: TClass; aEntry: PPublishedMethodEntry; aNewLocation: Pointer): Boolean;
+function TMeInjector.InjectPublishedMethod(const aClass: TClass; const aEntry: PPublishedMethodEntry; const aNewLocation: Pointer): Boolean;
 begin
   Result := not Enabled and (aClass <> nil);
   if Result then
@@ -274,7 +274,7 @@ begin
   end;
 end;
 
-function TMeInjector.InjectVirtualMethod(aClass: TClass; aIndex: Integer; aNewLocation: Pointer): Boolean;
+function TMeInjector.InjectVirtualMethod(const aClass: TClass; const aIndex: Integer; const aNewLocation: Pointer): Boolean;
 begin
   Result := not Enabled and (aClass <> nil);
   if Result then
@@ -291,7 +291,7 @@ begin
   end;
 end;
 
-function TMeInjector.InjectDynamicMethod(aClass: TClass; aSlot: Integer; aNewLocation: Pointer): Boolean;
+function TMeInjector.InjectDynamicMethod(const aClass: TClass; const aSlot: Integer; const aNewLocation: Pointer): Boolean;
 begin
   Result := not Enabled and (aClass <> nil);
   if Result then
@@ -308,8 +308,8 @@ begin
   end;
 end;
 
-function TMeInjector.Inject(aPatchLocation: Pointer; aNewLocation: Pointer
-  ; aClass: TClass = nil; aMethodType: TMethodType=mtUnknown): Boolean;
+function TMeInjector.Inject(const aPatchLocation: Pointer; const aNewLocation: Pointer
+  ; const aClass: TClass = nil; const aMethodType: TMethodType=mtUnknown): Boolean;
 begin
   Result := not Enabled and (aPatchLocation <> nil);
   if Result = False then Exit;
@@ -373,8 +373,8 @@ begin
   end;
 end;
 
-function TMeInjector.Inject(const aMethodName: string; aNewLocation: Pointer
-  ; aClass: TClass; aMethodType: TMethodType
+function TMeInjector.Inject(const aMethodName: string; const aNewLocation: Pointer
+  ; const aClass: TClass; const aMethodType: TMethodType
   ; const aDirective: Integer): Boolean;
 begin
   Result := aClass <> nil;

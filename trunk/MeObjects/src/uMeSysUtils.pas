@@ -1,5 +1,5 @@
 
-{ Summary: MeSysUtils - Helper functions and classes. }
+{ Summary: MeSysUtils - Some helper functions and classes. }
 {
   License
    * The contents of this file are released under the Mozilla Public License
@@ -35,6 +35,7 @@ uses
 type
   PMeThreadSafeList = ^ TMeThreadSafeList;
 
+  { Summary: represents a thread-safe list.}
   TMeThreadSafeList = object(TMeDynamicObject)
   protected
     FList: PMeList;

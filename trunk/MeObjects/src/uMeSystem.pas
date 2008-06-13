@@ -94,8 +94,9 @@ type
   end;
   PStackFrame = ^ TStackFrame;
   TStackFrame = record
-    CallerEBP: LongWord;
-    CallerAdr: LongWord;
+    //EBP
+    BaseAddr: Pointer;
+    ReturnAddr: Pointer;
   end;
 
   { Summary the Near Jump directive }
@@ -908,32 +909,38 @@ begin
     Result := 0;
 end;
 
-//function CallerComeFromModule(const aModule: HModule): Boolean;
-{
+
+function IsCallerFromModule(const aModule: HModule): Boolean;
 var
   vBaseOfStack: Cardinal;
   vTopOfStack: Cardinal;
   vStackFrame: PStackFrame;
   vCaller: Pointer;
 begin
-  vStackFrame := GetEBP;
-  vTopOfStack := GetStackTop;
+  {
+  asm
+    MOV  vStackFrame, EBP
+    MOV EAX, FS:[4]
+    MOV  vTopOfStac, EAX
+  end; //}
+  vStackFrame := PStackFrame(GetEBP);
+  vTopOfStack := Cardinal(GetStackTop);
   vBaseOfStack := Cardinal(vStackFrame) -1;
 
-  //check caller whether come from some HModule
+  //check caller whether come from the HModule
   while (Cardinal(vStackFrame) >= vBaseOfStack) and (Cardinal(vStackFrame) < vTopOfStack) do
   begin
-    vCaller := Pointer(vStackFrame.CallerAdr-1);
+    vCaller := Pointer(Cardinal(vStackFrame.ReturnAddr)-1);
     if GetModuleFromAddr(vCaller) = aModule then
     begin
       Result := True;
       Exit;
     end;
-    vStackFrame := vStackFrame.CallerEBP;
+    vStackFrame := vStackFrame.BaseAddr;
   end;
   Result := False;
 end;
-}
+//}
 
 { EMeError }
 constructor EMeError.Create(const Msg: string; const aErrorCode: Integer);
