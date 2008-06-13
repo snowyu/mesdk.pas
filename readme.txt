@@ -338,6 +338,58 @@ procedure GetDefaultFormatSettings(var Result: TFormatSettings);
 function GMTNow: TDateTime;
 
 
+** uMeInjector **
+the method(procedure) Code Injector
+  Provide the lightest and simplest injector object -- TMeInjector.
+  This object do not use any virtual method, so you can use it directly.
+  Each injector only take 36 bytes about in the memory. One injector 
+  maintains the one injected method(procedure) only. Call the InjectXXX 
+  Method to inject. The injector object is the smallest, simplest and 
+  fastest object in the MeAOP .
+
+TMeInjector
+Provide the lightest and simplest injector object to inject function or method.
+  This object do not use any virtual method, so you can use it directly.
+  Each injector only take 36 bytes about in the memory. One injector 
+  maintains the one injected method(procedure) only. Call the InjectXXX 
+  Method to inject. The injector object is the smallest, simplest and 
+  fastest object in the MeAOP .
+
+Usage:
+var
+  OldMessageBoxFunc: function (hWnd: HWND; lpText, lpCaption: PChar;
+    uType: UINT): Integer; stdcall = nil;
+
+function NewMessageBoxFunc(hWnd: HWND; lpText, lpCaption: PChar;
+  uType: UINT): Integer; stdcall;
+var
+  S: String;
+begin
+  S := UpperCase(lpText);
+  if Assigned(OldMessageBoxFunc) then
+    Result := OldMessageBoxFunc(hWnd, PChar(S), PChar('MeInjector:'+lpCaption), uType)
+  else 
+    Result := -1;
+end;
+
+var
+  vMsgBoxInjector: TMeInjector;
+
+begin
+  MessageBox(0, 'the origianl message box','Demo2', 0);
+  if vMsgBoxInjector.InjectProcedure(@MessageBox, @NewMessageBoxFunc) then
+    @OldMessageBoxFunc := vMsgBoxInjector.OriginalProc
+  else begin
+    MessageBox(0, 'ERROR::CAN NOT inject!','Demo2', 0);
+    halt;
+  end;
+
+  //the string 'the injected message box' should be UpperCase now.
+  MessageBox(0, 'the injected message box','Demo2', 0);
+
+  vMsgBoxInjector.Enabled := False;
+end.
+
 * MeRTTI *
 the Mini Run-time Type Infomation of Object. the MeType is stream-able.
 
