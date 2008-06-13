@@ -25,7 +25,7 @@ uses
 
 type
   //for virutal, dynamic method
-  TInjectVirtualMethodProc = function (aClass: TClass; aIndex: Integer; aNewLocation: Pointer): Boolean of object;
+  TInjectVirtualMethodProc = function (const aClass: TClass; const aIndex: Integer; const aNewLocation: Pointer): Boolean of object;
   TTest_MeInjector = class (TCustomTest_Method)
   protected
     FInjector: TMeInjector;

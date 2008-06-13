@@ -14,7 +14,7 @@
     * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
     * implied. See the License for the specific language governing
     * rights and limitations under the \license.
-    * The Original Code is $RCSfile: uMeTypinfo.pas,v $.
+    * The Original Code is $RCSfile: uMeYield.pas,v $.
     * The Initial Developers of the Original Code are Riceball LEE.
     * Portions created by Sergey Antonov<santonov.blogspot.com> is Copyright (C) 2007
     * Portions created by Riceball LEE is Copyright (C) 2007-2008
@@ -168,6 +168,7 @@ type
     FESP:pointer;
   end;
   //the control state of the rest of the computation, meaning the data structures and code needed to complete a computation. 
+  //limits: Do not use the DynamicArray(AnsiString) type as the local variable in the function at the Continuation.
   //当前函数执行的位置现场
   //不能用于在函数中可能有动态分配内容，如字符串，当退出该函数后自然被清除，这时候从函数的中间进入就会出问题！
   TMeContinuationRec = packed record

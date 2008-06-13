@@ -255,6 +255,7 @@ type
     property Software: string read FSoftware write SetSoftware;
   end;
 
+  { Summary: for logging information to the MeStrings. }
   TMeStringsLogger = object(TMeCustomLogger)
   protected
     FStrings: PMeStrings;
@@ -267,6 +268,7 @@ type
     property Strings: PMeStrings read FStrings write SetStrings;
   end;
 
+  { Summary: abstract stream logger for logging information to the MeStream. }
   TMeStreamLogger = object(TMeCustomLogger)
   protected
     FStream: PMeStream;

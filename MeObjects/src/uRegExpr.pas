@@ -1,4 +1,4 @@
-{Summary the MeRegExpr extension object .}
+{Summary the RegExpr class .}
 {
    @author  Riceball LEE(riceballl@hotmail.com)
    @version $Revision$
@@ -13,7 +13,7 @@
     * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
     * implied. See the License for the specific language governing
     * rights and limitations under the \license.
-    * The Original Code is $RCSfile: uMeRegExpr.pas,v $.
+    * The Original Code is $RCSfile: RegExpr.pas,v $.
     * The Initial Developers of the Original Code are Andrey V. Sorokin.
     * Portions created by Andrey V. Sorokin, St.Petersburg, Russia is Copyright (C) 1999-2004
     * Portions created by Riceball LEE is Copyright (C) 2003-2008
@@ -431,8 +431,8 @@ type
     constructor Create;
     destructor Destroy; override;
 
-    class function VersionMajor : integer; //###0.944
-    class function VersionMinor : integer; //###0.944
+    class function VersionMajor : integer; //###0.980
+    class function VersionMinor : integer; //###0.980
 
     {$IFDEF SubExprName_RegExpr}
     // added by riceball

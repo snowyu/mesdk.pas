@@ -271,7 +271,8 @@ type
   TMeThreadStopMode = (smTerminate, smSuspend);
   TMeThreadOptions = set of (itoStopped, itoReqCleanup, itoDataOwner, itoTag);
 
-  {
+  { Summary: the abstract thread with task.
+  
     the thread default is looped and suspended.
     when the task is done the Yarn will be free automaticly.
 
@@ -446,6 +447,7 @@ type
     property ThreadPriority: TMeThreadPriority read FThreadPriority write FThreadPriority;
   end;
 
+  { Summary: the thread run the the TMeThreadMgrTask task.}
   TMeThreadMgr = object(TMeThread)
   protected
     function GetTask: PMeThreadMgrTask;
@@ -521,6 +523,7 @@ var
      end;
 
     @author  Andreas Hausladen
+    @version: 2.21
 
 }
 procedure EnterMainThread;
