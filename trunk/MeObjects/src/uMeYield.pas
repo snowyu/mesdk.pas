@@ -152,15 +152,16 @@ type
   {$IFDEF YieldClass_Supports}
   TMeCustomCoRoutine = Class;
   {$ELSE}
-  PMeCoRoutine = ^TMeCustomCoRoutine;
+  PMeCustomCoRoutine = ^TMeCustomCoRoutine;
+  PMeCoRoutine = ^TMeCoRoutine;
 
-  PMeYieldObject = ^TMeCoRoutineEnumerator;
+  PMeCoRoutineEnumerator = ^TMeCoRoutineEnumerator;
   PYieldString = ^TYieldString;
   PYieldInteger = ^TYieldInteger;
   {$ENDIF}
 
-  TMeCoRoutineProc = procedure (const aCoRoutine: {$IFDEF YieldClass_Supports}TMeCustomCoRoutine{$ELSE} PMeCoRoutine{$endif});
-  TMeCoRoutineMethod = procedure () of object;
+  TMeCoroutineProc = procedure (const aCoRoutine: {$IFDEF YieldClass_Supports}TMeCoRoutineEnumerator{$ELSE} PMeCoRoutineEnumerator{$endif});
+  TMeCoroutineMethod = procedure () of object;
   TMeCoRoutineState = (coSuspended, coRunning, coDead);
 
   TPreservedRegisters = packed record
@@ -199,13 +200,19 @@ type
     InnerSEHOffsets:array[0..$F] of DWORD;
     {_$ENDIF}
 
-    procedure SetNextValue(const aValue); virtual;
-
+    { the CoRoutine itself. Override Execute to give the CoRoutine code. }
+    procedure CoExecute; virtual; abstract;
   public
-    constructor Create(const CoRoutineProc: TMeCoRoutineProc);
+    constructor Create();
     function Resume:boolean;
+    { Go forward to the next item
+      @return True if there is still an item, False if the enumerator is terminated
+      
+      Note: D2007 enumerable required
+    }
+    function MoveNext:boolean;
     function Reset:boolean;
-    procedure Yield(const Value);
+    procedure Yield();
     {_$IFDEF MarkContinuation_Supports}
     {WARNING: MUST NOT USE the local string etc dynamic local variable after Mark postion!!
       Do not Mark the Continuation in the loop. no unwind SEH supports
@@ -219,15 +226,25 @@ type
     property State: TMeCoRoutineState read FState;
   end;
 
+  TMeCoRoutine = {$IFDEF YieldClass_Supports}class{$ELSE}object(TMeCustomCoRoutine){$ENDIF}
+  protected
+    FCoRoutineProc: TMeCoRoutineProc;
+    procedure CoExecute;{$IFDEF YieldClass_Supports}override{$ELSE} virtual{$endif};
+  public
+    constructor Create(const CoRoutineProc: TMeCoRoutineProc);
+  end;
+
   { the abstract enumerator running in a CoRoutine
     In order to obtain a concrete enumerator, you must override the SetNextValue 
     methods, and define a Current property. The Execute method can call Yield many 
     times with any value as a parameter. The SetNextValue must store this value, 
     and the Current property should read it.
   }
-  TMeCoRoutineEnumerator = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeCustomCoRoutine)
+  TMeCoRoutineEnumerator = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeCoRoutine)
+  protected
+    procedure SetNextValue(const aValue); virtual; abstract;
   public
-    function MoveNext:boolean; //D2007 enumerable required
+    procedure Yield(const Value); {$IFDEF SUPPORTS_REINTRODUCE}reintroduce;{$ENDIF}
   end;
 
   TYieldString = {$IFDEF YieldClass_Supports}class{$ELSE}object{$ENDIF}(TMeCoRoutineEnumerator)
@@ -257,11 +274,13 @@ type
 implementation
 
 { TMeCustomCoRoutine }
-constructor TMeCustomCoRoutine.Create(const CoRoutineProc:TMeCoRoutineProc);
+constructor TMeCustomCoRoutine.Create();
 asm
   {$IFNDEF YieldClass_Supports}
   CALL TMeDynamicObject.Init
   {$ENDIF}
+  mov edx,[eax];
+  mov ecx, [edx+VMTOFFSET TMeCustomCoRoutine.CoExecute];
   mov eax.TMeCustomCoRoutine.FNextIP,ecx;
   mov eax.TMeCustomCoRoutine.FProc, ecx;
   mov eax.TMeCustomCoRoutine.FRegisters.FEAX,EAX;
@@ -287,10 +306,6 @@ begin
     end;
     FStackFrameSize := 0;
   end;
-end;
-
-procedure TMeCustomCoRoutine.SetNextValue(const aValue);
-begin
 end;
 
 function TMeCustomCoRoutine.Resume: boolean;
@@ -495,7 +510,12 @@ asm
 end;
 {_$ENDIF}
 
-procedure TMeCustomCoRoutine.Yield(const Value);
+function TMeCustomCoRoutine.MoveNext:boolean;
+begin
+  Result := Resume();
+end;
+
+procedure TMeCustomCoRoutine.Yield();
 asm
   CMP  EAX.TMeCustomCoRoutine.FState, coRunning
   JNE  @@Exit
@@ -511,11 +531,12 @@ asm
   pop ecx;
   mov eax.TMeCustomCoRoutine.FNextIP,ecx; //store the next execution address
 
-  //We must do it first for valid const reference
+  {//We must do it first for valid const reference
   push eax;
   mov ecx,[eax];
   CALL  DWORD PTR [ecx+VMTOFFSET TMeCustomCoRoutine.SetNextValue];
   pop eax;
+  //}
   
 {_$IFNDEF MarkContinuation_Supports}
   { Unwind SEH }
@@ -563,10 +584,28 @@ asm
 @@Exit:
 end;
 
-{ TMeCoRoutineEnumerator }
-function TMeCoRoutineEnumerator.MoveNext:boolean;
+{ TMeCoRoutine }
+procedure TMeCoRoutine.CoExecute;
 begin
-  Result := Resume();
+  if Assigned(FCoRoutineProc) then FCoRoutineProc({$IFNDEF YieldClass_Supports}@{$ENDIF}Self);
+end;
+
+constructor TMeCoRoutine.Create(const CoRoutineProc: TMeCoRoutineProc);
+begin
+  inherited Create;
+  FCoRoutineProc := CoRoutineProc;
+end;
+
+{ TMeCoRoutineEnumerator }
+{ Send an intermediate value
+  Yield uses SetNextValue to store the value. It should then be accessible via
+  the Current property.
+  @param Value   Value to send
+}
+procedure TMeCoRoutineEnumerator.Yield(const Value);
+begin
+  SetNextValue(Value);
+  inherited Yield;
 end;
 
 { TYieldString }

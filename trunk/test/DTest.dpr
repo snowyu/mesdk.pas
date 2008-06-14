@@ -90,6 +90,7 @@ uses
   , uMeURITest
   , uMeSysUtilsTest
   , uMeThreadTest
+  , uRegExprTest
   ;
 
 

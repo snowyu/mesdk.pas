@@ -51,7 +51,7 @@ const
   rsTestStringException = 'MyStringYieldException Test';
 
 //Fibonacc
-procedure IntegerYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutine{$ELSE} PMeCoroutine{$endif});
+procedure IntegerYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoRoutineEnumerator{$ELSE} PMeCoRoutineEnumerator{$endif});
 var
   I, X,Y, t: Integer;
 begin
@@ -71,7 +71,7 @@ begin
   end;
 end;
 
-procedure StringYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoroutine{$ELSE} PMeCoroutine{$endif});
+procedure StringYieldProc(const YieldObj: {$IFDEF YieldClass_Supports}TMeCoRoutineEnumerator{$ELSE} PMeCoRoutineEnumerator{$endif});
 var  
   YieldValue: string;
   i: integer;

@@ -44,11 +44,11 @@
   + \-[1..9]: means prev SubExpr in Expression.
     (['|"])\S+\-1
     match: 'dddd', "word".
+  + add more compatible with the Perl RegExpr:  (?<name>...) or (?'name'...)
+  + add compatible with the Python RegExpr:  (?P<name>...)
   ! EscChar can use SubExprName.
   ! get rid of the comment RegOp.
   ! continue to CapturingGroup feature: skiped group: (?:...) 
-  ! add more compatible with the Perl RegExpr:  (?<name>...) or (?'name'...)
-  ! add compatible with the Python RegExpr:  (?P<name>...)
   ! add more compatible with the Perl RegExpr:  (?|...)
     Perl 5.10 introduced a feature whereby each alternative in a subpattern uses the same numbers for its capturing parentheses. Such a subpattern starts with (?| and is itself a non-capturing subpattern. For example, consider this pattern: 
 
@@ -2595,7 +2595,7 @@ function TRegExpr.ParseAtom (var flagp : integer) : PRegExprChar;
              inc (regparse, 2);
            end;
            {.$ENDIF}
-            '<', 'P': begin // (?<name>...) the perl RegExpr named capturing group. (?P<name>...) the python RegExpr named capturing group
+            '<', 'P', '''': begin // (?<name>...) (?'name'...)the perl RegExpr named capturing group. (?P<name>...) the python RegExpr named capturing group
               inc (regparse, 2);
               if (regparse-1)^ = 'P' then
                 inc (regparse);
@@ -2603,22 +2603,24 @@ function TRegExpr.ParseAtom (var flagp : integer) : PRegExprChar;
                 Error (reeCompParseRegTooManyBrackets);
                 EXIT;
               end;
+              ender := (regparse-1)^;
+              if ender = '<' then ender := '>';
               if regcode <> @regdummy then
               begin
                {$IFDEF SubExprName_RegExpr}
                 FSubExprNames[regnpar] := '';
                {$ENDIF}
-                While (regparse^ <> #0) and (regparse^ <> '>') Do
+                While (regparse^ <> #0) and (regparse^ <> ender) Do
                 Begin
                   {$IFDEF SubExprName_RegExpr}
                   FSubExprNames[regnpar] := FSubExprNames[regnpar] + regparse^;
                   {$ENDIF}
                   inc(regparse);
                 End; // While
-                //writeln(FSubExprNames[regnpar]);
+                //writeln('FSubExprNames[',regnpar,']=',FSubExprNames[regnpar]);
               end
               else
-                While (regparse^ <> #0) and (regparse^ <> '>') Do
+                While (regparse^ <> #0) and (regparse^ <> ender) Do
                 Begin
                   inc(regparse);
                 End; // While

@@ -1,0 +1,42 @@
+MeAOP v.1.1 Release 2008.6.16
+
+* [Bug] TMeTokenizer can not process this: {aaa();}
+* [Bug] uMeYield
+* [Bug] uMeCoRoutine
+* uMeTypInfo: Get more support the pulbished method RTTI.
+* uMeTypes: remove the TCallingConvention type to uMeTypInfo.
+* uMeProcType
+  + TMeParam.LoadFromStream
+  + TMeParam.SaveToStream
++ uRegExpr: modified and enhanced
+  + SubExprName define and parse: "():SubExprName:"
+  + property MatchStrPos, MatchStrLen, MatchStr by SubExprName index.
+  + function GetSubExprIndexByName
+  + property SubExprNames to get the SubExprName by integer index.
+  + Subtitute the SubExprName by : $[SubExprName].
+  * the SubExprName is CaseSensitive!
+  * more speedup for a large-text search.
+    * remove Length(aPChar) in ExecPrim 
+      //len := Length(aPChar); it will be very slow on a large pchar.
+  + procedure SetSubjectStr(const Value: RegExprString);
+  + procedure SetSubjectStr(const Value: PRegExprChar);
+      it do not assigned the InputString, just point it directly. so u must do not free the string(be careful this)!!
+  + keep the more compatible with the Perl RegExpr: (?:....)
+      the non-capuring Group, but not whole impl it.
+  + \-[1..9]: means prev SubExpr in Expression.
+    (['|"])\S+\-1
+    match: 'dddd', "word".
+  + add more compatible with the Perl RegExpr:  (?<name>...) or (?'name'...)
+  + add compatible with the Python RegExpr:  (?P<name>...)
++ uMeRegExpr: the RegExpr extension object 
++ uMeRegExprCoRoutine: the CoRountine object of the MeRegExpr 
++ uMeThread: the thread object for the MeSDK Core.
++ uMeSyncObjs: collects the thread synchronization objects instead of the standard SyncObjs of Delphi.
++ uMeSysUtils: some helper functions and classes. eg u can AddFreeNotification for any TObject class.
++ uMeURI: Represents the Uniform Resource Identifier object.
++ uMeURL: the abstract Uniform/Universal Resource Accessor class and factory.
++ uMeLog: the Logging of Application class that defines a framework for logging general purposed information.
++ uMeLoggerEx: the extented logger objects.
++ uStringsLogger: for logging to TStrings.
+
+MeAOP v.1.0 first release. 2008.2.9

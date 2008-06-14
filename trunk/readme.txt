@@ -135,7 +135,7 @@ how to usage:
   GLogger.Info(aText);
 
 ** uMeLoggerEx **
-the extented logger object.
+the extented logger objects.
 
 TMeFileLogger
 Summary for logging information to the file.
@@ -201,6 +201,14 @@ TMeCoRoutineEnumerator
   + \-[1..9]: means prev SubExpr in Expression.
     (['|"])\S+\-1
     match: 'dddd', "word".
+  + add more compatible with the Perl RegExpr:  (?<name>...) or (?'name'...)
+  + add compatible with the Python RegExpr:  (?P<name>...)
+
+** uMeRegExpr.pas **
+the RegExpr extension object 
+
+** uMeRegExprCoRoutine.pas **
+the CoRountine object of the MeRegExpr 
 
 
 ** uMeThread.pas **
@@ -366,29 +374,29 @@ var
   S: String;
 begin
   S := UpperCase(lpText);
-  if Assigned(OldMessageBoxFunc) then
-    Result := OldMessageBoxFunc(hWnd, PChar(S), PChar('MeInjector:'+lpCaption), uType)
-  else 
-    Result := -1;
+  Result := OldMessageBoxFunc(hWnd, PChar(S), PChar('MeInjector:'+lpCaption), uType)
 end;
 
 var
   vMsgBoxInjector: TMeInjector;
 
 begin
-  MessageBox(0, 'the origianl message box','Demo2', 0);
-  if vMsgBoxInjector.InjectProcedure(@MessageBox, @NewMessageBoxFunc) then
-    @OldMessageBoxFunc := vMsgBoxInjector.OriginalProc
-  else begin
-    MessageBox(0, 'ERROR::CAN NOT inject!','Demo2', 0);
-    halt;
-  end;
+  vMsgBoxInjector.InjectProcedure(@MessageBox, @NewMessageBoxFunc);
+  @OldMessageBoxFunc := vMsgBoxInjector.OriginalProc
 
   //the string 'the injected message box' should be UpperCase now.
   MessageBox(0, 'the injected message box','Demo2', 0);
 
   vMsgBoxInjector.Enabled := False;
 end.
+
+
+** uMeURI.pas **
+Represents the Uniform Resource Identifier object.
+
+** uMeURL.pas **
+the abstract Uniform/Universal Resource Accessor class and factory.
+
 
 * MeRTTI *
 the Mini Run-time Type Infomation of Object. the MeType is stream-able.
