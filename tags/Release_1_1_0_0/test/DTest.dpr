@@ -86,7 +86,7 @@ uses
   , uMeInterceptorTest
   , uMeFeature
   {$ENDIF}
-  , uMeScriptTest
+//  , uMeScriptTest
   , uMeURITest
   , uMeSysUtilsTest
   , uMeThreadTest
