@@ -78,6 +78,8 @@ interface
 
 {$I MeSetting.inc}
 
+{.$Define Use_MeCoroutine}
+
 uses
 {$IFDEF MSWINDOWS}
   Windows, 
@@ -88,8 +90,11 @@ uses
   , uMeConsts
   , uMeSystem
   , uMeObject
-  //, uMeYield
+  {$IFDEF Use_MeCoroutine}
   , uMeCoroutine
+  {$ELSE}
+  , uMeYield
+  {$ENDIF}
   , uMeRegExpr
   {$IFDEF DEBUG}
   , DbugIntf
@@ -115,6 +120,7 @@ type
   public
     constructor Create(const aRegExpr: PMeCustomRegExpr);
     property Current: PMeAbstractRegExpr read FCurrent;
+    //for the current SubExpr if any.
     property Result: PMeRegExprResultItem read FResult;
   end;
 
@@ -125,7 +131,6 @@ constructor TMeRegExprEnumerator.Create(const aRegExpr: PMeCustomRegExpr);
 begin
   inherited Create;
   FRegExpr := aRegExpr;
-  
 end;
 
 procedure TMeRegExprEnumerator.CoExecute;
