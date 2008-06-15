@@ -1,4 +1,16 @@
 MeSDK Library
+the MeSDK provides a light and small object implementation for core developing
+it includes the MeObjects, MeRTTI, and MeAOP etc.
+
+The MeAOP Library is Aspect Oriented Programming for delphi. IMO, the aspect is the general feature in fact. It's a helper for 
+object-oriented programming to re-use the feature(function), such as the Login feature. Aspect Oriented Programming 
+attempts to aid programmers in the separation of features, or the breaking down of a program into distinct parts that 
+overlap in functionality as little as possible. 
+
+  * distill/separate the general features from many classes;
+  * many classes can share the feature, so it need not to modify many classes if the feature've been changed.
+  * no necessary to modify the method when adding a new feature to the method.
+
 
 * MeObjects *
 MeObjects Library for Delphi is a light object extension to make object type small and powerful. It makes the object type
