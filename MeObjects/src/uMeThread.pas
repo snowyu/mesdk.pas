@@ -25,6 +25,9 @@
       Riceball LEE
       Andreas Hausladen
       Chad Z. Hower and the Indy Pit Crew
+
+      History:
+       * [Bug] Can not compile on Delphi7
 }
 
 unit uMeThread;
@@ -84,8 +87,8 @@ type
     tpTimeCritical);
 {$ENDIF}
 
-  PSynchronizeRecord = ^TSynchronizeRecord;
-  TSynchronizeRecord = record
+  PMeSynchronizeRecord = ^TMeSynchronizeRecord;
+  TMeSynchronizeRecord = record
     FThread: PMeAbstractThread;
     FMethod: TMeThreadMethod;
     FSynchronizeException: TObject;
@@ -111,10 +114,9 @@ type
     FFinished: Boolean;
     FReturnValue: Integer;
     FOnTerminate: TMeNotifyEvent;
-    FSynchronize: TSynchronizeRecord;
+    FSynchronize: TMeSynchronizeRecord;
     FFatalException: TObject;
     procedure CallOnTerminate;
-    class procedure Synchronize(ASyncRec: PSynchronizeRecord; QueueEvent: Boolean = False); overload;
 {$IFDEF MSWINDOWS}
     function GetPriority: TMeThreadPriority;
     procedure SetPriority(const Value: TMeThreadPriority);
@@ -132,8 +134,8 @@ type
     procedure CheckThreadError(Success: Boolean); overload;
     procedure DoTerminate; virtual;
     procedure Execute; virtual; abstract;
-    procedure Queue(AMethod: TMeThreadMethod); overload;
-    procedure Synchronize(const aMethod: TMeThreadMethod); overload;
+    procedure iQueue(AMethod: TMeThreadMethod);
+    procedure iSynchronize(const aMethod: TMeThreadMethod);
     property ReturnValue: Integer read FReturnValue write FReturnValue;
     property Terminated: Boolean read FTerminated;
     procedure Init; virtual; //override
@@ -312,11 +314,11 @@ type
     procedure Run; virtual; abstract;
     class procedure WaitAllThreadsTerminated(AMSec: Integer = cWaitAllThreadsTerminatedCount);
   public
-    constructor Create(const aCreateSuspended: Boolean = True; const aLoop: Boolean = True); 
+    constructor Create(const aCreateSuspended: Boolean = True; const aLoop: Boolean = True);
     destructor Destroy; virtual;
     procedure Start; virtual;
     procedure Stop; virtual;
-    procedure Synchronize(const Method: TMeThreadMethod); overload;
+    procedure Synchronize(const Method: TMeThreadMethod);
     procedure Terminate; virtual;
     function TerminateAndWaitFor(const aTimeout: LongWord = INFINITE): LongWord; virtual;
 
@@ -379,7 +381,7 @@ type
     the task will be free automatic after done if FreeTask is true.
     note: if the exception occur even the FreeTask is false, it will still free the task when thread free.
     unless override the task.HandleException method and set the aThread.task := nil;
-      
+
   
     Usage: 
      FThreadForMgr := New(PMeThread, Create(New(PMeThreadMgr, Create)));
@@ -530,6 +532,7 @@ procedure EnterMainThread;
 procedure LeaveMainThread;
 
 function NewThreadTask(const aTask: PMeTask): PMeThread; overload;
+procedure ThreadSynchronize(ASyncRec: PMeSynchronizeRecord; QueueEvent: Boolean = False);
 
 implementation
 
@@ -542,7 +545,7 @@ uses KernelIoctl, RTLConsts, SysConst;
 
 type
   TSyncProc = record
-    SyncRec: PSynchronizeRecord;
+    SyncRec: PMeSynchronizeRecord;
     Queued: Boolean;
 {$IFDEF MSWINDOWS}
     Signal: THandle;
@@ -821,7 +824,7 @@ end;
 
 procedure TMeAbstractThread.DoTerminate;
 begin
-  if Assigned(FOnTerminate) then Synchronize(CallOnTerminate);
+  if Assigned(FOnTerminate) then iSynchronize(CallOnTerminate);
 end;
 
 {$IFDEF MSWINDOWS}
@@ -908,16 +911,16 @@ begin
 end;
 {$ENDIF}
 
-procedure TMeAbstractThread.Queue(AMethod: TMeThreadMethod);
+procedure TMeAbstractThread.iQueue(AMethod: TMeThreadMethod);
 var
-  LSynchronize: PSynchronizeRecord;
+  LSynchronize: PMeSynchronizeRecord;
 begin
   New(LSynchronize);
   try
     LSynchronize.FThread := @Self;
     LSynchronize.FSynchronizeException := nil;
     LSynchronize.FMethod := AMethod;
-    Synchronize(LSynchronize, True);
+    ThreadSynchronize(LSynchronize, True);
   finally
     if MainThreadID = GetCurrentThreadID then
       Dispose(LSynchronize);
@@ -926,10 +929,10 @@ end;
 
 class procedure TMeAbstractThread.Queue(aThread: PMeAbstractThread; AMethod: TMeThreadMethod);
 var
-  LSynchronize: PSynchronizeRecord;
+  LSynchronize: PMeSynchronizeRecord;
 begin
   if aThread <> nil then
-    aThread.Queue(AMethod)
+    aThread.iQueue(AMethod)
   else
   begin
     New(LSynchronize);
@@ -937,7 +940,7 @@ begin
       LSynchronize.FThread := nil;
       LSynchronize.FSynchronizeException := nil;
       LSynchronize.FMethod := AMethod;
-      Synchronize(LSynchronize, True);
+      ThreadSynchronize(LSynchronize, True);
     finally
       if MainThreadID = GetCurrentThreadID then
         Dispose(LSynchronize);
@@ -976,7 +979,7 @@ begin
   Queue(aThread, AMethod);
 end;
 
-class procedure TMeAbstractThread.Synchronize(ASyncRec: PSynchronizeRecord; QueueEvent: Boolean = False);
+procedure ThreadSynchronize(ASyncRec: PMeSynchronizeRecord; QueueEvent: Boolean = False);
 var
   SyncProc: TSyncProc;
   SyncProcPtr: PSyncProc;
@@ -1037,26 +1040,26 @@ begin
   end;
 end;
 
-procedure TMeAbstractThread.Synchronize(const aMethod: TMeThreadMethod);
+procedure TMeAbstractThread.iSynchronize(const aMethod: TMeThreadMethod);
 begin
   FSynchronize.FThread := @Self;
   FSynchronize.FSynchronizeException := nil;
   FSynchronize.FMethod := aMethod;
-  Synchronize(@FSynchronize);
+  ThreadSynchronize(@FSynchronize, False);
 end;
 
 class procedure TMeAbstractThread.Synchronize(aThread: PMeAbstractThread; AMethod: TMeThreadMethod);
 var
-  SyncRec: TSynchronizeRecord;
+  SyncRec: TMeSynchronizeRecord;
 begin
   if aThread <> nil then
-    aThread.Synchronize(AMethod)
+    aThread.iSynchronize(AMethod)
   else
   begin
     SyncRec.FThread := nil;
     SyncRec.FSynchronizeException := nil;
     SyncRec.FMethod := AMethod;
-    TMeAbstractThread.Synchronize(@SyncRec);
+    ThreadSynchronize(@SyncRec, False);
   end;
 end;
 
@@ -1363,7 +1366,7 @@ begin
   try
     BeforeExecute;
     try
-      while not Terminated do 
+      while not FTerminated do 
       begin
         if Stopped then
         begin
@@ -1372,12 +1375,12 @@ begin
           // the thread is restarted, in which case we dont want to restop it.
           if Stopped then 
           begin // DONE: if terminated?
-            if Terminated then 
+            if FTerminated then
             begin
               Break;
             end;
             Suspend; // Thread manager will revive us
-            if Terminated then 
+            if FTerminated then
             begin
               Break;
             end;
@@ -1389,9 +1392,9 @@ begin
           try
             BeforeRun;
             try
-              if Loop then 
+              if Loop then
               begin
-                while not Stopped do 
+                while not Stopped do
                 begin
                   try
                     Run;
@@ -1453,7 +1456,7 @@ begin
     begin
       // Resume is also called for smTerminate as .Start can be used to initially start a
       // thread that is created suspended
-      if Terminated then 
+      if FTerminated then 
       begin
         Include(FOptions,itoStopped);
       end 
@@ -1486,7 +1489,7 @@ begin
   begin
     FLock.Enter; try
       // Suspended may be True if checking stopped from another thread
-      Result := Terminated or (itoStopped in FOptions) or Suspended;
+      Result := FTerminated or (itoStopped in FOptions) or Suspended;
     finally FLock.Leave; end;
   end 
   else begin
@@ -1542,7 +1545,7 @@ end;
 
 procedure TMeCustomThread.Synchronize(const Method: TMeThreadMethod);
 begin
-  inherited Synchronize(Method);
+  inherited iSynchronize(Method);
 end;
 
 { TMeThread }

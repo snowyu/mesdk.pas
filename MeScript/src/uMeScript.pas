@@ -743,7 +743,7 @@ begin
   vParent := Parent;
   while (Result = -1) and (vParent <> nil) do
   begin
-    if vParent.InheritsFrom(TypeOf(TMeScriptBlock)) then with TMeScriptBlock(vParent^) do
+    if vParent.InheritsFrom(TypeOf(TMeScriptBlock)) then with PMeScriptBlock(vParent)^ do
     begin
       Inc(aStackIndex);
       for Result := 0 to Length(FVariablesName) do
@@ -1256,7 +1256,7 @@ begin
   vParent := Parent;
   while (Result = -1) and (vParent <> nil) do
   begin
-    if vParent.InheritsFrom(TypeOf(TMeScriptFunction)) then with TMeScriptFunction(vParent^) do
+    if vParent.InheritsFrom(TypeOf(TMeScriptFunction)) then with PMeScriptFunction(vParent)^ do
     begin
       Inc(aStackIndex);
       for Result := 0 to Arguments.Count - 1 do
