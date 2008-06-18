@@ -42,7 +42,11 @@ type
 type
   TTestInterceptResultRec = packed record
     Sender: TObject;
-    E: Exception; //only for DoOnAfterException
+    //only for DoOnAfterException
+    //E: Exception;  //it maybe free by finally section.
+    ET: ExceptionClass;
+    EMsg: string;
+    
     Tick: integer; //the time to execute.
     Method: Pointer;
     ResultState: TMeExecuteStates;
@@ -68,7 +72,7 @@ type
     function DoOnAllowExecute(Sender: TObject; MethodItem: TMeInterceptedMethodItem; const Params: PMeProcParams = nil): Boolean;virtual;
     procedure DoOnBeforeExecute(Sender: TObject; MethodItem: TMeInterceptedMethodItem; const Params: PMeProcParams = nil);virtual;
     procedure DoOnAfterExecute(Sender: TObject; MethodItem: TMeInterceptedMethodItem; const thisState: TMeExecuteStates; const Params: PMeProcParams = nil);virtual;
-    function DoOnAfterException(Sender: TObject; MethodItem: TMeInterceptedMethodItem; E: Exception; const Params: PMeProcParams = nil): Boolean;virtual;
+    function DoOnAfterException(Sender: TObject; MethodItem: TMeInterceptedMethodItem; const E: Exception; const Params: PMeProcParams = nil): Boolean;virtual;
     procedure CheckResults(Sender: TObject; aMethod: Pointer; E: ExceptionClass = nil; thisState: TMeExecuteStates = [esAllowed, esBefore, esAfter]);
   protected
     procedure SetUp;override;
@@ -206,16 +210,18 @@ begin
   {$ENDIF}
 end;
 
-function TTestMeCustomInterceptor.DoOnAfterException(Sender: TObject; MethodItem: TMeInterceptedMethodItem; E: Exception; const Params: PMeProcParams): Boolean;
+function TTestMeCustomInterceptor.DoOnAfterException(Sender: TObject; MethodItem: TMeInterceptedMethodItem; const E: Exception; const Params: PMeProcParams): Boolean;
 begin
   FResults[3].Sender := Sender;
   FResults[3].Method := MethodItem.Injector.MethodOriginalLocation;
-  FResults[3].E := E;
+  //FResults[3].E := E;
+  FResults[3].ET := ExceptionClass(E.ClassType);
+  FResults[3].EMsg := E.Message;
   QueryPerformanceCounter(FStopCount);
   FResults[3].Tick := FStopCount - FStartCount;
   {$IFDEF Debug_WriteToConsole_Support}
   if Assigned(Sender) then write(Sender.ClassName+'.');
-  writeln(MethodItem.Name, ' OnAfterException: '+ E.Message+' ', FResults[3].Tick);
+  writeln(MethodItem.Name, ' OnAfterException('+E.ClassName+'): '+ E.Message+' ', FResults[3].Tick);
   {$ENDIF}
   Result := FRaiseException; //if FRaiseException then raise;
 end;
@@ -225,7 +231,6 @@ begin
   CheckSame(Sender, FResults[0].Sender, 'AllowExecute Sender mismatch.');
   CheckSame(Sender, FResults[1].Sender, 'BeforeExecute Sender mismatch.');
   CheckSame(Sender, FResults[2].Sender, 'AfterExecute Sender mismatch.');
-
   CheckEquals(Byte(thisState), Byte(FResults[2].ResultState), 'AfterExecute ResultState mismatch.');
 
   CheckEquals(Integer(aMethod), Integer(FResults[0].Method), 'the Method Item mismatch in the AllowExecute ');
@@ -238,7 +243,12 @@ begin
   if E <> nil then
   begin
     CheckSame(Sender, FResults[3].Sender, 'AfterException Sender mismatch.');
-    CheckIs(FResults[3].E, E, 'AfterException Exception mismatch.');
+    //it seems that the Delphi7 use anther Exception instance on try-finally... and it will be free on out try-finally section.
+    {$IFDEF Compiler8_UP}
+    //CheckIs(FResults[3].E, E, 'AfterException Exception mismatch.');
+    {$ENDIF}
+    CheckEquals(E, FResults[3].ET, 'AfterException ExceptionClass mismatch.');
+
     CheckEquals(Integer(aMethod), Integer(FResults[3].Method), 'the Method Item mismatch in the AfterException ');
 
     Check(FResults[3].Tick <= FResults[2].Tick, 'AfterException should occur before AfterExecute .');
@@ -400,15 +410,15 @@ begin
   try
     FillChar(FResults, SizeOf(FResults), 0);
     vObj := TTestExceptionObj.Create;
-    with vObj do
     try
       //StartExpectingException(ETestError);
-      Method1;
+      vObj.Method1;
       CheckResults(vObj, @TTestExceptionObj.Method1, ETestError, [esAllowed, esBefore, esException]);
       //StopExpectingException('Execute');
     finally
-      Free;
+      vObj.Free;
     end;
+      writeln(1);
   finally
     Check(FInterceptorClass.RemoveFrom(TTestExceptionObj, @TTestExceptionObj.Method1), 'Can not remove from TTestExceptionObj.Method1');
   end;
