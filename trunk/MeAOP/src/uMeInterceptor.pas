@@ -76,7 +76,7 @@ type
      ; const thisState: TMeExecuteStates
      ; const Params: PMeProcParams = nil) of object;
   TMeAfterExceptionEvent = function(Sender: TObject; MethodItem: TMeInterceptedMethodItem
-    ; E: Exception
+    ; const E: Exception
     ; const Params: PMeProcParams = nil): Boolean of object;
 
   //##see uMeObject.TMeObjectMethod
@@ -254,7 +254,7 @@ type
     Note: the Self is point to the injected method's class instance.
     }
     function iAfterException(Sender: TObject; MethodItem:
-            TMeInterceptedMethodItem; E: Exception; const Params: PMeProcParams
+            TMeInterceptedMethodItem; const E: Exception; const Params: PMeProcParams
             = nil): Boolean;
     procedure iAfterExecute(Sender: TObject; MethodItem:
             TMeInterceptedMethodItem; const thisState: TMeExecuteStates; const
@@ -279,7 +279,7 @@ type
      @param Result      re-raise the exception if true, the default is true.
     }
     function AfterException(Sender: TObject; MethodItem:
-            TMeInterceptedMethodItem; E: Exception; const Params: PMeProcParams
+            TMeInterceptedMethodItem; const E: Exception; const Params: PMeProcParams
             = nil): Boolean; virtual;
     { Summary trigger on after the MethodItem is executed even though the MethodItem's raised exception }
     { Description
@@ -1620,7 +1620,7 @@ begin
 end;
 
 function TMeAbstractInterceptor.AfterException(Sender: TObject; MethodItem:
-        TMeInterceptedMethodItem; E: Exception; const Params: PMeProcParams =
+        TMeInterceptedMethodItem; const E: Exception; const Params: PMeProcParams =
         nil): Boolean;
 begin
   if Assigned(FOnAfterException) then
@@ -1691,7 +1691,7 @@ begin
 end;
 
 function TMeAbstractInterceptor.iAfterException(Sender: TObject; MethodItem:
-        TMeInterceptedMethodItem; E: Exception; const Params: PMeProcParams =
+        TMeInterceptedMethodItem; const E: Exception; const Params: PMeProcParams =
         nil): Boolean;
 var
   i: Integer;
