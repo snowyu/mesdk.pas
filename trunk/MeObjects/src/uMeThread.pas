@@ -532,7 +532,7 @@ procedure EnterMainThread;
 procedure LeaveMainThread;
 
 function NewThreadTask(const aTask: PMeTask): PMeThread; overload;
-procedure ThreadSynchronize(ASyncRec: PMeSynchronizeRecord; QueueEvent: Boolean = False);
+procedure ThreadSynchronize(ASyncRec: PMeSynchronizeRecord; QueueEvent: Boolean {$IFDEF SUPPORTS_DEFAULTPARAMS}= False{$ENDIF});
 
 implementation
 
@@ -979,7 +979,7 @@ begin
   Queue(aThread, AMethod);
 end;
 
-procedure ThreadSynchronize(ASyncRec: PMeSynchronizeRecord; QueueEvent: Boolean = False);
+procedure ThreadSynchronize(ASyncRec: PMeSynchronizeRecord; QueueEvent: Boolean);
 var
   SyncProc: TSyncProc;
   SyncProcPtr: PSyncProc;
