@@ -136,6 +136,17 @@ const
   COWAIT_WAITALL = $00000001;
   COWAIT_ALERTABLE = $00000002;
 
+  {$IFNDEF COMPILER8_UP}
+  //the delphi7 below have not these constants.
+  { OLE has sent a request and is waiting for a reply. }
+  RPC_S_CALLPENDING = HRESULT($80010115);
+  {$EXTERNALSYM RPC_S_CALLPENDING}
+
+  { This operation returned because the timeout period expired. }
+  RPC_E_TIMEOUT = HRESULT($8001011F);
+  {$EXTERNALSYM RPC_E_TIMEOUT}
+  {$ENDIF}
+
 function GetOleThreadWindow: HWND;
 var
   ChildWnd: HWND;
@@ -144,7 +155,7 @@ begin
   if (OleThreadWnd = 0) or not IsWindow(OleThreadWnd) then
   begin
     if (Win32Platform = VER_PLATFORM_WIN32_NT) and (Win32MajorVersion >= 5) then
-      ParentWnd := HWND_MESSAGE
+      ParentWnd := HWND(HWND_MESSAGE)
     else
       ParentWnd := 0;
     ChildWnd := 0;
