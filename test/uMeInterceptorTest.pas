@@ -418,7 +418,6 @@ begin
     finally
       vObj.Free;
     end;
-      writeln(1);
   finally
     Check(FInterceptorClass.RemoveFrom(TTestExceptionObj, @TTestExceptionObj.Method1), 'Can not remove from TTestExceptionObj.Method1');
   end;
