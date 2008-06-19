@@ -36,25 +36,97 @@ uses
   , uMeObject
   //, uMeTransport
   , uMeRemoteServerFunc
-  , IdTCPServer, IdContext
+  , uMeRemoteUtils
+  , uMeStrUtils
+  , IdCommandHandlers
+  , IdContext
+  , IdIOHandler
+  , IdReply
+  , IdTCPServer
   ;
 
 type
-  TMeIndyBinServer = class(TIdTCPServer)
-  end;
-  TMeIndyRemoteFunctionServer = class
+  TMeIndyRemoteFunctionServer = class(TIdTCPServer)
   protected
-    FSerer: TIdTCPServer
+    FRemoteFunctions: PMeRemmoteFunctions;
+
+    function ReadCommandLine(AContext: TIdContext): string;
+    function HandleCommand(const aContext: TIdContext; aLine: string): Boolean;
+    function DoExecute(AContext: TIdContext): Boolean; override;
+  public
+    constructor Create(aComponent: TComponent); override;
+  end;
+
+  {TMeIndyRemoteFunctionServer = class
+  protected
+    FSerer: TMeIndyBinServer
     FRemoteFunctions: PMeRemmoteFunctions;
     //procedure iSend(const aCmd: string; const aRequest: PMeStream; const aReply: PMeStream);
   public
-
     constructor Create();
     destructor Destroy(); override;
-  end;
+  end; //}
 
 implementation
 
+{ TMeIndyRemoteFunctionServer }
+constructor TMeIndyRemoteFunctionServer.Create(aComponent: TComponent); 
+begin
+  inherited;
+end;
+
+function TMeIndyRemoteFunctionServer.DoExecute(aContext: TIdContext): Boolean;
+var
+  vLine: string;
+begin
+    if aContext.Connection.Connected then 
+    begin
+      vLine := ReadCommandLine(aContext);
+      Result := (vLine <> '');
+      if Result then 
+      begin
+        if not HandleCommand(aContext, vLine) then
+        begin
+          aContext.Connection.IOHandler.Write(401); //unkown 
+        end;
+      end;
+    end;
+end;
+
+function TMeIndyRemoteFunctionServer.HandleCommand(const aContext: TIdContext; aLine: string): Boolean;
+var
+  vCmd: string;
+  vStream: PMeMemoryStream;
+  vStreamProxy: IStream;
+begin
+  vCmd := StrFetch(aLine, ' ');
+  Result := vCmd = 'cmd';
+  if Result then
+  begin
+    aContext.Connection.IOHandler.Write(200);
+    while InputBufferIsEmpty and aContext.Connection.Connected do
+      Sleep(50);
+    Result := aContext.Connection.Connected;
+    if Result then
+    begin
+      New(vStream, Create);
+      vStreamProxy := TMeStreamProxy.Create(vStream);
+      try
+        aContext.Connection.IOHandler.ReadStream(vStreamProxy);
+        if vStream.GetSize > 0 then
+        begin //process parameters
+        end;
+      finally
+        vStream.Free;
+      end;
+    end;
+  end
+end;
+
+function TMeIndyRemoteFunctionServer.ReadCommandLine(AContext: TIdContext): string;
+begin
+  Result := AContext.Connection.IOHandler.ReadLn;
+end;
 
 initialization
 finalization

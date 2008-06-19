@@ -88,7 +88,7 @@ begin
   CheckConnected;
   vStream := TMeStreamProxy.Create(aRequest);
   try
-    //true: write the stream size first.
+    //pass true means write the stream size first.
     IOHandler.Write(vStream, 0, True);
     CheckConnected;
     vStream.MeStream := aReply;
