@@ -46,15 +46,32 @@ uses
   ;
 
 type
+  //return -1 means not found.
+  TMeCmdSearchEvent = function(const aCmd: string): Integer of object;
+  TMeCmdExecuteEvent = procedure(const aContext: TIdContext; const aCmd: Integer; const aParams: PMeStream; var aSuccessful: Boolean) of object;
   TMeIndyRemoteFunctionServer = class(TIdTCPServer)
   protected
-    FRemoteFunctions: PMeRemmoteFunctions;
+    FOnCmdExecute: TMeCmdExecuteEvent;
+    FOnCmdSearch: TMeCmdSearchEvent;
 
     function ReadCommandLine(AContext: TIdContext): string;
     function HandleCommand(const aContext: TIdContext; aLine: string): Boolean;
     function DoExecute(AContext: TIdContext): Boolean; override;
   public
     constructor Create(aComponent: TComponent); override;
+    property OnCmdSearch: TMeCmdSearchEvent read FOnCmdSearch write FOnCmdSearch;
+    property OnCmdExecute: TMeCmdExecuteEvent read FOnCmdExecute write FOnCmdExecute;
+  end;
+
+  TMeIndyServerTransport = class
+  protected
+    FServer: TMeIndyRemoteFunctionServer;
+    FRemoteFunctions: PMeRemmoteFunctions;
+    function SearchCmd(const aCmd: string): Integer;
+    procedure ExecuteCmd(const aContext: TIdContext; const aCmd: Integer; const aParams: PMeStream; var aSuccessful: Boolean);
+  public
+    constructor Create();
+    destructor Destroy(); override;
   end;
 
   {TMeIndyRemoteFunctionServer = class
@@ -85,47 +102,87 @@ begin
       Result := (vLine <> '');
       if Result then 
       begin
-        if not HandleCommand(aContext, vLine) then
-        begin
-          aContext.Connection.IOHandler.Write(401); //unkown 
-        end;
+        Result := HandleCommand(aContext, vLine);
       end;
     end;
 end;
 
 function TMeIndyRemoteFunctionServer.HandleCommand(const aContext: TIdContext; aLine: string): Boolean;
 var
-  vCmd: string;
+  vCmdId: Integer;
   vStream: PMeMemoryStream;
   vStreamProxy: IStream;
 begin
-  vCmd := StrFetch(aLine, ' ');
-  Result := vCmd = 'cmd';
+  Result := StrFetch(aLine, ' ') = 'cmd';
   if Result then
   begin
-    aContext.Connection.IOHandler.Write(200);
-    while InputBufferIsEmpty and aContext.Connection.Connected do
-      Sleep(50);
-    Result := aContext.Connection.Connected;
-    if Result then
+    if Assigned(FOnCmdSearch) then
+      vCmdId := FOnCmdSearch(aLine);
+    Result := vCmdId >= 0;
+    if Result then 
     begin
-      New(vStream, Create);
-      vStreamProxy := TMeStreamProxy.Create(vStream);
-      try
-        aContext.Connection.IOHandler.ReadStream(vStreamProxy);
-        if vStream.GetSize > 0 then
-        begin //process parameters
+      aContext.Connection.IOHandler.Write(200);
+      Result := aContext.Connection.Connected;
+      if Result then
+      begin
+        New(vStream, Create);
+        vStreamProxy := TMeStreamProxy.Create(vStream);
+        try
+          aContext.Connection.IOHandler.ReadStream(vStreamProxy);
+          Result := False;
+          if Assigned(FOnCmdExecute) then
+            FOnCmdExecute(aContext, vCmdId, vStream, Result);
+        finally
+          vStream.Free;
         end;
-      finally
-        vStream.Free;
       end;
-    end;
+    end
+    else
+      aContext.Connection.IOHandler.Write(401); //unkown 
   end
 end;
 
 function TMeIndyRemoteFunctionServer.ReadCommandLine(AContext: TIdContext): string;
 begin
   Result := AContext.Connection.IOHandler.ReadLn;
+end;
+
+{ TMeIndyServerTransport }
+constructor TMeIndyServerTransport.Create();
+begin
+  inherited;
+  FServer := TMeIndyRemoteFunctionServer.Create(nil);
+  New(FRemoteFunctions, Create);
+  FServer.OnCmdSearch := SearchCmd;
+  FServer.OnCmdExecute := ExecuteCmd;
+end;
+
+destructor TMeIndyServerTransport.Destroy();
+begin
+  FreeAndNil(FServer);
+  MeFreeAndNil(FRemoteFunctions);
+  inherited;
+end;
+
+procedure TMeIndyServerTransport.ExecuteCmd(const aContext: TIdContext; const aCmd: Integer; const aParams: PMeStream; var aSuccessful: Boolean);
+var
+  vResult: PMeMemoryStream;
+begin
+  aSuccessful := False;
+  begin
+    New(vResult, Create);
+    try
+      FRemoteFunctions.Execute(aCmd, aParams, vResult);
+      aSuccessful := true;
+    finally
+      vResult.Free;
+    end;
+  end;
+end;
+
+function TMeIndyServerTransport.SearchCmd(const aCmd: string): Integer;
+begin
+  Result := FRemoteFunctions.IndexOf(aCmd);
 end;
 
 initialization
