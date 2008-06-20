@@ -46,8 +46,8 @@ type
   {Binary protocol
     C: cmd aMethodName<LN>
     S: 200 //one byte for status, 200 for ok
-    C: <StreamSize><Stream> //the StreamSize is Int32 (open IOHandler.LargeStream = true for int64)
-    S: <StreamSize><Stream>
+      C: <StreamSize><Stream> //the StreamSize is Int32 (open IOHandler.LargeStream = true for int64)
+      S: <StreamSize><Stream>
   }
   TMeIndyBinClient = class(TIdTCPClientCustom)
   protected
