@@ -60,6 +60,7 @@ type
   public
     destructor Destroy;virtual; //override
     procedure Execute();overload;
+    procedure Execute(const aIn, aOut: PMeStream);overload;
 
     property Instance: Pointer read FInstance write FInstance;
     property Name: string read FName write FName;
@@ -76,7 +77,8 @@ type
     function IndexOf(const aMethod: TMethod): Integer;
     function IndexOfName(const aName: string): Integer;
     function IsValid(const aName: string; const aMethod: TMethod): Boolean;
-    function Execute(const aName: string; const aIn, aOut: PMeStream): Integer;
+    function Execute(const aName: string; const aIn, aOut: PMeStream): Integer; overload;
+    procedure Execute(const aIndex: Integer; const aIn, aOut: PMeStream); overload;
 
     property Items[const Index: Integer]: PMeRemmoteFunction read GetItem;
   end;
@@ -100,6 +102,13 @@ begin
   inherited Execute(FProc);
 end;
 
+procedure TMeRemmoteFunction.Execute(const aIn, aOut: PMeStream);
+begin
+  LoadParamsFromStream(@Self, aIn);
+  Execute;
+  SaveParamsToStream(@Self, aOut);
+end;
+
 { TMeRemmoteFunctions }
 destructor TMeRemmoteFunctions.Destroy;
 begin
@@ -107,17 +116,20 @@ begin
   inherited;
 end;
 
-function TMeRemmoteFunctions.Execute(const aName: string; const aIn, aOut: PMeStream): Integer;
+procedure TMeRemmoteFunctions.Execute(const aIndex: Integer; const aIn, aOut: PMeStream);
 var
   vItem: PMeRemmoteFunction;
+begin
+  vItem := Get(aIndex);
+  vItem.Execute(aIn, aOut);
+end;
+
+function TMeRemmoteFunctions.Execute(const aName: string; const aIn, aOut: PMeStream): Integer;
 begin
   Result := IndexOfName(aName);
   if Result >= 0 then
   begin
-    vItem := Get(Result);
-    LoadParamsFromStream(vItem, aIn);
-    vItem.Execute;
-    SaveParamsToStream(vItem, aOut);
+    Execute(Result, aIn, aOut);
   end;
 end;
 
@@ -203,7 +215,7 @@ end;
 
 initialization
   SetMeVirtualMethod(TypeOf(TMeRemmoteFunction), ovtVmtParent, TypeOf(TMeProcParams));
-  SetMeVirtualMethod(TypeOf(TMeRemmoteFunctions), ovtVmtParent, TypeOf(TMeList));
+  SetMeVirtualMethod(TypeOf(TMeRemmoteFunctions), ovtVmtParent, TypeOf(TMeThreadSafeList));
   {$IFDEF MeRTTI_SUPPORT}
   SetMeVirtualMethod(TypeOf(TMeRemmoteFunction), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeRemmoteFunctions), ovtVmtClassName, nil);
