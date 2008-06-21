@@ -2179,8 +2179,8 @@ var
   P, P1: PChar;
   S: string;
 begin
-  if aDelimiter = #0 then
-    aDelimiter := FDelimiter;
+    if aDelimiter = #0 then
+      aDelimiter := FDelimiter;
     P := PChar(Value);
     if not FStrictDelimiter then
       while P^ in [#1..' '] do

@@ -87,10 +87,12 @@ type
     procedure TestAdd;
     procedure TestAddCheck;
     procedure TestAddNamedPair;
+    procedure TestAddNamedPairCheck;
   published
     procedure Test_Add;
     procedure Test_ValueNamePair;
     procedure Test_LoadSave;
+    procedure Test_AddDelimitedText;
     procedure Test_InheritsFrom;override;
   end;
 
@@ -437,6 +439,25 @@ begin
   end;
 end;
 
+procedure TTest_MeStrings.TestAddNamedPairCheck;
+var 
+  i: Integer;
+  j,k: Integer;
+begin
+  with PMeStrings(FMeObject)^ do
+  begin
+    k := (High(aNamedStrList) - Low(aNamedStrList) + 1);
+    for i := Low(aNamedStrList) to High(aNamedStrList) do
+    begin
+      CheckEquals(aNamedStrList[i], Items[i], 'the MeStrings['+IntToStr(i)+'].value is error.');
+      CheckEquals(i, Objects[i], 'the MeStrings.Objects['+IntToStr(i)+'].value is error.');
+      CheckEquals(StrToInt(GetValueByIndex(i)), Objects[i], 'the MeStrings.Objects['+IntToStr(i)+'].GetValueByIndex() is error.');
+      CheckEquals(aStrList[i], Names[i], 'the MeStrings['+IntToStr(i)+'].Names[] is error.');
+      CheckEquals(StrToInt(Values[PChar(Names[i])]), Objects[i], 'the MeStrings.Objects['+IntToStr(i)+'].Values[] is error.');
+    end;
+  end;
+end;
+
 procedure TTest_MeStrings.TestAdd;
 var 
   i: Integer;
@@ -502,10 +523,25 @@ begin
   TestAddCheck;
 end;
 
+
 procedure TTest_MeStrings.Test_ValueNamePair;
 begin
   TestClear;
   TestAddNamedPair;
+end;
+
+procedure TTest_MeStrings.Test_AddDelimitedText;
+begin
+  TestClear;
+  with PMeStrings(FMeObject)^ do
+  begin
+    StrictDelimiter := False;
+    AddDelimitedText('Content-Type=text/html; charset=gb2312', ';');
+    CheckEquals(0, IndexOfName('Content-Type'), 'Content-Type IndexOfName error');
+    CheckEquals(1, IndexOfName('charset'), 'charset IndexOfName error');
+    CheckEquals('text/html', GetValueByIndex(0), 'Content-Type value error');
+    CheckEquals('gb2312', GetValueByIndex(1), 'charset value error');
+  end;
 end;
 
 { TTest_MeDynamicMemory }
