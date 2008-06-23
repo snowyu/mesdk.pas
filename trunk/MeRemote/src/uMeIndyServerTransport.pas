@@ -34,11 +34,12 @@ uses
   {$ENDIF MSWINDOWS}
   SysUtils, Classes
   , uMeObject
+  , uMeStream
   //, uMeTransport
   , uMeRemoteServerFunc
   , uMeRemoteUtils
   , uMeStrUtils
-  , IdCommandHandlers
+  //, IdCommandHandlers
   , IdContext
   , IdIOHandler
   , IdReply
@@ -58,7 +59,7 @@ type
     function HandleCommand(const aContext: TIdContext; aLine: string): Boolean;
     function DoExecute(AContext: TIdContext): Boolean; override;
   public
-    constructor Create(aComponent: TComponent); override;
+    constructor Create(aComponent: TComponent); //override;
     property OnCmdSearch: TMeCmdSearchEvent read FOnCmdSearch write FOnCmdSearch;
     property OnCmdExecute: TMeCmdExecuteEvent read FOnCmdExecute write FOnCmdExecute;
   end;
@@ -72,6 +73,8 @@ type
   public
     constructor Create();
     destructor Destroy(); override;
+
+    property Server: TMeIndyRemoteFunctionServer read FServer;
   end;
 
   {TMeIndyRemoteFunctionServer = class
@@ -105,17 +108,20 @@ begin
         Result := HandleCommand(aContext, vLine);
       end;
     end;
+  //if return false to stop.
+  Result := true;
 end;
 
 function TMeIndyRemoteFunctionServer.HandleCommand(const aContext: TIdContext; aLine: string): Boolean;
 var
   vCmdId: Integer;
   vStream: PMeMemoryStream;
-  vStreamProxy: IStream;
+  vStreamProxy: TMeStreamProxy;
 begin
   Result := StrFetch(aLine, ' ') = 'cmd';
   if Result then
   begin
+    vCmdId := -1;
     if Assigned(FOnCmdSearch) then
       vCmdId := FOnCmdSearch(aLine);
     Result := vCmdId >= 0;
@@ -134,6 +140,7 @@ begin
             FOnCmdExecute(aContext, vCmdId, vStream, Result);
         finally
           vStream.Free;
+          FreeAndNil(vStreamProxy);
         end;
       end;
     end
@@ -182,7 +189,7 @@ end;
 
 function TMeIndyServerTransport.SearchCmd(const aCmd: string): Integer;
 begin
-  Result := FRemoteFunctions.IndexOf(aCmd);
+  Result := FRemoteFunctions.IndexOfName(aCmd);
 end;
 
 initialization

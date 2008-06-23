@@ -77,12 +77,12 @@ end;
 
 function TMeStreamProxy.GetSize: Int64;
 begin
-  Result := FMeStream.Size;
+  Result := FMeStream.GetSize;
 end;
 
 procedure TMeStreamProxy.SetSize(const NewSize: Int64); 
 begin
-  FMeStream.Size := NewSize;
+  FMeStream.SetSize(NewSize);
 end;
 
 function TMeStreamProxy.Read(var Buffer; Count: Longint): Longint; 

@@ -35,10 +35,12 @@ uses
   Windows,
   {$ENDIF MSWINDOWS}
   SysUtils, Classes
+  , TypInfo
   , uMeObject
   , uMeStream
   , uMeSysUtils
   , uMeTypInfo
+  , uMeTypes
   , uMeProcType
   , uMeRemoteUtils
   ;
@@ -59,8 +61,8 @@ type
     procedure Init;virtual; //override;
   public
     destructor Destroy;virtual; //override
-    procedure Execute();overload;
-    procedure Execute(const aIn, aOut: PMeStream);overload;
+    procedure rExecute();overload;
+    procedure rExecute(const aIn, aOut: PMeStream);overload;
 
     property Instance: Pointer read FInstance write FInstance;
     property Name: string read FName write FName;
@@ -97,22 +99,27 @@ begin
   inherited;
 end;
 
-procedure TMeRemmoteFunction.Execute();
+procedure TMeRemmoteFunction.rExecute();
 begin
   inherited Execute(FProc);
 end;
 
-procedure TMeRemmoteFunction.Execute(const aIn, aOut: PMeStream);
+procedure TMeRemmoteFunction.rExecute(const aIn, aOut: PMeStream);
 begin
   LoadParamsFromStream(@Self, aIn);
-  Execute;
+  rExecute;
   SaveParamsToStream(@Self, aOut);
 end;
 
 { TMeRemmoteFunctions }
 destructor TMeRemmoteFunctions.Destroy;
 begin
-  FreeMeObjects;
+  with LockList^ do
+  try
+    FreeMeObjects;
+  finally
+    UnlockList;
+  end;
   inherited;
 end;
 
@@ -121,7 +128,7 @@ var
   vItem: PMeRemmoteFunction;
 begin
   vItem := Get(aIndex);
-  vItem.Execute(aIn, aOut);
+  vItem.rExecute(aIn, aOut);
 end;
 
 function TMeRemmoteFunctions.Execute(const aName: string; const aIn, aOut: PMeStream): Integer;
@@ -177,13 +184,14 @@ end;
 function TMeRemmoteFunctions.IsValid(const aName: string; const aMethod: TMethod): Boolean;
 var
   vItem: PMeRemmoteFunction;
+  i: Integer;
 begin
   Result :=  (aName <> '') and Assigned(aMethod.Code);
   if Result then with LockList^ do
   try
-    for Integer(Result) := 0 to Count - 1 do
+    for i := 0 to Count - 1 do
     begin
-      vItem := Items[Integer(Result)];
+      vItem := Items[i];
       if (vItem.FName = aName) or ((vItem.FInstance = aMethod.Data) and (vItem.FProc = aMethod.Code)) then
       begin
         Result := False;
@@ -198,14 +206,18 @@ end;
 
 procedure TMeRemmoteFunctions.Register(const aMethod: TMethod; const aName: string; aProcParams: PTypeInfo);
 var
-  vFunc: PMeRemmoteFunction;  
+  vFunc: PMeRemmoteFunction;
+  vClass: TClass;
 begin
   if IsValid(aName, aMethod) then
   begin
     New(vFunc, Create);
     if Assigned(aMethod.Data) and not Assigned(aProcParams) then
       aProcParams := TypeInfo(TMeObjectMethod);
-    vFunc.InitFromType(aProcParams);
+    vClass := nil;
+    if Assigned(aMethod.Data) and IsObject(aMethod.Data) then
+      vClass := TObject(aMethod.Data).ClassType;
+    vFunc.InitFromType(RegisterProcTypeInfo(aProcParams, vClass));
     vFunc.FInstance := aMethod.Data;
     vFunc.FProc := aMethod.Code;
     vFunc.FName := aName;
