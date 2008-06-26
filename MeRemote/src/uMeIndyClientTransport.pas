@@ -52,6 +52,7 @@ type
   TMeIndyBinClient = class(TIdTCPClientCustom)
   protected
   public
+    constructor Create(aComponent: TComponent); 
     procedure SendCmd(const aCmd: string; const aRequest: PMeStream; const aReply: PMeStream); overload;
     property Host;
     property Port;
@@ -77,13 +78,19 @@ const
 implementation
 
 { TMeIndyBinClient }
+constructor TMeIndyBinClient.Create(aComponent: TComponent);
+begin
+  inherited;
+end;
+
 procedure TMeIndyBinClient.SendCmd(const aCmd: string; const aRequest: PMeStream; const aReply: PMeStream); 
 var
-  b: Byte;
+  b: byte;
   vStream: TMeStreamProxy;
 begin
   CheckConnected;
   IOHandler.WriteLn('cmd '+ aCmd);
+  //IOHandler.LargeStream := False;
   CheckConnected;
   b := IOHandler.ReadByte;
   if b <> 200 then
@@ -95,6 +102,8 @@ begin
     IOHandler.Write(vStream, 0, True);
     CheckConnected;
     vStream.MeStream := aReply;
+    //b := IOHandler.ReadLongInt;
+    //writeln('LoadParamsFromStream:',b);
     IOHandler.ReadStream(vStream);
   finally
     vStream.Free;

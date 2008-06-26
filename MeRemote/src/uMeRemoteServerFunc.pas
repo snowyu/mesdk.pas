@@ -107,8 +107,11 @@ end;
 procedure TMeRemmoteFunction.rExecute(const aIn, aOut: PMeStream);
 begin
   LoadParamsFromStream(@Self, aIn);
-  writeln('execute:', Name);
   rExecute;
+  if Assigned(ResultParam) then
+    writeln(ResultParam.AsString)
+  else
+    writeln('err');
   SaveParamsToStream(@Self, aOut);
 end;
 

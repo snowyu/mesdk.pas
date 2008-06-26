@@ -3127,7 +3127,7 @@ begin
   if i > 0 then
   begin
     SetLength(Result, i);
-    ReadBuffer(Result[i], i);
+    ReadBuffer(Result[1], i);
   end;
 end;
 

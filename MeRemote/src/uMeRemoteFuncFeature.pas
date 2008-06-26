@@ -100,7 +100,9 @@ begin
       FTransport.Send(MethodItem.Name, vStream, vResultStream);
       vResultStream.Seek(0, soBeginning);
       if Assigned(Params) then
+      begin
         LoadParamsFromStream(Params, vResultStream);
+      end;
     finally
       vStream.Free;
       vResultStream.Free;

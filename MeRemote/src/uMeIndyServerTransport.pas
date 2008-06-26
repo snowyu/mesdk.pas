@@ -135,15 +135,17 @@ begin
         New(vStream, Create);
         vStreamProxy := TMeStreamProxy.Create(vStream);
         try
+          aContext.Connection.IOHandler.LargeStream := False;
           aContext.Connection.IOHandler.ReadStream(vStreamProxy);
           Result := False;
           if Assigned(FOnCmdExecute) then
           begin
+            vStream.SetPosition(0);
             FOnCmdExecute(aContext, vCmdId, vStream, Result);
             if Result then
             begin
               vStream.SetPosition(0);
-              aContext.Connection.IOHandler.Write(vStreamProxy);
+              aContext.Connection.IOHandler.Write(vStreamProxy, 0, True);
             end;
           end;
         finally
@@ -188,6 +190,8 @@ begin
     New(vResult, Create);
     try
       FRemoteFunctions.Execute(aCmd, aParams, vResult);
+      aParams.SetSize(0);
+      aParams.CopyFrom(vResult, 0);
       aSuccessful := true;
     finally
       vResult.Free;

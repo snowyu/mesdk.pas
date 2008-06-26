@@ -109,16 +109,22 @@ begin
   begin
     PMeParam(aParams.Items[i]).SaveToStream(aStream);
   end;
+  if Assigned(aParams.ResultParam) then
+    PMeParam(aParams.ResultParam).SaveToStream(aStream);
 end;
 
 procedure LoadParamsFromStream(const aParams: PMeProcParams; const aStream: PMeStream);
 var
   i: Integer;
 begin
+  //writeln('Load::',aStream.GetSize);
   for i := 0 to aParams.Count - 1 do
   begin
+    //writeln('Load::',i,':', aParams.Items[i].Name);
     PMeParam(aParams.Items[i]).LoadFromStream(aStream);
   end;
+  if Assigned(aParams.ResultParam) then
+    PMeParam(aParams.ResultParam).LoadFromStream(aStream);
 end;
 
 
