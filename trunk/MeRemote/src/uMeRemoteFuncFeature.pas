@@ -35,9 +35,12 @@ uses
   Windows,
   {$ENDIF MSWINDOWS}
   SysUtils, Classes
+  , TypInfo
   , uMeObject
   , uMeStream
   , uMeSysUtils
+  , uMeTypes
+  , uMeProcType
   , uMeInterceptor
   , uMeFeature
   , uMeTransport
