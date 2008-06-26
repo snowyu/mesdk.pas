@@ -1549,7 +1549,23 @@ begin
   if Assigned(FDataType.ParamType) then
   begin
     if FDataType.IsByRef then
+    begin
       case FDataType.ParamType.Kind of
+        mtkSet, mtkEnumeration, mtkInteger: if FDataType.ParamType.ClassType = TypeOf(TMeCustomOrdinalType) then
+          case PMeCustomOrdinalType(FDataType.ParamType).OrdType of
+            otSByte:
+                PShortInt(FParamValue.VPointer)^ := StrToInt(aValue);
+            otUByte:
+                PByte(FParamValue.VPointer)^ := StrToInt(aValue);
+            otSWord:
+                PSmallInt(FParamValue.VPointer)^ := StrToInt(aValue);
+            otUWord:
+                PWord(FParamValue.VPointer)^ := StrToInt(aValue);
+            otSLong:
+                PInteger(FParamValue.VPointer)^ := StrToInt(aValue);
+            otULong:
+                PLongWord(FParamValue.VPointer)^ := StrToInt(aValue);
+          end;
         mtkVariant:
         begin
           PVariant(FParamValue.VPointer)^ := aValue;
@@ -1572,6 +1588,7 @@ begin
             FParamValue.VString^ := aValue; 
           end;
       end// case
+    end
     else
       case FDataType.ParamType.Kind of
         mtkVariant:
@@ -1579,6 +1596,7 @@ begin
           Variant(FParamValue.VVariant) := aValue;
         end;
         mtkInt64:   FParamValue.VInt64 := StrToInt(aValue);
+        mtkInteger:   FParamValue.VInteger := StrToInt(aValue);
         mtkFloat: if FDataType.ParamType.ClassType = TypeOf(TMeFloatType) then
           case PMeFloatType(FDataType.ParamType).FloatType of
             ftSingle: FParamValue.VSingle := StrToFloat(aValue);
