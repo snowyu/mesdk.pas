@@ -53,6 +53,8 @@ type
   protected
   public
     procedure SendCmd(const aCmd: string; const aRequest: PMeStream; const aReply: PMeStream); overload;
+    property Host;
+    property Port;
   end;
 
   TMeIndyClientTransport = class(TMeTransport)
@@ -66,6 +68,7 @@ type
   public
     constructor Create; override;
     destructor Destroy; override;
+    property Client: TMeIndyBinClient read FClient;
   end;
 
 const 

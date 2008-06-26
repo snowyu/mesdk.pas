@@ -43,14 +43,14 @@ uses
   , IdContext
   , IdIOHandler
   , IdReply
-  , IdTCPServer
+  , IdCustomTCPServer
   ;
 
 type
   //return -1 means not found.
   TMeCmdSearchEvent = function(const aCmd: string): Integer of object;
   TMeCmdExecuteEvent = procedure(const aContext: TIdContext; const aCmd: Integer; const aParams: PMeStream; var aSuccessful: Boolean) of object;
-  TMeIndyRemoteFunctionServer = class(TIdTCPServer)
+  TMeIndyRemoteFunctionServer = class(TIdCustomTCPServer)
   protected
     FOnCmdExecute: TMeCmdExecuteEvent;
     FOnCmdSearch: TMeCmdSearchEvent;
@@ -75,6 +75,7 @@ type
     destructor Destroy(); override;
 
     property Server: TMeIndyRemoteFunctionServer read FServer;
+    property RemoteFunctions: PMeRemmoteFunctions read FRemoteFunctions;
   end;
 
   {TMeIndyRemoteFunctionServer = class
@@ -137,7 +138,14 @@ begin
           aContext.Connection.IOHandler.ReadStream(vStreamProxy);
           Result := False;
           if Assigned(FOnCmdExecute) then
+          begin
             FOnCmdExecute(aContext, vCmdId, vStream, Result);
+            if Result then
+            begin
+              vStream.SetPosition(0);
+              aContext.Connection.IOHandler.Write(vStreamProxy);
+            end;
+          end;
         finally
           vStream.Free;
           FreeAndNil(vStreamProxy);
