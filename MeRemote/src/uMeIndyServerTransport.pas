@@ -110,7 +110,7 @@ begin
       end;
     end;
   //if return false to stop.
-  Result := true;
+  Result := False;
 end;
 
 function TMeIndyRemoteFunctionServer.HandleCommand(const aContext: TIdContext; aLine: string): Boolean;
