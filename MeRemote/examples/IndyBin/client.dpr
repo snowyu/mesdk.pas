@@ -1,7 +1,7 @@
 program client;
 {$AppType Console}
 uses
-  SysUtils
+  Windows, SysUtils
   , uMeObject
   , uMeTypes
   , uMeProcType
@@ -31,7 +31,15 @@ end;
 
 var
   vTransport: TMeIndyClientTransport;
+  vA,vB, vC: Integer;
+  vBegin, vEnd: Int64;
 begin
+  vA := 1;
+  vB := 2;
+  if ParamCount >= 1 then
+    vA := StrToIntDef(ParamStr(1), 1);
+  if ParamCount >= 2 then
+    vB := StrToIntDef(ParamStr(2), 2);
   vTransport := TMeIndyClientTransport.Create();
   with vTransport.Client do
   try
@@ -39,7 +47,11 @@ begin
     Host := 'localhost';
     Port := 1111;
     TMeRemoteFuncFeature.AddTo(@Add, 'add', TypeInfo(TAdd), vTransport);
-    writeln('1+2=',Add(1,2));
+    QueryPerformanceCounter(vBegin);
+    vC := Add(vA,vB);
+    QueryPerformanceCounter(vEnd);
+    writeln(vA,'+',vB,'=',vC);
+    writeln('RunTime(QueryPerformanceCount):',vEnd-vBegin);
     except
       On E: Exception do
         Writeln('Exception(', E.ClassName, '):', E.Message);
