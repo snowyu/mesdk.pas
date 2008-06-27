@@ -1,0 +1,12 @@
+2008-6-27
+  the prototype of MeRemote RPC can work now.
+  but a lot of things need to do.
+    the binary stream format.
+    the Server includes API and the Services:
+      the API is the function only
+      each service is an object.
+      the basic service is system service to  listMethods
+    more unit Test case added.
+    implement the RESTful API.
+    implement RESTful json-RPC API.
+
