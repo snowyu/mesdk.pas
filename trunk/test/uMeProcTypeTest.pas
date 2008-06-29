@@ -32,7 +32,7 @@ type
     function CheckProcParamInfo(const aProcParamInfo: TMeParamType; const aParamData: TMeParamData): PMeParamData;
   published
     procedure Test_AssignTypeInfo;
-    procedure Test_ParamStream;
+    //procedure Test_ParamStream;
   end;
 
 implementation
@@ -40,7 +40,7 @@ implementation
 type
   TTestProc1 = function(var aIntVar: integer; const aByte: Byte; out aOut: String): Boolean of object;
   TTestProc2 = procedure(const aInt: integer; const aStr: string; a: Boolean; c: shortstring) of object;
-  TTestProc3 = procedure(const aInt: LongInt; const aStr: WideString; out a: Boolean; var c: shortstring);
+  TTestProc3 = procedure(const aInt: LongInt; const aStr: WideString; out a: Boolean; var c: shortstring) of object;
  
 function TTest_MeProcType.MeTypeClass: TMeClass;
 begin
@@ -130,9 +130,7 @@ begin
   TestAssignFromTypeInfo(TypeInfo(TTestProc3));
 end;
 
-Type
-  TTestFuncParams = procedure(const i: integer; s: string; b: Boolean):
-
+{
 procedure TTest_MeProcType.Test_ParamStream;
 var
   vParams: PMeProcParams;
@@ -141,6 +139,7 @@ begin
   vParams.InitFromType(RegisterProcTypeInfo(TypeInfo(TTestFuncParams)));
   vParams.
 end;
+//}
 
 Initialization
 
