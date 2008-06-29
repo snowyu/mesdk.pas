@@ -31,6 +31,8 @@ uses
 
 type
   PMeFileLogger = ^ TMeFileLogger;
+  PMeConsoleLogger = ^ TMeConsoleLogger;
+
   { Summary for logging information to the file. }
   TMeFileLogger = object(TMeStreamLogger)
   private
@@ -42,9 +44,20 @@ type
     procedure Close; virtual; //override;
   end;
   
+  { Summary for logging information to console. }
+  { note: only for console application}
+  TMeConsoleLogger = object(TMeCustomLogger)
+  private
+  protected
+    procedure WriteLog(aMsg: string); virtual; //override;
+  public
+    procedure Open; virtual; //override;
+    procedure Close; virtual; //override;
+  end;
 
 implementation
 
+{ TMeFileLogger }
 constructor TMeFileLogger.Create(const aFileName: string);
 begin
   inherited Create(New(PMeFileStream, Create));
@@ -71,10 +84,26 @@ begin
   PMeFileStream(FStream).Close();
 end;
 
+{ TMeConsoleLogger }
+procedure TMeConsoleLogger.WriteLog(aMsg: string);
+begin
+  Writeln(aMsg);
+end;
+
+procedure TMeConsoleLogger.Open;
+begin
+end;
+
+procedure TMeConsoleLogger.Close;
+begin
+end;
+
 initialization
   {$IFDEF MeRTTI_SUPPORT}
   SetMeVirtualMethod(TypeOf(TMeFileLogger), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeConsoleLogger), ovtVmtClassName, nil);
   {$ENDIF}
   SetMeVirtualMethod(TypeOf(TMeFileLogger), ovtVmtParent, TypeOf(TMeStreamLogger));
+  SetMeVirtualMethod(TypeOf(TMeConsoleLogger), ovtVmtParent, TypeOf(TMeCustomLogger));
 finalization
 end.
