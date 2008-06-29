@@ -334,7 +334,7 @@ end;
 procedure TMeCustomDownloadPartTask.Init;
 begin
   inherited;
-  FStream := TMemoryStream.Create;
+  //FStream := TMemoryStream.Create;
 end;
 
 destructor TMeCustomDownloadPartTask.Destroy;
@@ -508,7 +508,7 @@ end;
 
 function TMeHttpDownloadSimpleTask.Run: Boolean;
 var
-  vStream: TStream;
+  //vStream: TStream;
   vBackup: TStream;
 begin
   if (FStream.Position > 0) and Assigned(FDownInfo) and FDownInfo.FHeaderInited and FDownInfo.FCanResume then
