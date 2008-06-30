@@ -899,6 +899,9 @@ function RegExprSubExpressions (const ARegExpr : string;
   Modif : integer;
   Stack : ^TStackArray; //###0.945
   StackIdx, StackSz : integer;
+  {$IFDEF SubExprName_RegExpr}
+  vChar: REChar;
+  {$ENDIF}
  begin
   Result := 0; // no unbalanced brackets found at this very moment
 
@@ -923,7 +926,7 @@ function RegExprSubExpressions (const ARegExpr : string;
   while (i <= Len) do begin
     case ARegExpr [i] of
       '(': begin
-        if (i < Len) and (ARegExpr [i + 1] = '?') then begin
+        if (i < Len) and (ARegExpr [i + 1] = '?') {$IFDEF SubExprName_RegExpr}and ((i+1< Len) and not (ARegExpr[i+2] in ['<', '''', 'P'])){$ENDIF} then begin
            // this is not subexpression, but comment or other
            // Perl extension. We must check is it (?ismxrg-ismxrg)
            // and change AExtendedSyntax if /x is changed.
@@ -938,7 +941,36 @@ function RegExprSubExpressions (const ARegExpr : string;
               then AExtendedSyntax := (Modif and MaskModX) <> 0;
           end
          else begin // subexpression starts
-           ASubExprs.Add (''); // just reserve space
+           {$IFDEF SubExprName_RegExpr}
+           if (ARegExpr [i + 1] = '?') and ((i+4< Len) and (ARegExpr[i+2] in ['<', '''', 'P'])) then
+           begin
+             i0 := i+2;
+             vChar := ARegExpr[i0];
+             if vChar = 'P' then
+             begin
+               inc(i0);
+               vChar := '>';
+             end
+             else if vChar = '<' then
+               vChar := '>';
+
+             inc(i0);
+             while (i0 < Len) and (ARegExpr[i0] <> vChar) do
+               inc(i0);
+             if ARegExpr[i0] = vChar then
+             begin
+               if ARegExpr[i+2] = 'P' then
+                  ASubExprs.Add (Copy(ARegExpr, i+4, i0-i-4))
+               else
+                  ASubExprs.Add (Copy(ARegExpr, i+3, i0-i-3));
+               i := i0+1;
+             end
+             else
+               ASubExprs.Add ('');
+           end
+           else
+           {$ENDIF}
+             ASubExprs.Add (''); // just reserve space
            with Stack [StackIdx] do begin
              SubExprIdx := ASubExprs.Count - 1;
              StartPos := i;
@@ -955,7 +987,7 @@ function RegExprSubExpressions (const ARegExpr : string;
              SubExprLen := i - StartPos + 1;
              ASubExprs.Objects [SubExprIdx] :=
               TObject (StartPos or (SubExprLen ShL 16));
-             ASubExprs [SubExprIdx] := System.Copy (
+             ASubExprs [SubExprIdx] := ASubExprs [SubExprIdx] + ' '+ System.Copy (
               ARegExpr, StartPos + 1, SubExprLen - 2); // add without brackets
             end;
           end;
