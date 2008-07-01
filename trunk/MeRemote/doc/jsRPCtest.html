@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<!--
+ JSON/XML-RPC Server Test Console <http://code.google.com/p/json-xml-rpc/>
+ Copyright: 2007, Weston Ruter <http://weston.ruter.net/>
+ License: GNU General Public License, Free Software Foundation
+          <http://creativecommons.org/licenses/GPL/2.0/>
+-->
+	<head>
+		<title>JSON/XML-RPC Server Test Console</title>
+		<script type="text/javascript" src="firebug/firebug.js"></script>
+		<script type="text/javascript" src="base64.js"></script>
+		<script type="text/javascript" src="rpc_client.js"></script>
+
+		<style type="text/css">
+		legend {
+			padding-left:.5em;
+			padding-right:.5em;
+			background-color:white;
+			border:solid 2px #CCC;
+		}
+		fieldset {
+			border:solid 2px #CCC;
+			padding:.5em;
+		}
+		#responseFieldset {
+			margin-top:.5em;
+			margin-bottom:0;
+			padding:0;
+		}
+		#responseData {
+			/*height:10em;*/
+			overflow:auto;
+			margin:0;
+			padding:.5em;
+		}
+		</style>
+  </head>
+<body>
+
+		<fieldset>
+			<legend>Request</legend>
+
+
+
+<script>
+  var vDemoService = new RpcClient.Service("http://localhost:81/demo.ashx", {IsAsync: false, Sanitize: true/*, Methods: ['counter']*/}); 
+
+  try {
+    var vResult = vDemoService.wadd(10,2);
+    alert(vResult);
+  }
+  catch(e){
+    alert("Unable to execute because: " + e);
+  }
+
+
+  //RpcClient.setAsynchronous(vDemoService, true);
+  vDemoService.setAsynchronous(true);
+  vDemoService.wadd({params:[10,2],
+                  onSuccess:function(sum){
+                     alert("The sum is: " + sum);
+                  },
+                  onException:function(errorObj){
+                     alert("Unable to add numbers because: " + errorObj);
+                  },
+                  onComplete:function(responseObj){
+                     //any 'final' logic
+                  }
+  });
+
+</script>
+</body>
+</html>

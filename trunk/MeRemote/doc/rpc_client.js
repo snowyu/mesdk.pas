@@ -18,10 +18,10 @@
  *
  * Usage:
  * var rpc = new RpcClient.Service("/app/service", {
- *                         asynchronous: true,   //default: true
- *                         sanitize: true,       //default: true
- *                         methods: ['greet'],   //default: null (synchronous introspection populates)
- *                         protocol: cJSONRpc, //default: JSON-RpcClient
+ *                         IsAsync: true,   //default: true
+ *                         Sanitize: true,       //default: true
+ *                         Methods: ['greet'],   //default: null (synchronous introspection populates)
+ *                         Protocol: cJSONRpc, //default: cJSONRpc
  * }); 
  * rpc.greet({
  *    params:{name:"World"},
@@ -52,15 +52,15 @@
  * function which will be generated in the JavaScript (json-in-script) response. The HTTP GET
  * parameter for passing the callback function is currently non-standardized and so
  * varies from server to server. Create a service proxy with the option
- * 'callbackParamName' in order to specify the callback function name parameter;
+ * 'CallbackParamName' in order to specify the callback function name parameter;
  * the default is 'JSON-response-callback', as used by associated JSON/XML-RpcClient
  * Server project. For example, getting Google Calendar data:
  *
  * var gcalService = new RpcClient.Service("http://www.google.com/calendar/feeds/myemail%40gmail.com/public", {
- *                         asynchronous: true,  //true (default) required, otherwise error raised
- *                         sanitize: false,     //explicit false required, otherwise error raised
- *                         methods: ['full']    //explicit list required, otherwise error raised
- *                         callbackParamName: 'callback'
+ *                         IsAsync: true,  //true (default) required, otherwise error raised
+ *                         Sanitize: false,     //explicit false required, otherwise error raised
+ *                         Methods: ['full']    //explicit list required, otherwise error raised
+ *                         CallbackParamName: 'callback'
  *                         }); 
  * gcalService.full({
  *      params:{
@@ -74,20 +74,197 @@
  *          });
  *      }
  * });
+
+Web 浏览器客户端 JavaScript [[JSON-RPC]] 客户端实现草案
+
+= 说明 =
+
+基于[http://www.coolcode.cn/show-185-1.html PHPRPC 与 JSON-RPC、XML-RPC 的比较]一文对RPC 协议的比较。选定以JSON-RPC标准为基础进行扩展。不选择 PHPRPC 是因为不赞同将其数据格式牢牢的绑定在PHP的序列格式之上，这样降低了跨语言的能力。
+
+WebBrowser的跨域问题：按照PHPRPC一文，可以通过web浏览器客户端JavaScript程序中动态追加js的方式方式加以解决。而其它弊端也可以通过JSON-RPC标准本身加以改造解决。
+
+
+= JavaScript RPC Client =
+本rpc.js实现了对json-rpc的异步以及同步调用。并且通过异步调用的方式实现对Web浏览器跨域调用的支持。JavaScript RPC Client实现了 2006-8-7公布的JSON-RPC 1.1草案内容，同时支持老的JSON-RPC 1.0 版本。
+
+JavaScript RPC Client通过实现客户端的Service调用类来完成对JSON-RPC的调用。
+<code language="javascript">
+var service = new RpcClient.Service("/app/service", {--options--});
+</code>
+
+Service类一旦实例化后，该服务上的所有API都可以直接调用。假如上述service上有如下的API: wadd(a,b)和echo(s)，wadd将a,b两数相加并返回结果,echo将输入的参数s原样返回。你可以直接使用“service.wadd(23,12)”和“echo('hello')”来调用服务上的API.
+
+初始化Service的配置参数如下：
+
+{|cellspacing="0" border="1"
+!参数  || 默认值 || 说明
+|-
+|IsAsync: Boolean || true ||Synchronous calls are not possible to cross-site servers. This option may be changed later by calling: rpc.setAsynchronous(service, bIsAsync) or service.setAsynchronous(bIsAsync)
+|-
+|Sanitize:Boolean || true  || Forces the response data to be validated as legal JSON. This option is relevant to JSON-RPC only, and must be set to 'false' when making calls to a cross-site server.
+|-
+|User:String || null || Username for HTTP authentication.
+|-
+|Passwd: String || null || Password for HTTP authentication.
+|-
+|CallbackParamName:String || "JSON-response-callback" || This option is only relevant to cross-site JSON-RPC calls. The value is the name of the HTTP GET parameter which the server will use to generate the json-in-script response.
+|-
+|Protocol: String || cJSONRpc || May also be cXMLRpc.
+|-
+|DateEncoding: String || "ISO8601"|| Dates are by default encoded as ISO 8601 strings. If the server expects dates to be encoded differently, you may also supply the values "classHinting", "@timestamp@", and "ASP.NET".
+|-
+|DecodeISO8601:Boolean || true || Determines whether ISO 8601 date strings are automatically constructed into Date objects. UTC is assumed.
+|-
+|Methods: Array || none || When this option is not supplied, the service performs introspection via system.listMethods. If the service resides on a cross-site server, this option containing the method list must be provided since synchronous calls cannot be made in this case.
+|}
+
+= 教程 =
+
+== 如何使用 rpc-client.js 调用json-RPC? ==
+
+通过使用提供的 Service 类来实现在js中对api的调用，用如下的方法初始化
+
+同步调用的方法如下:
+<code language="javascript">
+ var vDemoService = new RpcClient.Service(
+    // API URL
+    "/demo.ashx", 
+   
+   {//参数列表，如果没有就启用默认值
+    //是否异步调用,默认为是。 
+    asynchronous: false, 
+    //API名称列表，如果该列表没有提供,将自动去调用服务端的
+    //system.listMethods去获取API名称列表。
+    //注意：当跨域调用时，不会获取API名称列表，必须手动设置API名称表。
+    methods: ['counter','wadd'], 
+    // 是否强制返回数据为有效的json格式，默认为真（注意跨域必须改成false!）
+    sanitize: true  
+  }); 
+</code>
+
+设置是否异步模式也可以在运行时候设置：
+<code language="javascript">
+    vDemoService.setAsynchronous(false);
+</code>
+
+同步调用最为简单和我们直接使用函数没有太大差别： 
+<code language="javascript">
+  try {
+    var sum = vDemoService.wadd(1,1);
+    alert("The sum is: " + sum);}
+  catch(e){
+    alert("Unable to add numbers because: " + e);
+  }
+</code>
+
+异步调用稍微复杂些，除了设置参数外，你还需要设好回调函数：  
+<code language="javascript">
+  function myResultCallback(aResult){
+     alert("The sum is: " + aResult);
+  }
+  function myExpcetionHandler(aError){
+     alert("The Error is: " + aError);
+  }
+  vDemoService.setAsynchronous(true);
+  vDemoService.wadd([10,2], myResultCallback, myExpcetionHandler);
+</code>
+
+
+[[Category:RPC-Client]]
+[[Category:JSON-RPC]]
+
  */
 
 var RpcClient = {
-	version:"1.0.0.0",	
-	requestCount: 0
+	//private members
+	__XMLHttpNameCache: null,
+
+  //public members
+	Version:"1.0.0.0",	
+	RequestCount: 0
 };
 
 var cErrorCanNotSanitized = 1;
 var cErrorXMLCanNotCrossSite = 2;
 var cErrorNeedAsyncForCrossSite = 3;
-var cErrorAPINamesRequired = 4;
+var cErrorAPINamesRequired  = 4;
+var cErrorSuccessHandler    = 5;
+var cErrorExceptionHandler  = 6;
+var cErrorCompleteHandler   = 7;
+var cErrorAsyncParamType    = 8;
+var cErrorXMLParamsType     = 9;
+var cErrorResponseObject    = 10;
+var cErrorResponseIdMissed  = 11;
+var cErrorResponseIdUnkonwn = 12;
+var cErrorQueryStringParamType = 13;
+var cErrorQueryStringParamNestedType = 14;
+var cErrorQueryStringParamObjectType = 15;
+var cErrorXMLDoubleTypeInvalid = 16;
+var cErrorXMLBoolTypeInvalid   = 17;
+var cErrorXMLISODateTypeInvalid = 18;
+var cErrorBase64FuncNotInstalled = 19;
+var cErrorXMLArrayDataMissed = 20;
+var cErrorXMLArrayValueMissed = 21;
+var cErrorXMLArrayIllegalElement = 22;
+var cErrorXMLDocRequired = 23;
+var cErrorXMLRpcDocInvalid = 24;
+var cErrorXMLMethodResponse = 25;
 
-var cJSONRpc = "JSON-Rpc";
-var cXMLRpc  = "XML-Rpc";
+var cJSONRpc = "JSON-RPC";
+var cXMLRpc  = "XML-RPC";
+
+/*
+ * the function createXMLHttp() modified from
+ * http://webfx.eae.net/dhtml/xmlextras/xmlextras.html and
+ * http://www.ugia.cn/?p=85
+ */
+RpcClient.createXMLHttp = function () {
+            if (window.XMLHttpRequest) {
+                var objXMLHttp = new XMLHttpRequest();
+                // some older versions of Moz did not support the readyState property
+                // and the onreadystate event so we patch it!
+                if (objXMLHttp.readyState == null) {
+                    objXMLHttp.readyState = 0;
+                    objXMLHttp.addEventListener(
+                        "load",
+                        function () {
+                            objXMLHttp.readyState = 4;
+                            if (typeof(objXMLHttp.onreadystatechange) == "function") {
+                                objXMLHttp.onreadystatechange();
+                            }
+                        },
+                        false
+                    );
+                }
+                return objXMLHttp;
+            }
+            else if (RpcClient.__XMLHttpNameCache != null) {
+                // Use the cache name first.
+                 return new ActiveXObject(RpcClient.__XMLHttpNameCache);
+            }
+            else {
+                var MSXML = ['MSXML2.XMLHTTP.6.0',
+                             'MSXML2.XMLHTTP.5.0',
+                             'MSXML2.XMLHTTP.4.0',
+                             'MSXML2.XMLHTTP.3.0',
+                             'MsXML2.XMLHTTP.2.6',
+                             'MSXML2.XMLHTTP',
+                             'Microsoft.XMLHTTP.1.0',
+                             'Microsoft.XMLHTTP.1',
+                             'Microsoft.XMLHTTP'];
+                var n = MSXML.length;
+                for(var i = 0; i < n; i++) {
+                    try {
+                        objXMLHttp = new ActiveXObject(MSXML[i]);
+                        // Cache the XMLHttp ActiveX object name.
+                        RpcClient.__XMLHttpNameCache = MSXML[i];
+                        return objXMLHttp;
+                    }
+                    catch(e) {}
+                }
+                return null;
+            }
+        }
 
 RpcClient.Service = function(serviceURL, options){
 	//if(typeof Prototype == 'undefined')
@@ -108,16 +285,46 @@ RpcClient.Service = function(serviceURL, options){
 /* //to reduce the size of the file.
   var rsErrorCanNotSanitized = "You are attempting to access a service on another site, and the JSON data returned " +
 						"by cross-site requests cannot be sanitized. You must therefore explicitly set the " +
-						"'sanitize' option to false (it is true by default) in order to proceed with making " +
+						"'Sanitize' option to false (it is true by default) in order to proceed with making " +
 						"potentially insecure cross-site RpcClient calls.";
   var rsErrorXMLCanNotCrossSite = "Unable to use the XML-RpcClient protocol to access services on other domains.";
   var rsErrorNeedAsyncForCrossSite = "It is not possible to establish a synchronous connection to a cross-site RpcClient service.";
   var rsErrorAPINamesRequired = "You must manually supply the service's method names since auto-introspection is not permitted for cross-site services.";
+  var rsErrorAsyncHandler = "The asynchronous handler callback function you provided is invalid";
+  var rsErrorAsyncParamType = "When making asynchronous calls, the parameters for the method must be passed as an array (or a hash)";
+  var rsErrorXMLParamsType =  "Unable to pass associative arrays to XML-RpcClient services.";
+  var rsErrorResponseObject = "The server did not respond with a response object.";
+  var rsErrorResponseIdMissed = "The server did not respond with the required response id for asynchronous calls.";
+  var rsErrorResponseIdUnkonwn = "Fatal error with RpcClient code: no such ID found in pendingRequests.";
+  var rsErrorQueryStringParamType = "You must supply either an array ,date or object type to convert into a query string. ";
+  var rsErrorQueryStringParamNestedType = "Unable to pass nested arrays nor objects as parameters while in making a cross-site request.";
+  var rsErrorBase64FuncNotInstalled = "Not able to parse base64 data yet.";
+  var rsErrorXMLArrayDataMissed = "XML-Rpc Parse Error: Expected 'data' element as sole child element of 'array'.";
+  var rsErrorXMLArrayIllegalElement = "XML-RpcClient Parse Error: Illegal element.";
+  var rsErrorXMLDocRequired = "Malformed XML document.";
+  var rsErrorXMLRpcDocInvalid = "Invalid XML-Rpc document.";
+  var rsErrorXMLMethodResponse = "Malformed XML-Rpc methodResponse document.";
+  var rsErrorQueryStringParamObjectType = "Unable to pass objects as parameters while in making a cross-site request.";
 */
   var rsErrorCanNotSanitized = "";
   var rsErrorXMLCanNotCrossSite = "";
   var rsErrorNeedAsyncForCrossSite = "";
   var rsErrorAPINamesRequired = "";
+  var rsErrorAsyncHandler = "";
+  var rsErrorAsyncParamType = "";
+  var rsErrorXMLParamsType =  "";
+  var rsErrorResponseObject = "";
+  var rsErrorResponseIdMissed = "";
+  var rsErrorResponseIdUnkonwn = "";
+  var rsErrorQueryStringParamType = "";
+  var rsErrorQueryStringParamNestedType = "";
+  var rsErrorBase64FuncNotInstalled = "";
+  var rsErrorXMLArrayDataMissed = "";
+  var rsErrorXMLArrayIllegalElement = "";
+  var rsErrorXMLDocRequired = "";
+  var rsErrorXMLRpcDocInvalid = "";
+  var rsErrorXMLMethodResponse = "";
+  var rsErrorQueryStringParamObjectType = "";
 
 	//Set other default options
 	var vProvidedMethodList;
@@ -132,26 +339,26 @@ RpcClient.Service = function(serviceURL, options){
 	
 	//Get the provided options
 	if(options instanceof Object){
-		if(options.asynchronous !== undefined){
-			this.FIsAsynchronous = !!options.asynchronous;
+		if(options.IsAsync !== undefined){
+			this.FIsAsynchronous = !!options.IsAsync;
 			if(!this.FIsAsynchronous && this.FIsCrossSite)
 				throw Error(cErrorNeedAsyncForCrossSite, rsErrorNeedAsyncForCrossSite);
 		}
-		if(options.sanitize != undefined)
-			this.FIsResponseSanitized = !!options.sanitize;
-		if(options.user != undefined)
-			this.FUserName = options.user;
-		if(options.password != undefined)
-			this.FPassword = options.password;
-		if(options.callbackParamName != undefined)
-			this.FCallbackParamName = options.callbackParamName;
-		if(String(options.protocol) == cXMLRpc)
+		if(options.Sanitize != undefined)
+			this.FIsResponseSanitized = !!options.Sanitize;
+		if(options.User != undefined)
+			this.FUserName = options.User;
+		if(options.Passwd != undefined)
+			this.FPassword = options.Passwd;
+		if(options.CallbackParamName != undefined)
+			this.FCallbackParamName = options.CallbackParamName;
+		if(String(options.Protocol) == cXMLRpc)
 			this.FProtocol = cXMLRpc;
-		if(options.dateEncoding != undefined)
-			this.FDateEncoding = options.dateEncoding;
-		if(options.decodeISO8601 != undefined)
-			this.FDecodeISO8601 = !!options.decodeISO8601;
-		vProvidedMethodList = options.methods;
+		if(options.DateEncoding != undefined)
+			this.FDateEncoding = options.DateEncoding;
+		if(options.DecodeISO8601 != undefined)
+			this.FDecodeISO8601 = !!options.DecodeISO8601;
+		vProvidedMethodList = options.Methods;
 	}
 
 	if(this.FIsCrossSite){
@@ -224,22 +431,24 @@ RpcClient.setAsynchronous = function(Service, isAsynchronous){
 };
 
 RpcClient.Service.prototype.iCallMethod = function(methodName, params, successHandler, exceptionHandler, completeHandler){
-	RpcClient.requestCount++;
-	
+	RpcClient.RequestCount++;
 	//Verify that successHandler, exceptionHandler, and completeHandler are functions
 	if(this.FIsAsynchronous){
 		if(successHandler && typeof successHandler != 'function')
-			throw Error('The asynchronous onSuccess handler callback function you provided is invalid; the value you provided (' + successHandler.toString() + ') is of type "' + typeof(successHandler) + '".');
+		  //'The asynchronous onSuccess handler callback function you provided is invalid; the value you provided (' + successHandler.toString() + ') is of type "' + typeof(successHandler) + '".'
+			throw Error(cErrorSuccessHandler, rsErrorAsyncHandler);
 		if(exceptionHandler && typeof exceptionHandler != 'function')
-			throw Error('The asynchronous onException handler callback function you provided is invalid; the value you provided (' + exceptionHandler.toString() + ') is of type "' + typeof(exceptionHandler) + '".');
+			//, 'The asynchronous onException handler callback function you provided is invalid; the value you provided (' + exceptionHandler.toString() + ') is of type "' + typeof(exceptionHandler) + '".'
+			throw Error(cErrorExceptionHandler, rsErrorAsyncHandler);
 		if(completeHandler && typeof completeHandler != 'function')
-			throw Error('The asynchronous onComplete handler callback function you provided is invalid; the value you provided (' + completeHandler.toString() + ') is of type "' + typeof(completeHandler) + '".');
+			//, 'The asynchronous onComplete handler callback function you provided is invalid; the value you provided (' + completeHandler.toString() + ') is of type "' + typeof(completeHandler) + '".'
+			throw Error(cErrorCompleteHandler, rsErrorAsyncHandler);
 	}	
 
 	try {
 		//Assign the provided callback function to the response lookup table
 		if(this.FIsAsynchronous || this.FIsCrossSite){
-			RpcClient.pendingRequests[String(RpcClient.requestCount)] = {
+			RpcClient.pendingRequests[String(RpcClient.RequestCount)] = {
 				//method:methodName,
 				onSuccess:successHandler,
 				onException:exceptionHandler,
@@ -252,7 +461,7 @@ RpcClient.Service.prototype.iCallMethod = function(methodName, params, successHa
 			
 			//Create an ad hoc function specifically for this cross-site request; this is necessary because it is 
 			//  not possible pass an JSON-RpcClient request object with an id over HTTP Get requests.
-			RpcClient.callbacks['r' + String(RpcClient.requestCount)] = (function(instance, id){
+			RpcClient.callbacks['r' + String(RpcClient.RequestCount)] = (function(instance, id){
 				var call = {instance: instance, id: id}; //Pass parameter into closure
 				return function(response){
 					if(response instanceof Object && (response.result || response.error)){
@@ -263,21 +472,21 @@ RpcClient.Service.prototype.iCallMethod = function(methodName, params, successHa
 						instance.__doCallback({id: call.id, result: response});
 					}
 				}
-			})(this, RpcClient.requestCount);
-			//RpcClient.callbacks['r' + String(RpcClient.requestCount)] = new Function("response", 'response.id = ' + RpcClient.requestCount + '; this.__doCallback(response);');
+			})(this, RpcClient.RequestCount);
+			//RpcClient.callbacks['r' + String(RpcClient.RequestCount)] = new Function("response", 'response.id = ' + RpcClient.RequestCount + '; this.__doCallback(response);');
 			
 			//Make the request by adding a SCRIPT element to the page
 			var script = document.createElement('script');
 			script.setAttribute('type', 'text/javascript');
 			var src = this.FServiceURL +
 						'/' + methodName +
-						'?' + this.FCallbackParamName + '=RpcClient.callbacks.r' + (RpcClient.requestCount);
+						'?' + this.FCallbackParamName + '=RpcClient.callbacks.r' + (RpcClient.RequestCount);
 			if(params)
 				src += '&' + RpcClient.toQueryString(params);
 			script.setAttribute('src', src);
-			script.setAttribute('id', 'RpcClient' + RpcClient.requestCount);
+			script.setAttribute('id', 'RpcClient' + RpcClient.RequestCount);
 			var head = document.getElementsByTagName('head')[0];
-			RpcClient.pendingRequests[RpcClient.requestCount].scriptElement = script;
+			RpcClient.pendingRequests[RpcClient.RequestCount].scriptElement = script;
 			head.appendChild(script);
 			
 			return undefined;
@@ -287,57 +496,62 @@ RpcClient.Service.prototype.iCallMethod = function(methodName, params, successHa
 			//Obtain and verify the parameters
 			if(params){
 				if(!(params instanceof Object) || params instanceof Date) //JSON-RpcClient 1.1 allows params to be a hash not just an array
-					throw Error('When making asynchronous calls, the parameters for the method must be passed as an array (or a hash); the value you supplied (' + String(params) + ') is of type "' + typeof(params) + '".');
+				  // 'When making asynchronous calls, the parameters for the method must be passed as an array (or a hash); the value you supplied (' + String(params) + ') is of type "' + typeof(params) + '".'
+					throw Error(cErrorAsyncParamType, rsErrorAsyncParamType);
 				//request.params = params;
 			}
 			
 			//Prepare the XML-RpcClient request
 			var request,postData;
-			if(this.FProtocol == cXMLRpc){
-				if(!(params instanceof Array))
-					throw Error("Unable to pass associative arrays to XML-RpcClient services.");
-				
-				var xml = ['<?xml version="1.0"?><methodCall><methodName>' + methodName + '</methodName>'];
-				if(params){
-					xml.push('<params>');
-					for(var i = 0; i < params.length; i++)
-						xml.push('<param>' + this.__toXMLRPC(params[i]) + '</param>');
-					xml.push('</params>');
-				}
-				xml.push('</methodCall>');
-				postData = xml.join('');
-				
-				//request = new Document();
-				//var methodCallEl = document.createElement('methodCall');
-				//var methodNameEl = document.createElement('methodName');
-				//methodNameEl.appendChild(document.createTextNode(methodName));
-				//methodCallEl.appendChild(methodNameEl);
-				//if(params){
-				//	var paramsEl = document.createElement('params');
-				//	for(var i = 0; i < params.length; i++){
-				//		var paramEl = document.createElement('param');
-				//		paramEl.appendChild(this.__toXMLRPC(params[i]));
-				//		paramsEl.appendChild(paramEl);
-				//	}
-				//	methodCallEl.appendChild(paramsEl);
-				//}
-				//request.appendChild(methodCallEl);
-				//postData = request.serializeXML();
-			}
-			//Prepare the JSON-RpcClient request
-			else {
-				request = {
-					version:"1.1",
-					method:methodName,
-					id:RpcClient.requestCount
-				};
-				if(params)
-					request.params = params;
-				postData = this.__toJSON(request);
+			switch(this.FProtocol) {
+			  case cJSONRpc: {//Prepare the JSON-RpcClient request
+  				request = {
+  					version:"1.1",
+  					method:methodName,
+  					id:RpcClient.RequestCount
+  				};
+  				if(params)
+  					request.params = params;
+  				postData = this.__toJSON(request);
+			    break;
+			  }
+			  case cXMLRpc:{
+  				if(!(params instanceof Array))
+  					throw Error(cErrorXMLParamsType, rsErrorXMLParamsType);
+  				
+  				var xml = ['<?xml version="1.0"?><methodCall><methodName>' + methodName + '</methodName>'];
+  				if(params){
+  					xml.push('<params>');
+  					for(var i = 0; i < params.length; i++)
+  						xml.push('<param>' + this.__toXMLRPC(params[i]) + '</param>');
+  					xml.push('</params>');
+  				}
+  				xml.push('</methodCall>');
+  				postData = xml.join('');
+  				
+  				//request = new Document();
+  				//var methodCallEl = document.createElement('methodCall');
+  				//var methodNameEl = document.createElement('methodName');
+  				//methodNameEl.appendChild(document.createTextNode(methodName));
+  				//methodCallEl.appendChild(methodNameEl);
+  				//if(params){
+  				//	var paramsEl = document.createElement('params');
+  				//	for(var i = 0; i < params.length; i++){
+  				//		var paramEl = document.createElement('param');
+  				//		paramEl.appendChild(this.__toXMLRPC(params[i]));
+  				//		paramsEl.appendChild(paramEl);
+  				//	}
+  				//	methodCallEl.appendChild(paramsEl);
+  				//}
+  				//request.appendChild(methodCallEl);
+  				//postData = request.serializeXML();
+			    break;
+			  }
 			}
 			
 			//XMLHttpRequest chosen (over Ajax.Request) because it propogates uncaught exceptions
-			var xhr;
+			var xhr = RpcClient.createXMLHttp();
+			/*
 			if(window.XMLHttpRequest)
 				xhr = new XMLHttpRequest();
 			else if(window.ActiveXObject){
@@ -347,6 +561,7 @@ RpcClient.Service.prototype.iCallMethod = function(methodName, params, successHa
 					xhr = new ActiveXObject('Microsoft.XMLHTTP');
 				}
 			}
+			*/
 			xhr.open('POST', this.FServiceURL, this.FIsAsynchronous, this.FUserName, this.FPassword);
 			if(this.FProtocol == cXMLRpc){
 				xhr.setRequestHeader('Content-Type', 'text/xml');
@@ -364,7 +579,7 @@ RpcClient.Service.prototype.iCallMethod = function(methodName, params, successHa
 				
 				//Handle the response
 				var instance = this;
-				var requestInfo = {id:RpcClient.requestCount}; //for XML-RpcClient since the 'request' object cannot contain request ID
+				var requestInfo = {id:RpcClient.RequestCount}; //for XML-RpcClient since the 'request' object cannot contain request ID
 				xhr.onreadystatechange = function(){
 					//QUESTION: Why can't I use this.readyState?
 					if(xhr.readyState == 4){
@@ -391,7 +606,7 @@ RpcClient.Service.prototype.iCallMethod = function(methodName, params, successHa
 				xhr.send(postData);
 				var response;
 				if(this.FProtocol == cXMLRpc)
-					response = this.__getXMLRPCResponse(xhr, RpcClient.requestCount);
+					response = this.__getXMLRPCResponse(xhr, RpcClient.RequestCount);
 				else
 					response = this.__evalJSON(xhr.responseText, this.FIsResponseSanitized);
 				
@@ -425,15 +640,22 @@ RpcClient.pendingRequests = {};
 //   is made, a function is created 
 RpcClient.callbacks = {};
 
+RpcClient.Service.prototype.setAsynchronous = function(aIsAsync){
+	if(!aIsAsync && this.FIsCrossSite)
+		throw Error(cErrorNeedAsyncForCrossSite, rsErrorNeedAsyncForCrossSite);
+  this.FIsAsynchronous = aIsAsync;
+}
+
 //Called by asychronous calls when their responses have loaded
 RpcClient.Service.prototype.__doCallback = function(response){
 	if(typeof response != 'object')
-		throw Error('The server did not respond with a response object.');
+		throw Error(cErrorResponseObject, rsErrorResponseObject);
 	if(!response.id)
-		throw Error('The server did not respond with the required response id for asynchronous calls.');
+		throw Error(cErrorResponseIdMissed, rsErrorResponseIdMissed);
 
 	if(!RpcClient.pendingRequests[response.id])
-		throw Error('Fatal error with RpcClient code: no ID "' + response.id + '" found in pendingRequests.');
+	  //'Fatal error with RpcClient code: no such ID "' + response.id + '" found in pendingRequests.'
+		throw Error(cErrorResponseIdUnkonwn, rsErrorResponseIdUnkonwn);
 	
 	//Remove the SCRIPT element from the DOM tree for cross-site (JSON-in-Script) requests
 	if(RpcClient.pendingRequests[response.id].scriptElement){
@@ -629,7 +851,7 @@ RpcClient.Service.prototype.__evalJSON = function(json, sanitize){ //from Protot
 			return eval('(' + json + ')');
     }
 	catch(e){err = e;}
-    throw new SyntaxError('Badly formed JSON string: ' + json + " ... " + (err ? err.message : ''));
+    throw new SyntaxError(e.code, 'Badly formed JSON string: ' + json + " ... " + (err ? err.message : ''));
 };
 
 //This function iterates over the properties of the passed object and converts them 
@@ -852,7 +1074,7 @@ RpcClient.Service.prototype.__parseXMLRPC = function(valueEl){
 					//   Whitespace is not permitted. Just numeric characters preceeded by a plus or minus.
 					var intVal = parseInt(typeEL.firstChild.nodeValue);
 					if(isNaN(intVal))
-						throw Error("XML-RpcClient Parse Error: The value provided as an integer '" + typeEL.firstChild.nodeValue + "' is invalid.");
+						throw Error("XML-Rpc Parse Error: The value provided as an integer '" + typeEL.firstChild.nodeValue + "' is invalid.");
 					return intVal;
 				case 'double':
 					//There is no representation for infinity or negative infinity or "not a number".
@@ -862,11 +1084,11 @@ RpcClient.Service.prototype.__parseXMLRPC = function(valueEl){
 					//   allowable values is implementation-dependent, is not specified.
 					var floatVal = parseFloat(typeEL.firstChild.nodeValue);
 					if(isNaN(floatVal))
-						throw Error("XML-RpcClient Parse Error: The value provided as a double '" + typeEL.firstChild.nodeValue + "' is invalid.");
+						throw Error(cErrorXMLDoubleTypeInvalid, "XML-Rpc Parse Error: The value provided as a double '" + typeEL.firstChild.nodeValue + "' is invalid.");
 					return floatVal;
 				case 'boolean':
 					if(typeEL.firstChild.nodeValue != '0' && typeEL.firstChild.nodeValue != '1')
-						throw Error("XML-RpcClient Parse Error: The value provided as a boolean '" + typeEL.firstChild.nodeValue + "' is invalid.");
+						throw Error(cErrorXMLBoolTypeInvalid, "XML-Rpc Parse Error: The value provided as a boolean '" + typeEL.firstChild.nodeValue + "' is invalid.");
 					return Boolean(parseInt(typeEL.firstChild.nodeValue));
 				case 'string':
 					if(!typeEL.firstChild)
@@ -883,10 +1105,13 @@ RpcClient.Service.prototype.__parseXMLRPC = function(valueEl){
 						if(matches[6]) date.setUTCMilliseconds(parseInt(matches[6]));
 						return date;
 					}
-					throw Error("XML-RpcClient Parse Error: The provided value does not match ISO8601.");
+					throw Error(cErrorXMLISODateTypeInvalid, "XML-Rpc Parse Error: The provided value does not match ISO8601.");
 				case 'base64':
-					throw Error("Not able to parse base64 data yet.");
-					//return base64_decode(typeEL.firstChild.nodeValue);
+					//base64_decode
+					if (typeof(atob) != "undefined") {
+  					return atob(typeEL.firstChild.nodeValue)
+  			  else
+					  throw Error(cErrorBase64FuncNotInstalled, rsErrorBase64FuncNotInstalled);
 				case 'nil':
 					return null;
 				case 'struct':
@@ -919,7 +1144,7 @@ RpcClient.Service.prototype.__parseXMLRPC = function(valueEl){
 						dataEl = dataEl.nextSibling;
 					
 					if(!dataEl)
-						new Error("XML-RpcClient Parse Error: Expected 'data' element as sole child element of 'array'.");
+						throw Error(cErrorXMLArrayDataMissed, rsErrorXMLArrayDataMissed);
 					
 					valueEl = dataEl.firstChild;
 					while(valueEl){
@@ -929,13 +1154,14 @@ RpcClient.Service.prototype.__parseXMLRPC = function(valueEl){
 							if(valueEl.nodeName == 'value')
 								arr.push(this.__parseXMLRPC(valueEl));
 							else
-								throw Error("XML-RpcClient Parse Error: Illegal element child '" + valueEl.nodeName + "' of an array's 'data' element.");
+								throw Error(cErrorXMLArrayValueMissed, rsErrorXMLArrayValueMissed);
 						}
 						valueEl = valueEl.nextSibling;
 					}
 					return arr;
 				default:
-					throw Error("XML-RpcClient Parse Error: Illegal element '" + typeEL.nodeName + "' child of the 'value' element.");
+				  //"XML-RpcClient Parse Error: Illegal element '" + typeEL.nodeName + "' child of the 'value' element."
+					throw Error(cErrorXMLArrayIllegalElement, rsErrorXMLArrayIllegalElement);
 			}
 		}
 	}
@@ -945,10 +1171,10 @@ RpcClient.Service.prototype.__parseXMLRPC = function(valueEl){
 RpcClient.Service.prototype.__getXMLRPCResponse = function(xhr, id){
 	var response = {};
 	if(!xhr.responseXML)
-		throw Error("Malformed XML document.");
+		throw Error(cErrorXMLDocRequired, rsErrorXMLDocRequired);
 	var doc = xhr.responseXML.documentElement;
 	if(doc.nodeName != 'methodResponse')
-		throw Error("Invalid XML-RpcClient document.");
+		throw Error(cErrorXMLRpcDocInvalid, rsErrorXMLRpcDocInvalid);
 	
 	var valueEl = doc.getElementsByTagName('value')[0];
 	if(valueEl.parentNode.nodeName == 'param' &&
@@ -963,10 +1189,10 @@ RpcClient.Service.prototype.__getXMLRPCResponse = function(xhr, id){
 			message: fault.faultString
 		};
 	}
-	else throw Error("Invalid XML-RpcClient document.");
+	else throw Error(cErrorXMLRpcDocInvalid, rsErrorXMLRpcDocInvalid);
 	
 	if(!response.result && !response.error)
-		throw Error("Malformed XML-RpcClient methodResponse document.");
+		throw Error(cErrorXMLMethodResponse, rsErrorXMLMethodResponse);
 	
 	response.id = id; //XML-RpcClient cannot pass and return request IDs
 	return response;
@@ -980,7 +1206,8 @@ RpcClient.Service.prototype.__getXMLRPCResponse = function(xhr, id){
 //   and throwing an exception if nested hashes or nested arrays appear.
 RpcClient.toQueryString = function(params){
 	if(!(params instanceof Object || params instanceof Array) || params instanceof Date)
-		throw Error('You must supply either an array or object type to convert into a query string. You supplied: ' + params.constructor);
+	  //'You must supply either an array ,date or object type to convert into a query string. You supplied: ' + params.constructor
+		throw Error(cErrorQueryStringParamType, rsErrorQueryStringParamType);
 
 	var str = '';
 	var useHasOwn = {}.hasOwnProperty ? true : false;
@@ -996,7 +1223,8 @@ RpcClient.toQueryString = function(params){
 					if(params[key][i] instanceof Date)
 						str += encodeURIComponent(RpcClient.dateToISO8601(params[key][i]));
 					else if(params[key][i] instanceof Object)
-						throw Error('Unable to pass nested arrays nor objects as parameters while in making a cross-site request. The object in question has this constructor: ' + params[key][i].constructor);
+					  //'Unable to pass nested arrays nor objects as parameters while in making a cross-site request. The object in question has this constructor: ' + params[key][i].constructor);
+						throw Error(cErrorQueryStringParamNestedType, rsErrorQueryStringParamNestedType);
 					else str += encodeURIComponent(String(params[key][i]));
 				}
 			}
@@ -1007,7 +1235,8 @@ RpcClient.toQueryString = function(params){
 				if(params[key] instanceof Date)
 					str += encodeURIComponent(RpcClient.dateToISO8601(params[key]));
 				else if(params[key] instanceof Object)
-					throw Error('Unable to pass objects as parameters while in making a cross-site request. The object in question has this constructor: ' + params[key].constructor);
+				  //'Unable to pass objects as parameters while in making a cross-site request. The object in question has this constructor: ' + params[key].constructor
+					throw Error(cErrorQueryStringParamObjectType, rsErrorQueryStringParamObjectType);
 				else str += encodeURIComponent(String(params[key]));
 			}
 		}
