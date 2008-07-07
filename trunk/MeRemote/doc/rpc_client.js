@@ -551,17 +551,6 @@ RpcClient.Service.prototype.iCallMethod = function(methodName, params, successHa
 			
 			//XMLHttpRequest chosen (over Ajax.Request) because it propogates uncaught exceptions
 			var xhr = RpcClient.createXMLHttp();
-			/*
-			if(window.XMLHttpRequest)
-				xhr = new XMLHttpRequest();
-			else if(window.ActiveXObject){
-				try {
-					xhr = new ActiveXObject('Msxml2.XMLHTTP');
-				} catch(err){
-					xhr = new ActiveXObject('Microsoft.XMLHTTP');
-				}
-			}
-			*/
 			xhr.open('POST', this.FServiceURL, this.FIsAsynchronous, this.FUserName, this.FPassword);
 			if(this.FProtocol == cXMLRpc){
 				xhr.setRequestHeader('Content-Type', 'text/xml');
@@ -1109,7 +1098,8 @@ RpcClient.Service.prototype.__parseXMLRPC = function(valueEl){
 				case 'base64':
 					//base64_decode
 					if (typeof(atob) != "undefined") {
-  					return atob(typeEL.firstChild.nodeValue)
+  					return atob(typeEL.firstChild.nodeValue);
+  				}
   			  else
 					  throw Error(cErrorBase64FuncNotInstalled, rsErrorBase64FuncNotInstalled);
 				case 'nil':

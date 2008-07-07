@@ -1,3 +1,114 @@
+2008-7-7
++ Use the MooTools as JavaScript Core OO Library:
+  my mootools-1.2-core.js includes: Core, Array, Function, Number, String, Hash, Event, Class, Class.Extras
+  Total Size: 24kb(not Compressed); 15kb(YUI Compressed).
+
+HTTP-RPC 1.0 Specification proposal
+;Editor: [[User:Riceball|Riceball LEE]](riceballl@hotmail.com)
+
+= Overview =
+HTTP-RPC is a stateless, light-weight remote procedure call (RPC) protocol for inter-networking applications over HTTP. It uses the HTTP protocol([http://www.w3.org/Protocols/rfc2616/rfc2616.html RFC 2616]) as transport. The data is format-independent. It's designed to be simple and RESTful!
+
+By leveraging HTTP, HTTP-RPC allows implementations to immediately benefit from the widely deployed World Wide Web infrastructure that is well-documented and understood today. It introduces no new HTTP verbs or message header extensions. The HTTP-RPC does not assume any data format in it. So u can choose ur favorite data format, eg. Json, Xml, etc.
+
+== Goals ==
+The primary goals of this specification are to define the HTTP-RPC 1.1 protocol in terms of:
+* Expressing a Service API(remote procedure call) and its result(no data format specified)
+* Expressing the DATA API(RESTful) call and its result.
+* Using HTTP to transfer the request and response messages that make up a remote procedure call.
+* Expressing error conditions in HTTP.
+
+== Non-Goals ==
+HTTP-RPC does not address the data format, security, correlation, reliability, sessions management, state management and many other features that may be found in other RPC protocols or distributed systems. Developers are instead encouraged to employ features of HTTP and related Internet technologies that can offer some of these features in an equally compelling, robust and satisfying manner. Some features may be defined as extensions by other specifications.
+
+= Conventions =
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in [http://www.ietf.org/rfc/rfc2119.txt RFC 2119].
+An implementation is not compliant if it fails to satisfy one or more of the MUST requirements for the protocols it implements. An implementation that satisfies all of the MUST and all of the SHOULD requirements for its features is said to be unconditionally compliant; one that satisfies all of the 'must' requirements but not all of the SHOULD requirements for its features is said to be conditionally compliant.
+
+All names (i.e. method-names or parameter-names) are case-sensitive.
+
+Clients are the origin of Request objects. Servers are the origin of Response objects.
+
+= Terminology =
+Below is a summary of some terminology used in this documentation that can help in disambiguation of commonly applied and therefore often overloaded terms:
+
+;Client: The agent that is the initiator of the remote procedure call.
+;Server: Software that implements HTTP-RPC, which may hosts one or more HTTP-RPC services and which also acts as the gateway to lower-level protocols and transports.
+;Service: Provider of one or more procedures that may be the target of remote procedure calls by clients.
+;Procedure: A named operation on a service that may be the target of a remote procedure call. In this document, the terms method and procedure are used to mean the same thing. 
+;Method: Same as Procedure. 
+;Call: An invocation of a procedure on a service that results in a sequential request-response transaction between the client and the server.
+;Data API: A named operation on a service that represent a data resource.
+;Service API: Same as Procedure.
+;Request: The message that frames a call and its parameters.
+;Response: The message that frames the result of a successful call or the error in the case of a failed call.
+;Result: The answer for a successful call.
+;Error: The answer for a failed call.
+;Notification: A one-way (fire and forget) call that produces no results, including any indication of error.
+
+= Http Header Requirements and Extensions =
+    
+== Http Header for Request ==
+the HTTP request message MUST specify the following headers:
+* The User-Agent MUST be specified.
+* For HTTP POST only, the Content-Type MUST be specified and SHOULD read the data format. eg, application/json.
+* For HTTP POST only, The Content-Length MUST be specified and correct according to the guidelines and rules laid out in [http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.4 Section 4.4, ¡°Message Length¡±], of the HTTP specification.
+* The Accept MUST be specified and SHOULD read the data format. eg, application/json.
+* The Revision MUST be specified to tell the receiver the version of the HTTP-RPC protocol being used by the client. 
+* For Data API only, The Content-Version is OPTIONAL to specify the version of the resource, the latest version of the resource used if it is not specified.
+
+== Http Header for Response ==
+* The Revision MUST be specified to tell the client the version of the HTTP-RPC protocol being used by the server. 
+* the Content-Type MUST be specified and SHOULD read the data format. eg, application/json.
+* For Data API only, The Content-Version is MUST be specified the version of the resource.
+* Others Http Header fllows the HTTP specification.
+
+= Service API - Procedure Call (Request) =
+A remote procedure call is made by sending a request to a remote service using either [http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.5 HTTP POST] or [http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.3 HTTP GET]. How and where the call is encoded within the HTTP message depends on the HTTP method that is employed. It must be employed as Http Get method if it is the cacheabled request or the XCross Site. 
+
+== Http Method ==
+
+=== POST ===
+In the case of HTTP POST, the procedure call is carried in the body of the HTTP message whereas in the case of HTTP GET, it is expressed along the path and query components of the HTTP Request-URI, and the parameters must be encoded via ur data format. And u must appy the http-header parameters to specify the data format and HTTP-RPC protocol version, eg:
+<pre>
+Content-Type: application/json
+Accept: application/json
+Revision: 1.0
+</pre>
+
+Suppose that a service exposes a procedure named sum that takes two Number parameters, as in sum(a, b), and returns their sum which carry the data via Json. The HTTP POST to call this procedure call would be as follows:
+<pre>
+POST /myservice HTTP/1.1 
+User-Agent: Wget/1.6
+Host: www.example.com
+Content-Type: application/json
+Content-Length: 181
+Accept: application/json
+Revision: 1.0
+
+{
+    "ver"  : "1.0",
+    "method"  : "sum",
+    "params"  : [ 17, 25 ]
+}
+</pre>
+
+In this example, the method being targeted is provided by a service located at http://www.example.com/myservice. The call is expressed as a JSON Object in the body of the HTTP POST message. The "ver" member of this object tells the receiver the version of the HTTP-RPC protocol being used by the client. The Content-Version of the Http Header Field tells the receiver the version of the method being called by the client. if not means current version method.
+
+=== GET ===
+
+<pre>
+GET /myservice/sum?a=17&b=25 HTTP/1.1 
+User-Agent: Wget/1.6
+Host: www.example.com
+Content-Version: 1.0
+Accept: application/json
+Revision: 1.0
+</pre>
+
+= Data API (Request) =
+the Data API represents a RESTful data resource.
+
 2008-6-27
   the prototype of MeRemote RPC can work now.
   but a lot of things need to do.
