@@ -1,3 +1,79 @@
+2008-7-8
+SNDA-RPC 协议规范
+
+= Overview =
+SNDA-RPC 是基于 [JSON-RPC/zh] 的扩展和修改，其目标是继续保持它的简单调用，修正其不足，以及扩展它对RESTful的支持。SNDA-RPC 是运行在 HTTP 协议上无状态的，轻量级远程调用协议，其Service API的数据格式使用的是JSON，Data API的数据格式使用的[[JSON]], [http://bitworking.org/projects/atom/draft-ietf-atompub-protocol-04.html Atom],[[RSS]] 。
+
+= Terminology =
+;客户(Client): API的调用方
+;服务器(Server): 实现 API服务的服务器软件，内部可以宿主一个或多个 API服务或者是API服务的代理网关或传输者。
+;服务(Service): 提供一个或多个 API的提供者。
+;Service API: 已命名的在服务中的一个API远程调用。本文中术语过程，方法，Service API都是同一个意思。
+;Data API: 已命名的在服务中的一个数据资源。
+;过程(Procedure): 参加 Service API.
+;方法(Method): 参加 Service API.
+;调用(Call): 在服务商的一次过程调用将导致在客户和服务器之间发生一次连续的请求-响应处理.
+;请求(Request): 请求消息发送API的调用参数。
+;响应(Response): 响应消息返回调用结果，无论成果或失败的结果。
+;错误(Error): 失败调用的应答。
+;通知(Notification): 一种单向(发完就不管)的调用，没有任何结果，也不会指示错误。
+;短连: 当客户需要调用服务的时候，方与服务相连，调用完毕后立即断开连接。每次连接只执行一个API。连接时间较短。短连又可分为强制短连和非强制短连。强制短连为服务器强制，在完成任务后服务器主动断开与客户的连接。非强制短连为客户端在完成任务后自觉的断开与服务器的连接，文中短连如无特殊说明均为非强制短连。
+;长连: 客户登录上服务后，一直与服务连接，直到客户注销。每次连接执行若干API，空闲也不会断开，直到客户自己注销，连接时间较长。
+
+= Http Header 的需求和扩展 =
+我们使用了如下的Http Header 字段，并对Header字段做了扩展，满足我们的需要。
+
+== 请求方(Request)需要设置的Http Header 字段  ==
+
+请求方必须设置如下的Http Header 字段：
+
+* User-Agent 字段必须设置
+* Content-Type 字段必须设置为"application/json" (仅当请求为HTTP POST的时候).
+* Content-Length 必须参照HTTP规范([http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.4 Section 4.4, “Message Length”])正确设置.(仅当请求为HTTP POST的时候).
+* Accept 字段必须设置要，对于 ServiceAPI 必须设置为"application/json"，对于Data API则可以设置为："application/json", "application/atom","application/rss"，注意具体的某个Data API支持哪些格式，需要查阅相应的Data API 手册。
+* 【扩展】Protocol-Version 字段必须设置，用来告诉服务器客户端使用的是哪一个SNDA-RPC 协议规范版本。
+* 【扩展】API_Key 字段，对于需要限制访问权限的API需要客户提供一个授权API_Key（仅当访问受限API服务的时候必须）,对于公开开放的无权限要求的则不需要。
+* Date 字段，用于指明访问时间，对于需要限制访问权限的API需要客户提供该信息,API服务端允许客户端请求时间误差为10分钟。（仅当访问受限API服务的时候必须）,对于公开开放的无权限要求的则不需要。该访问时间的日期格式为ISO8601<ref>ISO8601 DateTime Format: http://www.w3.org/TR/NOTE-datetime</ref>格式
+
+
+可选的设置字段如下：
+
+* Content-Version 字段<ref>参见 http://www.ietf.org/rfc/rfc2068.txt 19.6.2.2</ref>用来指定资源的版本，如果没有表示需要对该资源的最新版操作。（仅当请求为Data API的时候）
+* Content-MD5 字段是对URL参数的MD5校验和，生成方式如下：根据参数名称将你的所有请求参数按照字母先后顺序排序，如将param1=1,param2=2,param3=3 排序，参数名和参数值链接后，前面加上字符串snda。例如计算此字符串sndaparam11param22param33的md5()值，将此值以RFC 1864<ref>Content-MD5 Header Field: http://www.ietf.org/rfc/rfc1864.txt</ref>文中约定的Base64的字符串格式输出。例如 Content-MD5: Q2hlY2sgSW50ZWdyaXR5IQ==
+* 【扩展】 Session 字段，会话Id字段，用于失去连接后，告诉服务器上次的会话Id，如果服务器依然保持有客户端上一次断线前的会话，那么该会话就会继续，否者服务器将返回一个完全不同的会话Id。
+
+== 响应方(Response)需要设置的Http Header 字段  ==
+
+服务器作为响应方必须要设置的 Http Header 字段如下：
+* Content-Type 字段必须设置为适当的返回数据类型，Service API总是为"application/json"，则可以为Data API则可以为："application/json", "application/atom","application/rss"，具体返回什么格式，需要视请求方发送的Accept Header 字段的内容类型来定。
+* Content-Version 字段用来指定返回资源的版本（仅当请求为Data API的时候）
+* Content-Length 必须参照HTTP规范([http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.4 Section 4.4, “Message Length”])正确设置.
+* 其它HTTP协议规定的必须返回的Http Header 字段.
+* 【扩展】Protocol-Version 字段必须设置，用来告诉客户端，服务器使用的是哪一个SNDA-RPC 协议规范版本。
+
+可选的设置字段如下：
+
+* 【扩展】 Session 字段，当前会话Id字段，如果服务器支持会话，才会设置。用于客户端失去连接后，服务器在一定时间内依然能保持客户端的会话信息。
+
+= URL参数扩展 =
+
+== callback参数 - Web Browser 跨域支持扩展 ==
+API调用必须是[http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.3 HTTP GET]。在API调用URL上增加一个callback参数，内容为一个回调js函数名称。
+
+当在服务器端发现URL中存在实现callback参数的时候，将返回的json对象塞入该回调函数，以如下形式返回javascript（假设我们存在如下的调用：http://ip/service/add?0=1&1=2&id=1&callback=mycallback ）：
+<code language="js">
+  mycallback({"result":3, "error":null, "id":1});
+</code>
+
+= References =
+* [[JSON-RPC/zh]]
+<references/>
+
+
+[[Category:Remote procedure call]]
+[[Category:Standards]]
+
+
 2008-7-7
 + Use the MooTools as JavaScript Core OO Library:
   my mootools-1.2-core.js includes: Core, Array, Function, Number, String, Hash, Event, Class, Class.Extras
@@ -45,6 +121,24 @@ Below is a summary of some terminology used in this documentation that can help 
 ;Result: The answer for a successful call.
 ;Error: The answer for a failed call.
 ;Notification: A one-way (fire and forget) call that produces no results, including any indication of error.
+;Short connection: 
+;Long connection: keep the connection open unitl the client logout.
+
+;客户(Client): API的调用方
+;服务器(Server): 实现 API服务的服务器软件，内部可以宿主一个或多个 API服务或者是API服务的代理网关或传输者。
+;服务(Service): 提供一个或多个 API的提供者。
+;Service API: 已命名的在服务中的一个API远程调用。本文中术语过程，方法，Service API都是同一个意思。
+;Data API: 已命名的在服务中的一个数据资源。
+;过程(Procedure): 参加 Service API.
+;方法(Method): 参加 Service API.
+;调用(Call): 在服务商的一次过程调用将导致在客户和服务器之间发生一次连续的请求-响应处理.
+;请求(Request): 请求消息发送API的调用参数。
+;响应(Response): 响应消息返回调用结果，无论成果或失败的结果。
+;错误(Error): 失败调用的应答。
+;通知(Notification): 一种单向(发完就不管)的调用，没有任何结果，也不会指示错误。
+;短连: 当客户需要调用服务的时候，方与服务相连，调用完毕后立即断开连接。每次连接只执行一个API。连接时间较短。短连又可分为强制短连和非强制短连。强制短连为服务器强制，在完成任务后服务器主动断开与客户的连接。非强制短连为客户端在完成任务后自觉的断开与服务器的连接，文中短连如无特殊说明均为非强制短连。
+;长连: 客户登录上服务后，一直与服务连接，直到客户注销。每次连接执行若干API，空闲也不会断开，直到客户自己注销，连接时间较长。
+
 
 = Http Header Requirements and Extensions =
     
@@ -54,11 +148,11 @@ the HTTP request message MUST specify the following headers:
 * For HTTP POST only, the Content-Type MUST be specified and SHOULD read the data format. eg, application/json.
 * For HTTP POST only, The Content-Length MUST be specified and correct according to the guidelines and rules laid out in [http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.4 Section 4.4, “Message Length”], of the HTTP specification.
 * The Accept MUST be specified and SHOULD read the data format. eg, application/json.
-* The Revision MUST be specified to tell the receiver the version of the HTTP-RPC protocol being used by the client. 
-* For Data API only, The Content-Version is OPTIONAL to specify the version of the resource, the latest version of the resource used if it is not specified.
+* [Ext]The Protocol-Version MUST be specified to tell the receiver the version of the HTTP-RPC protocol being used by the client. 
+* [Ext]For Data API only, The Content-Version is OPTIONAL to specify the version of the resource, the latest version of the resource used if it is not specified.
 
 == Http Header for Response ==
-* The Revision MUST be specified to tell the client the version of the HTTP-RPC protocol being used by the server. 
+* The Protocol-Version MUST be specified to tell the client the version of the HTTP-RPC protocol being used by the server. 
 * the Content-Type MUST be specified and SHOULD read the data format. eg, application/json.
 * For Data API only, The Content-Version is MUST be specified the version of the resource.
 * Others Http Header fllows the HTTP specification.
@@ -73,7 +167,7 @@ In the case of HTTP POST, the procedure call is carried in the body of the HTTP 
 <pre>
 Content-Type: application/json
 Accept: application/json
-Revision: 1.0
+Protocol-Version: 1.0
 </pre>
 
 Suppose that a service exposes a procedure named sum that takes two Number parameters, as in sum(a, b), and returns their sum which carry the data via Json. The HTTP POST to call this procedure call would be as follows:
@@ -84,7 +178,7 @@ Host: www.example.com
 Content-Type: application/json
 Content-Length: 181
 Accept: application/json
-Revision: 1.0
+Protocol-Version: 1.0
 
 {
     "ver"  : "1.0",
