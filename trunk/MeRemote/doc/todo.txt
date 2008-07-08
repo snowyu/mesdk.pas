@@ -2,16 +2,16 @@
 SNDA-RPC 协议规范
 
 = Overview =
-SNDA-RPC 是基于 [JSON-RPC/zh] 的扩展和修改，其目标是继续保持它的简单调用，修正其不足，以及扩展它对RESTful的支持。SNDA-RPC 是运行在 HTTP 协议上无状态的，轻量级远程调用协议，其Service API的数据格式使用的是JSON，Data API的数据格式使用的[[JSON]], [http://bitworking.org/projects/atom/draft-ietf-atompub-protocol-04.html Atom],[[RSS]] 。
+SNDA-RPC 是基于JSON-RPC<ref name="JSON-RPC">[[JSON-RPC/zh|JSON-RPC]]: http://json-rpc.org/</ref> 的扩展和修改，其目标是继续保持它的简单调用，修正其不足，以及扩展它对RESTful的支持。SNDA-RPC 是运行在 HTTP 协议上无状态的，轻量级远程调用协议，其Service API的数据格式使用的是JSON<ref name="JSON">[[JSON/zh|JSON]]: http://www.json.org/json-zh.html</ref>，Data API的数据格式使用的JSON<ref name="JSON"/>, Atom<ref name="Atom">[http://bitworking.org/projects/atom/draft-ietf-atompub-protocol-04.html Atom]: http://bitworking.org/projects/atom/draft-ietf-atompub-protocol-04.html</ref>,RSS<ref name="RSS">[[RSS]]: http://en.wikipedia.org/wiki/RSS_(file_format)</ref>。数据字符集编码用的是UTF8<ref name="UTF8">UTF8字符集: http://en.wikipedia.org/wiki/UTF-8</ref>.
 
 = Terminology =
 ;客户(Client): API的调用方
 ;服务器(Server): 实现 API服务的服务器软件，内部可以宿主一个或多个 API服务或者是API服务的代理网关或传输者。
 ;服务(Service): 提供一个或多个 API的提供者。
-;Service API: 已命名的在服务中的一个API远程调用。本文中术语过程，方法，Service API都是同一个意思。
-;Data API: 已命名的在服务中的一个数据资源。
-;过程(Procedure): 参加 Service API.
-;方法(Method): 参加 Service API.
+;Service API: 已命名的在服务中的一个API远程调用，我们用一个英文动词来命名Service API，如，登录API我们命名为Login。本文中术语Proceudre，Method，Service API都是同一个意思。
+;Data API: 已命名的在服务中的一个数据资源，我们用一个英文名词来命名Data API，如，相片我们命名为Photo。
+;过程(Procedure): 参见 Service API.
+;方法(Method): 参见 Service API.
 ;调用(Call): 在服务商的一次过程调用将导致在客户和服务器之间发生一次连续的请求-响应处理.
 ;请求(Request): 请求消息发送API的调用参数。
 ;响应(Response): 响应消息返回调用结果，无论成果或失败的结果。
@@ -19,13 +19,13 @@ SNDA-RPC 是基于 [JSON-RPC/zh] 的扩展和修改，其目标是继续保持它的简单调用，修正其
 ;通知(Notification): 一种单向(发完就不管)的调用，没有任何结果，也不会指示错误。
 ;短连: 当客户需要调用服务的时候，方与服务相连，调用完毕后立即断开连接。每次连接只执行一个API。连接时间较短。短连又可分为强制短连和非强制短连。强制短连为服务器强制，在完成任务后服务器主动断开与客户的连接。非强制短连为客户端在完成任务后自觉的断开与服务器的连接，文中短连如无特殊说明均为非强制短连。
 ;长连: 客户登录上服务后，一直与服务连接，直到客户注销。每次连接执行若干API，空闲也不会断开，直到客户自己注销，连接时间较长。
+;会话(Session): 在一段时间内客户服务器双方保持状态，完成一系列动作/消息的过程。
 
 = Http Header 的需求和扩展 =
-我们使用了如下的Http Header 字段，并对Header字段做了扩展，满足我们的需要。
+我们使用了如下的Http Header 字段，并对Header字段做了扩展，满足我们的需要。对于我们扩展的非标准的HTTP Header字段前面用“【扩展】”标识。
 
-== 请求方(Request)需要设置的Http Header 字段  ==
-
-请求方必须设置如下的Http Header 字段：
+== 请求方(Request)  ==
+请求方(Request)需要设置的Http Header 字段。请求方必须设置如下的Http Header 字段：
 
 * User-Agent 字段必须设置
 * Content-Type 字段必须设置为"application/json" (仅当请求为HTTP POST的时候).
@@ -38,13 +38,12 @@ SNDA-RPC 是基于 [JSON-RPC/zh] 的扩展和修改，其目标是继续保持它的简单调用，修正其
 
 可选的设置字段如下：
 
-* Content-Version 字段<ref>参见 http://www.ietf.org/rfc/rfc2068.txt 19.6.2.2</ref>用来指定资源的版本，如果没有表示需要对该资源的最新版操作。（仅当请求为Data API的时候）
-* Content-MD5 字段是对URL参数的MD5校验和，生成方式如下：根据参数名称将你的所有请求参数按照字母先后顺序排序，如将param1=1,param2=2,param3=3 排序，参数名和参数值链接后，前面加上字符串snda。例如计算此字符串sndaparam11param22param33的md5()值，将此值以RFC 1864<ref>Content-MD5 Header Field: http://www.ietf.org/rfc/rfc1864.txt</ref>文中约定的Base64的字符串格式输出。例如 Content-MD5: Q2hlY2sgSW50ZWdyaXR5IQ==
+* Content-Version 字段<ref>Content-Version 字段参见 http://www.ietf.org/rfc/rfc2068.txt 19.6.2.2</ref>用来指定资源的版本，如果没有表示需要对该资源的最新版操作。（仅当请求为Data API的时候）
+* Content-MD5 字段是对请求信息的MD5校验和，对于HTTP Get方式的URL参数生成方式如下：根据参数名称将你的所有请求参数按照字母先后顺序排序，如将param1=1,param2=2,param3=3 排序，参数名和参数值链接后，前面加上字符串snda。例如计算此字符串sndaparam11param22param33的md5()值，将此值以RFC 1864<ref>Content-MD5 Header Field: http://www.ietf.org/rfc/rfc1864.txt</ref>文中约定的Base64的字符串格式输出，对于POST方式只需要简单的对发送的正文(Body)进行散列即可。例如 Content-MD5: Q2hlY2sgSW50ZWdyaXR5IQ==
 * 【扩展】 Session 字段，会话Id字段，用于失去连接后，告诉服务器上次的会话Id，如果服务器依然保持有客户端上一次断线前的会话，那么该会话就会继续，否者服务器将返回一个完全不同的会话Id。
 
-== 响应方(Response)需要设置的Http Header 字段  ==
-
-服务器作为响应方必须要设置的 Http Header 字段如下：
+== 响应方(Response)  ==
+响应方(Response)需要设置的Http Header 字段。服务器作为响应方必须要设置的 Http Header 字段如下：
 * Content-Type 字段必须设置为适当的返回数据类型，Service API总是为"application/json"，则可以为Data API则可以为："application/json", "application/atom","application/rss"，具体返回什么格式，需要视请求方发送的Accept Header 字段的内容类型来定。
 * Content-Version 字段用来指定返回资源的版本（仅当请求为Data API的时候）
 * Content-Length 必须参照HTTP规范([http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.4 Section 4.4, “Message Length”])正确设置.
@@ -66,13 +65,11 @@ API调用必须是[http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.3 HTTP 
 </code>
 
 = References =
-* [[JSON-RPC/zh]]
 <references/>
 
 
 [[Category:Remote procedure call]]
 [[Category:Standards]]
-
 
 2008-7-7
 + Use the MooTools as JavaScript Core OO Library:
