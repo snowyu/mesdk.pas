@@ -70,6 +70,34 @@ begin
   GLogger.info(cWorkModeStr[AWorkMode]+ ' Current: %d', [AWorkCount]);
 end;
 
+var
+ vBegin, vEnd: Longword;
+procedure GrabUrl(const aUrl: string; aStream: TStream);
+var
+ vThread: PMeThread;
+ vTask: PMeHttpDownloadSimpleTask;
+begin
+  New(vTask, Create(aURL, aStream));
+  vThread := NewThreadTask(vTask);
+  try
+    vThread.OnException := TMeExceptionThreadEvent(ToMethod(@DoException));
+    vTask.OnStatus := TIdStatusEvent(ToMethod(@DoStatus));
+    vTask.OnWorkBegin := TWorkBeginEvent(ToMethod(@DoWorkBegin));
+    vTask.OnWork := TWorkEvent(ToMethod(@DoWork));
+    vTask.OnWorkEnd := TWorkEndEvent(ToMethod(@DoWorkEnd));
+    vBegin := GetTickCount;
+    //vHttp.Get(vURL, vStream);
+    vThread.Start;
+    while not vThread.Terminated do
+    begin
+      Sleep(100);
+    end;
+    vEnd := GetTickCount;
+  finally
+    vThread.Free;
+  end;
+end;
+
 {procedure DoRedirect(const Self: TObject; Sender: TObject; var dest: string; var NumRedirect: Integer; var Handled: boolean; var VMethod: TIdHTTPMethod);
 begin
   handled := true;
@@ -80,11 +108,8 @@ var
   FLogData : TStrings;
   FVerbose: Boolean;
  vFileName: string;
- vThread: PMeThread;
- vTask: PMeHttpDownloadSimpleTask;
  vURL : string;
  vStream: TMemoryStream;
- vBegin, vEnd: Longword;
  vStrs: PMeStrings;
 begin
  try
@@ -102,32 +127,9 @@ begin
   vStream := TMemoryStream.Create;
   FLogData := TStringList.Create;
   writeln(vURL);
-  New(vTask, Create(vURL, vStream));
-  vThread := NewThreadTask(vTask);
   try
-    vThread.OnException := TMeExceptionThreadEvent(ToMethod(@DoException));
-    vTask.OnStatus := TIdStatusEvent(ToMethod(@DoStatus));
-    vTask.OnWorkBegin := TWorkBeginEvent(ToMethod(@DoWorkBegin));
-    vTask.OnWork := TWorkEvent(ToMethod(@DoWork));
-    vTask.OnWorkEnd := TWorkEndEvent(ToMethod(@DoWorkEnd));
-    vBegin := GetTickCount;
-    //vHttp.Get(vURL, vStream);
-    vThread.Start;
-    while not vThread.Terminated do
-    begin
-      Sleep(100);
-    end;
-    vEnd := GetTickCount;
-    {
-    for i := 0 to vHTTP.Response.RawHeaders.Count -1 do
-    begin  
-        FLogData.Add(vHTTP.Response.RawHeaders[i]);       
-        if FVerbose then
-        begin
-          WriteLn(vHTTP.Response.RawHeaders[i]);
-        end;
-    end;}
- 
+    GrabUrl(vURL, vStream);
+    GrabUrl(vURL, vStream);
     if (vStrs.count > 0) then
     begin
       WriteLn('-------------------------');
@@ -145,10 +147,9 @@ begin
     end;
     //Sleep(500);
   finally
+    vStream.Free;
     vStrs.Free;
     FreeAndNil(FLogData);
-    vStream.Free;
-    vThread.Free;
   end;
  except
    On E: Exception Do
