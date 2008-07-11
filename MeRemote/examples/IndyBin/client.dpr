@@ -46,7 +46,7 @@ begin
    try
     Host := 'localhost';
     Port := 1111;
-    //vTransport.KeepAlive := True; //todo: not impl yet.
+    vTransport.KeepAlive := True; //todo: not impl yet.
     TMeRemoteFuncFeature.AddTo(@Add, 'add', TypeInfo(TAdd), vTransport);
     QueryPerformanceCounter(vBegin);
     vC := Add(vA,vB);
@@ -54,6 +54,14 @@ begin
     writeln(vA,'+',vB,'=',vC);
     writeln('RunTime(QueryPerformanceCount):',vEnd-vBegin);
 
+    //TMeRemoteFuncFeature.AddTo(@Add, 'add', TypeInfo(TAdd), vTransport);
+    vA := 33;
+    vB := 1234;
+    QueryPerformanceCounter(vBegin);
+    vC := Add(vA,vB);
+    QueryPerformanceCounter(vEnd);
+    writeln(vA,'+',vB,'=',vC);
+    writeln('RunTime(QueryPerformanceCount):',vEnd-vBegin);
     except
       On E: Exception do
         Writeln('Exception(', E.ClassName, '):', E.Message);

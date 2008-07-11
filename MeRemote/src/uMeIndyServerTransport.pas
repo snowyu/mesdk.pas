@@ -110,7 +110,10 @@ begin
       end;
     end;
   //if return false to stop.
-  Result := False;
+  //Result := False;
+  if Result and Assigned(AContext.Connection) then begin
+    Result := AContext.Connection.Connected;
+  end;
 end;
 
 function TMeIndyRemoteFunctionServer.HandleCommand(const aContext: TIdContext; aLine: string): Boolean;
