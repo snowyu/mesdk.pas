@@ -1,5 +1,5 @@
 2008-7-8
-<div align="center"><font size="5">'''SNDA-RPC Э��淶'''</font> proposal<br/>Revision:0.8a({{REVISIONID}})
+<div align="center"><font size="5">'''SNDA-RPC 协议规范'''</font> proposal<br/>Revision:0.8a({{REVISIONID}})
 -----
 </div>
 
@@ -9,104 +9,257 @@ __TOC__
 Editor: [[User:Riceball|Riceball LEE]] 
 </div>
 = Overview =
-SNDA-RPC �ǻ���JSON-RPC<ref name="JSON-RPC">[[JSON-RPC/zh|JSON-RPC]]: http://json-rpc.org/</ref> ����չ���޸ģ���Ŀ���Ǽ����������ļ򵥵��ã������䲻�㣬�Լ���չ����RESTful��֧�֡�SNDA-RPC �������� HTTP Э��<ref name="HTTP">HTTP 1.1 Э��: http://www.w3.org/Protocols/rfc2616/rfc2616.html</ref>����״̬�ģ�������Զ�̵���Э�飬��Service API�����ݸ�ʽʹ�õ���JSON<ref name="JSON">[[JSON/zh|JSON]]: http://www.json.org/json-zh.html</ref>��Data API�����ݸ�ʽʹ�õ�JSON<ref name="JSON"/>, Atom<ref name="Atom">[http://bitworking.org/projects/atom/draft-ietf-atompub-protocol-04.html Atom]: http://bitworking.org/projects/atom/draft-ietf-atompub-protocol-04.html</ref>,RSS<ref name="RSS">[[RSS]]: http://en.wikipedia.org/wiki/RSS_(file_format)</ref>�������ַ��������õ���UTF8<ref name="UTF8">UTF8�ַ���: http://en.wikipedia.org/wiki/UTF-8</ref>.
+SNDA-RPC 是基于JSON-RPC<ref name="JSON-RPC">[[JSON-RPC/zh|JSON-RPC]]: http://json-rpc.org/</ref> 的扩展和修改，其目标是继续保持它的简单调用，修正其不足，以及扩展它对RESTful的支持。SNDA-RPC 是运行在 HTTP 协议<ref name="HTTP">HTTP 1.1 协议: http://www.w3.org/Protocols/rfc2616/rfc2616.html</ref>上无状态的，轻量级远程调用协议，其Service API的数据格式使用的是JSON<ref name="JSON">[[JSON/zh|JSON]]: http://www.json.org/json-zh.html</ref>，Data API的数据格式使用的JSON<ref name="JSON"/>, Atom<ref name="Atom">[http://bitworking.org/projects/atom/draft-ietf-atompub-protocol-04.html Atom]: http://bitworking.org/projects/atom/draft-ietf-atompub-protocol-04.html</ref>,RSS<ref name="RSS">[[RSS]]: http://en.wikipedia.org/wiki/RSS_(file_format)</ref>。数据字符集编码用的是UTF-8<ref name="UTF8">UTF-8字符集: http://en.wikipedia.org/wiki/UTF-8</ref>.
 
-== �Ķ����� ==
-* ��Ҫ����ʢ��Service and Data API �����SDK���������Ա
-* ��Ҫ����ʢ��ͻ��˵��� API SDK���������Ա
+== Goals ==
+本规范的主要目标是在如下方面定义 SNDA-RPC 协议：
+* 描述Service API（远程过程）调用和返回结果
+* 描述Data API(RESTful Resource)调用和返回结果
+* 使用HTTP 1.1 协议传输请求和响应数据
+* 使用JSON<ref name="JSON" />作为消息数据的主要格式
+* 增强对[[Web_Cache]]（如：CDN 等）的兼容性，最大限度利用HTTP的现有资源
+* 尽量符合 W3C 存取控制标准（The W3C Access Control）：跨域安全检测请求规范<ref name="W3CAC">W3C 存取控制（The W3C Access Control）: http://www.w3.org/TR/access-control/ 是跨域的安全检测请求规范，让客户端文件对於谁可以、谁不可以向它们发出“以浏览器为基础的 request”（例如 XMLHttpRequest）有更好的控制。除此之外，这个 access control scheme 让网路应用程式拥有允许“跨站要求（cross-site request）”的能力。理论上，这让你在部署好存取控制点（Access Control Point）后，可以由 yoursite.com 的一个页面透过 XMLHttpRequest 向 google.com 要求一份文件。这个层级的控制，让管理网站内容的人员在决定是否“让他们的使用者建立混合不同网站内容的网页（mashup）或网站应用程式”时更有弹性。</ref>
+* SNDA-RPC协议的错误状态代码定义
+* 定义SNDA-RPC服务描述的简单规范
 
-== �Ķ����� ==
-�������ö��������������˽⣨���룩��
-* HTTP 1.1 Э���׼�淶<ref name="HTTP" />
-* JSON Э���׼�淶 <ref name="JSON" />
-* JSON-RPC 1.1 Э���׼�淶 <ref name="JSON-RPC" />
+== Non-Goals ==
+以下的方面将在其它专有规范中阐述，不在本规范约定范围之内，包括：
+* 安全策略
+* 服务的相互关联策略
+* 可靠性策略
+* 会话管理
+* 状态管理
 
-�����ϣ��֧��RSS,Atom���ݸ�ʽ����ѡ����
-* Atom Э���׼�淶<ref name="Atom" />
-* RSS Э���׼�淶<ref name="RSS" />
+== 阅读对象 ==
+* 需要开发盛大Service and Data API 服务端SDK的资深开发人员
+* 需要开发盛大客户端调用 API SDK的资深开发人员
+
+== 阅读背景 ==
+首先您该对如下内容有所了解（必须）：
+* HTTP 1.1 协议标准规范<ref name="HTTP" />
+* JSON 协议标准规范 <ref name="JSON" />
+* JSON-RPC 1.1 协议标准规范 <ref name="JSON-RPC" />
+
+如果你希望支持RSS,Atom数据格式（可选）：
+* Atom 协议标准规范<ref name="Atom" />
+* RSS 协议标准规范<ref name="RSS" />
 
 = Terminology =
-;�ͻ�(Client): API�ĵ��÷�
-;������(Server): ʵ�� API����ķ������������ڲ���������һ������ API���������API����Ĵ������ػ����ߡ�
-;����(Service): �ṩһ������ API���ṩ�ߡ�
-;Service API: ���������ڷ����е�һ��APIԶ�̵��ã�������һ��Ӣ�Ķ���������Service API���磬��¼API��������ΪLogin������������Proceudre��Method��Service API����ͬһ����˼��
-;Data API: ���������ڷ����е�һ��������Դ��������һ��Ӣ������������Data API���磬��Ƭ��������ΪPhoto��
-;����(Procedure): �μ� Service API.
-;����(Method): �μ� Service API.
-;����(Call): �ڷ����̵�һ�ι��̵��ý������ڿͻ��ͷ�����֮�䷢��һ������������-��Ӧ����.
-;����(Request): �ͻ���������Ϣ����API�ĵ��ò�����
-;��Ӧ(Response): ��������Ӧ��Ϣ���ص��ý�������۳ɹ���ʧ�ܵĽ����
-;����(Error): ʧ�ܵ��õ�Ӧ��
-;֪ͨ(Notification): һ�ֵ���(����Ͳ���)�ĵ��ã�û���κν����Ҳ����ָʾ����
-;����: ���ͻ���Ҫ���÷����ʱ�򣬷������������������Ϻ������Ͽ����ӡ�ÿ������ִֻ��һ��API������ʱ��϶̡������ֿɷ�Ϊǿ�ƶ����ͷ�ǿ�ƶ�����ǿ�ƶ���Ϊ������ǿ�ƣ���������������������Ͽ���ͻ������ӡ���ǿ�ƶ���Ϊ�ͻ��������������Ծ��ĶϿ�������������ӣ����ж�����������˵����Ϊ��ǿ�ƶ�����
-;����: �ͻ���¼�Ϸ����һֱ��������ӣ�ֱ���ͻ�ע����ÿ������ִ������API������Ҳ����Ͽ���ֱ���ͻ��Լ�ע��������ʱ��ϳ���
-;�Ự(Session): ��һ��ʱ���ڿͻ�������˫������״̬�����һϵ�ж���/��Ϣ�Ĺ��̡�
+;客户(Client): API的调用方
+;服务器(Server): 实现 API服务的服务器软件，内部可以宿主一个或多个 API服务或者是API服务的代理网关或传输者。
+;服务(Service): 提供一个或多个 API的提供者。
+;Service API: 已命名的在服务中的一个API远程调用，我们用一个英文动词来命名Service API，如，登录API我们命名为Login。本文中术语Proceudre，Method，Service API都是同一个意思。
+;Data API: 已命名的在服务中的一个数据资源，我们用一个英文名词来命名Data API，如，相片我们命名为Photo。
+;过程(Procedure): 参见 Service API.
+;方法(Method): 参见 Service API.
+;调用(Call): 在服务商的一次过程调用将导致在客户和服务器之间发生一次连续的请求-响应处理.
+;请求(Request): 客户端请求消息发送API的调用参数。
+;响应(Response): 服务器响应消息返回调用结果，无论成果或失败的结果。
+;错误(Error): 失败调用的应答。
+;通知(Notification): 一种单向(发完就不管)的调用，没有任何结果（结果为null），如果有错误会返回错误。
+;短连: 当客户需要调用服务的时候，方与服务相连，调用完毕后立即断开连接。每次连接只执行一个API。连接时间较短。短连又可分为强制短连和非强制短连。强制短连为服务器强制，在完成任务后服务器主动断开与客户的连接。非强制短连为客户端在完成任务后自觉的断开与服务器的连接，文中短连如无特殊说明均为非强制短连。
+;长连: 客户登录上服务后，一直与服务连接，直到客户注销。每次连接执行若干API，空闲也不会断开，直到客户自己注销，连接时间较长。
+;会话(Session): 在一段时间内客户服务器双方保持状态，完成一系列动作/消息的过程。
 
-= Http Header ���������չ =
-����ʹ�������µ�Http Header �ֶΣ�����Header�ֶ�������չ���������ǵ���Ҫ������������չ�ķǱ�׼��HTTP Header�ֶ�ǰ���á�����չ������ʶ������ֶν�����ĳЩ��ʽ��Ϊ���룬��ô�ֶ�˵����������ǻ��С�(����ΪXXX��ʱ��)�����Ƶ������ش�˵����
+= 类型系统 =
+SNDA的类型系统为JSON的类型系统，用于指明API调用中的值。JSON包括四种基本类型：数值(number)，字符串(string)，布尔型(boolean)，和空(null)；两种结构类型：对象(object)和数组(array)。
 
-== ����(Request)  ==
-����(Request)��Ҫ���õ�Http Header �ֶΡ����󷽱����������µ�Http Header �ֶΣ�
+;值(Value): 可以是字符串（string）、数值(number)、布尔值、 空值(null)、对象（object）或者数组（array）。这些结构可以嵌套。 
+;字符串（string）: 是由双引号包围的任意数量Unicode字符的集合，使用反斜线转义。一个字符（character）即一个单独的字符串（character string）。 字符串（string）与C或者Java的字符串非常相似。 
+;数值（number): 包括整数或小数，是由数字字符等构成。也与C或者Java的数值非常相似，不过未曾使用的八进制与十六进制格式。如：
+  1323
+  -34.45
+  +1.24E9
+;布尔类型（boolean）: 由 true, false 真假两个标识构成。
+;空（null）: 就是 null. 表示该值为空，什么都没有。
+;数组(Array): 是值（value）的有序列表。一个数组以“[”（左中括号）开始，“]”（右中括号）结束。值之间使用“,”（逗号）分隔。
+;对象(Object): 对象是一个无序的“'''名称/值'''对”集合。一个对象以“{”（左括号）开始，“}”（右括号）结束。每个“名称”后跟一个“:”（冒号）；“'''名称/值'''对”之间使用“,”（逗号）分隔。
 
-* '''User-Agent''' �ֶα�������
-* '''Content-Type'''�ֶα������ã�����Ϊ���ݸ�ʽ�������ַ������Լ��汾��<ref name="Content-Type">Content-Type�ֶ��е�version����Ϊ���ǵ���չ����</ref>�������Ҫָ���汾�ŵĻ�����DataAPIΪ��Դ�İ汾�ţ���ServiceAPI��Ϊ����İ汾�ţ�û�������Ƕ����°汾�������磺"Content-Type: application/json; charset=utf-8; version=1" .
-* '''Content-Length''' �������HTTP�淶([http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.4 Section 4.4, ��Message Length��])��ȷ����.(��������ΪHTTP POST��ʱ��).
-* '''Accept''' �ֶα�������Ҫ������ ServiceAPI ��������Ϊ"application/json"������Data API���������Ϊ��"application/json", "application/atom","application/rss"��ע������ĳ��Data API֧����Щ��ʽ����Ҫ������Ӧ��Data API �ֲᡣ
-* ����չ��'''Protocol-Version''' �ֶα������ã��������߷������ͻ���ʹ�õ�����һ��SNDA-RPC Э��淶�汾��
-* ����չ��'''API_Key''' �ֶΣ�������Ҫ���Ʒ���Ȩ�޵�API��Ҫ�ͻ��ṩһ����ȨAPI_Key��������������API�����ʱ����룩,���ڹ������ŵ���Ȩ��Ҫ�������Ҫ��
-* '''Date''' �ֶΣ�����ָ���ͻ��˷���ʱ�䣬������Ҫ���Ʒ���Ȩ�޵�API��Ҫ�ͻ��ṩ����Ϣ,API����������ͻ�������ʱ�����Ϊ10���ӡ���������������API�����ʱ����룩,���ڹ������ŵ���Ȩ��Ҫ�������Ҫ���÷���ʱ������ڸ�ʽΪISO8601<ref>ISO8601 DateTime Format: http://www.w3.org/TR/NOTE-datetime</ref>��ʽ���磺"1997-07-16T19:20:30.45+08:00",��ʾʱ��+8������ʱ�䣩�ı���ʱ��Ϊ1997��7��16��19��20��30.45�롣
+= Http Header 的需求和扩展 =
+我们使用了如下的Http Header 字段，并对Header字段做了扩展，满足我们的需要。对于我们扩展的非标准的HTTP Header字段前面用“【扩展】”标识。如果字段仅当在某些方式才为必须，那么字段说明的最后我们会有“(仅当为XXX的时候)”类似的言语特此说明。
+
+== 请求方(Request)  ==
+请求方(Request)需要设置的Http Header 字段。请求方必须设置如下的Http Header 字段：
+
+* '''User-Agent''' 字段必须设置
+* '''Content-Type'''字段必须设置，内容为数据格式，数据字符集，以及版本号<ref name="Content-Type">Content-Type字段中的version参数为我们的扩展参数</ref>（如果需要指定版本号的话，在DataAPI为资源的版本号，在ServiceAPI中为服务的版本号，没有则总是对最新版本操作）如："Content-Type: application/json; charset=utf-8; version=1" .
+* '''Content-Length''' 必须参照HTTP规范([http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.4 Section 4.4, “Message Length”])正确设置.(仅当请求为HTTP POST的时候).
+* '''Accept''' 字段必须设置要，对于 ServiceAPI 必须设置为"application/json"，对于Data API则可以设置为："application/json", "application/atom","application/rss"，注意具体的某个Data API支持哪些格式，需要查阅相应的Data API 手册。
+* 【扩展】'''Protocol-Version''' 字段必须设置，用来告诉服务器客户端使用的是哪一个SNDA-RPC 协议规范版本。
+* 【扩展】'''API_Key''' 字段，对于需要限制访问权限的API需要客户提供一个授权API_Key（仅当访问受限API服务的时候必须）,对于公开开放的无权限要求的则不需要。
+* '''Date''' 字段，用于指明客户端访问时间，对于需要限制访问权限的API需要客户提供该信息,API服务端允许客户端请求时间误差为10分钟。（仅当访问受限API服务的时候必须）,对于公开开放的无权限要求的则不需要。该访问时间的日期格式为[[HTTP-Date]]<ref name="HTTP-Date">[[HTTP-Date]]：所有的[[HTTP-Date]]时间都是格林威治(GMT)标准时间， 可以使用三种时间格式：rfc1123-date, rfc850-date 和 asctime-date.
+</ref>格式，如："Fri, 22 May 2008 18:20:12 GMT",表示格林威治(GMT)时间为2008年5月22号礼拜5，18点20分12秒。
 
 
-��ѡ�������ֶ����£�
-* '''Content-MD5''' �ֶ�<ref>Content-MD5ͷ�ֶ���HTTPЭ���׼�и��ֶ����ڼ���EntityBody��MD5ֵ����HTTP Get����BodyΪ�գ�ֻ��URI�����ｫ���Ϊ����URL������MD5�����</ref>�Ƕ�������Ϣ��MD5У��ͣ�����HTTP Get��ʽ��URL�������ɷ�ʽ���£����ݲ������ƽ���������������������ĸ�Ⱥ�˳�������罫param1=1,param2=2,param3=3 ���򣬲������Ͳ���ֵ���Ӻ�ǰ������ַ���snda�����������ַ���sndaparam11param22param33��md5()ֵ������ֵ��RFC 1864<ref>Content-MD5 Header Field: http://www.ietf.org/rfc/rfc1864.txt</ref>����Լ����Base64���ַ�����ʽ���������POST��ʽֻ��Ҫ�򵥵ĶԷ��͵�����(Body)����ɢ�м��ɡ����� Content-MD5: Q2hlY2sgSW50ZWdyaXR5IQ==
-* ����չ�� '''Session''' �ֶΣ��ỰId�ֶΣ�����ʧȥ���Ӻ󣬸��߷������ϴεĻỰId�������������Ȼ�����пͻ�����һ�ζ���ǰ�ĻỰ����ô�ûỰ�ͻ���������߷�����������һ����ȫ��ͬ�ĻỰId��
+可选的设置字段如下：
+* '''Content-MD5''' 字段<ref>Content-MD5头字段在HTTP协议标准中该字段用于计算EntityBody的MD5值，而HTTP Get方法Body为空，只有URI，这里将其改为计算URL参数的MD5检验和</ref>是对请求信息的MD5校验和，对于HTTP Get方式的URL参数生成方式如下：根据参数名称将你的所有请求参数按照字母先后顺序排序，如将param1=1,param2=2,param3=3 排序，参数名和参数值链接后，前面加上字符串snda。例如计算此字符串sndaparam11param22param33的md5()值，将此值以RFC 1864<ref>Content-MD5 Header Field: http://www.ietf.org/rfc/rfc1864.txt</ref>文中约定的Base64的字符串格式输出，对于POST方式只需要简单的对发送的正文(Body)进行散列即可。例如 Content-MD5: Q2hlY2sgSW50ZWdyaXR5IQ==
+* 【扩展】 '''Session''' 字段，会话Id字段，用于失去连接后，告诉服务器上次的会话Id，如果服务器依然保持有客户端上一次断线前的会话，那么该会话就会继续，否者服务器将返回一个完全不同的会话Id。
 
-== ��Ӧ��(Response)  ==
-��Ӧ��(Response)��Ҫ���õ�Http Header �ֶΡ���������Ϊ��Ӧ������Ҫ���õ� Http Header �ֶ����£�
-* '''Content-Type''' �ֶα�������Ϊ�ʵ��ķ����������ͣ�Service API����Ϊ"application/json"�������ΪData API�����Ϊ��"application/json", "application/atom","application/rss"�����巵��ʲô��ʽ����Ҫ�����󷽷��͵�Accept Header �ֶε��������������������ַ���������Ϊutf-8�����Լ��汾��<ref name="Content-Type" />�������Ҫָ���汾�ŵĻ�����DataAPIΪ��Դ�İ汾�ţ���ServiceAPI��Ϊ����İ汾�ţ�û����˵���÷���֧�ְ汾����
-* '''ETag''' �ֶ�<ref>HTTP Э����˵������ETagΪ�������������ʵ��ֵ��������˵����ĳ��Web��Դ�����ļǺţ�token�������������������жϼǺ���ʲô���京�壬����HTTP��Ӧͷ�н��䴫�͵��ͻ��ˣ������Ƿ������˷��صĸ�ʽ��
-����ETag: "50b1c1d4f775c61:df3"
-�����ͻ��˵Ĳ�ѯ���¸�ʽ�������ģ�
-����If-None-Match: W/"50b1c1d4f775c61:df3"
-�������ETagû�ı䣬�򷵻�״̬304��Not Changed.��״̬�룬����Ϊ�ա����μ�: HTTP Э��14.19�ڣ�</ref>����ָ��������Դ�汾��Ψһ��ʶ����������ΪData API��ʱ��
-* '''Last-Modified''' �ֶ�����ָʾ����Դ�ڷ����ڶ�����޸ĵ�ʱ�䣬��ʱ���ʽΪ[[HTTP-Date]]��ʽ�����е�ʱ�䶼�Ǹ�������(GMT)��׼ʱ�䣬�磺"Last-Modified: Fri, 22 May 2008 18:20:12 GMT"����������ΪData API��ʱ��
-* '''Content-Length''' �������HTTP�淶([http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.4 Section 4.4, ��Message Length��])��ȷ����.
-* ����HTTPЭ��涨�ı��뷵�ص�Http Header �ֶ�.
-* ����չ��'''Protocol-Version''' �ֶα������ã��������߿ͻ��ˣ�������ʹ�õ�����һ��SNDA-RPC Э��淶�汾��
+== 响应方(Response)  ==
+响应方(Response)需要设置的Http Header 字段。服务器作为响应方必须要设置的 Http Header 字段如下：
+* '''Content-Type''' 字段必须设置为适当的返回数据类型，Service API总是为"application/json"，则可以为Data API则可以为："application/json", "application/atom","application/rss"，具体返回什么格式，需要视请求方发送的Accept Header 字段的内容类型来定；数据字符集（总是为utf-8），以及版本号<ref name="Content-Type" />（如果需要指定版本号的话，在DataAPI为资源的版本号，在ServiceAPI中为服务的版本号，没有则说明该服务不支持版本）。
+* '''ETag''' 字段<ref>HTTP 协议规格说明定义ETag为“被请求变量的实体值”，或者说是与某个Web资源关联的记号（token）。服务器单独负责判断记号是什么及其含义，并在HTTP响应头中将其传送到客户端，以下是服务器端返回的格式：
+　　ETag: "50b1c1d4f775c61:df3"
+　　客户端的查询更新格式是这样的：
+　　If-None-Match: W/"50b1c1d4f775c61:df3"
+　　如果ETag没改变，则返回状态304（Not Changed.）状态码，内容为空。（参见: HTTP 协议14.19节）</ref>用来指定返回资源版本的唯一标识（仅当请求为Data API的时候）
+* '''Last-Modified''' 字段用来指示此资源在服务期端最后被修改的时间，其时间格式为[[HTTP-Date]]格式<ref name="HTTP-Date" />，所有的时间都是格林威治(GMT)标准时间，如："Last-Modified: Fri, 22 May 2008 18:20:12 GMT"（仅当请求为Data API的时候）
+* '''Content-Length''' 必须参照HTTP规范([http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.4 Section 4.4, “Message Length”])正确设置.
+* 其它HTTP协议规定的必须返回的Http Header 字段.
+* 【扩展】'''Protocol-Version''' 字段必须设置，用来告诉客户端，服务器使用的是哪一个SNDA-RPC 协议规范版本。
 
-��ѡ�������ֶ����£�
+可选的设置字段如下：
 
-* ����չ�� '''Session''' �ֶΣ���ǰ�ỰId�ֶΣ����������֧�ֻỰ���Ż����á����ڿͻ���ʧȥ���Ӻ󣬷�������һ��ʱ������Ȼ�ܱ��ֿͻ��˵ĻỰ��Ϣ��
+* 【扩展】 '''Session''' 字段，当前会话Id字段，如果服务器支持会话，才会设置。用于客户端失去连接后，服务器在一定时间内依然能保持客户端的会话信息。
 
-= URL������չ =
+= URL参数扩展 =
 
-== callback����  ==
-callback������Ϊ�˶�  Web Browser �ṩ����֧����չ�����ӵġ�
-����֧�ֵ�API���ñ�����[http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.3 HTTP GET]����API����URL������һ��callback����������Ϊһ���ص�js�������ơ�
+== callback参数  ==
+callback参数是为了对  Web Browser 提供跨域支持扩展而增加的。
+跨域支持的API调用必须是[http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.3 HTTP GET]。在API调用URL上增加一个callback参数，内容为一个回调js函数名称。
 
-���ڷ������˷���URL�д���ʵ��callback������ʱ�򣬽����ص�json��������ûص���������������ʽ����javascript���������Ǵ������µĵ��ã�http://ip/service/add?0=1&1=2&id=1&callback=mycallback ����
+当在服务器端发现URL中存在实现callback参数的时候，将返回的json对象塞入该回调函数，以如下形式返回javascript（假设我们存在如下的调用：http://ip/service/add?0=1&1=2&id=1&callback=mycallback ）：
 <code language="js">
   mycallback({"result":3, "error":null, "id":1});
 </code>
 
-= ����Լ�� =
-���е�API����ʹ��US-Ascii[A-Z,a-z,0-9,_]��ɣ������ִ�Сд��
+= HTTP 状态码 =
 
-* Service API��ÿһ��Service API����Զ�̷����ϵ�һ�����������������ö��ʻ򶯱��ṹ������Service API���磬��¼API��������ΪLogin��
-* Data API�����������ڷ����е�һ��������Դ������������������Data API���磬��Ƭ��������ΪPhoto��
+= 命名约定 =
+在SNDA-RPC中的服务、 API、参数的标识名称只能是由如下的字符组成：
+* 大写字符 A to Z (U+0041 to U+005A, ASCII 65 to 90)
+* 小写字符 a to z (U+0061 to U+007A, ASCII 97 to 122)
+* 十进制数字 0 to 9 (U+0030 to U+0039, ASCII 48 to 57)
+* 下划线 "_" (U+002D, ASCII 95)
+* 点 "." (U+002E, ASCII 46): 用于API或Service标识名称中，分隔下属的成员
 
-= ����Լ�� =
-Ҫ�����ĳ��API����������Ҫ֪�����API�����ƣ��Լ�������Ȼ�����API��ͬ�ĵ��÷�ʽ�����������(Request)����Ϣ�С�����Service API���ԣ��������е�Service API����HTTP Get��ʽ����������ΪHTTP POST��;������Data API���ԣ����ʷ�ʽ��Ҫ����Ĳ�������ȡ�����������£�ɾ����������
+* Service API：每一个Service API都是远程服务上的一个函数，我们总是用动词或动宾结构来命名Service API，如，登录API我们命名为Login。
+* Data API：已命名的在服务中的一个数据资源，我们用名词来命名Data API，如，相片我们命名为Photo。
 
-== Service API ����Լ�� ==
-=== HTTP Get ��ʽ ===
-=== HTTP Post ��ʽ ===
+= 调用约定 =
+要想调用某个API我们首先需要知道这个API的名称，以及参数，然后根据API不同的调用方式将其放入请求方(Request)的信息中。对于Service API而言，几乎所有的Service API都是HTTP Get方式（极少数的为HTTP POST）;而对于Data API而言，访问方式则要视你的操作（获取，创建，更新，删除）而定。
 
-== Data API ����Լ�� ==
-=== HTTP Get ��ʽ ===
-=== HTTP Post ��ʽ ===
-=== HTTP Put ��ʽ ===
-=== HTTP Delete ��ʽ ===
+== 常规调用约定 ==
+常规调用约定描述的是在Service API 和 Data API 中都存在的调用约定。
+
+调用参数
+* '''id''' 参数供异步调用使用，服务器必须原样返回该值。(异步调用时候必须)
+* '''version''': 表示要调用方法的版本号，如果没有默认为最新版本。
+* '''method''': 调用API名称
+* '''params''': 调用参数列表，调用参数可以选择按位置或名称进行引用，但是禁止混合引用。
+** 按位置引用
+** 按名称引用
+
+== Service API 调用约定 ==
+几乎所有的Service API都应该支持HTTP Get和HTTP Post两种方式，仅当在Service API需要发送很多的参数数据到服务器方才只能使用 HTTP Post 方式。
+
+=== 调用请求约定 === 
+==== HTTP Get 方式 ====
+在使用HTTP Get 方式的时候，请求的调用参数格式不是Json格式，而是URL参数格式，
+
+请求的调用参数全部在URL参数中安装URL标准约定进行编码.
+* '''URL最后的文档部分'''指明被调的API名称
+* '''id''' URL参数供异步调用使用，服务器必须原样返回该值。(异步调用时候必须)
+* '''version''' URL参数: 表示要调用方法的版本号，如果没有默认为最新版本。
+* '''callback''' URL参数为仅当跨域调用<ref name="CrossSiteScript">Cross Site Script hack方式的跨域调用应该在未来[http://www.w3.org/TR/access-control/ W3C Access Control](跨域安全检测请求规范)完全执行后废弃</ref>的时候使用的回调函数，以后可能会被废弃。
+* '''api_key''' URL参数仅当跨域调用<ref name="CrossSiteScript" />需要，以后可能会被废弃。其含义请参阅[[#请求方(Request)|HTTP Header字段]]中的相关描述。
+* '''date''' URL参数仅当跨域调用<ref name="CrossSiteScript" />需要，以后可能会被废弃。'''注意'''：这里的日期格式采用ISO8601<ref name="ISO8601">[[WikiMedia:ISO_8601|ISO8601]] 日期时间格式: http://www.iso.org/iso/date_and_time_format</ref>日期时间格式, 如："20081022T234350Z",表示格林威治时间2008年10月22号23点43分50秒。 其含义请参阅[[#请求方(Request)|HTTP Header字段]]中的相关描述。
+* '''其它'''URL参数为被调的API的参数
+
+
+注意：
+* 参数必须是数组或闭包
+* 注意旧web浏览器和代理可能有URI长度限制<ref>[http://classicasp.aspfaq.com/forms/what-is-the-limit-on-querystring/get/url-parameters.html URI长度限制]</ref>
+* 字符串参数需要按照URL参数标准进行编码
+
+===== 按位置引用 =====
+我们普通的函数调用参数总是按位置引用的，总是按照声明的参数顺序，将参数值传递的
+ int Add(int a, int b);
+ Add(2, 3)
+
+而在HTTP Get方式中，则是用数字来表示位置，0表示第一个参数，1表示第二个参数，依此类推。如：
+<pre>
+<nowiki>http://<end point>/Add?0=2&1=3&id=1</nowiki>
+</pre>
+
+===== 按名称引用 =====
+我们也可以使用参数的名称来传递参数值。如：
+<pre>
+<nowiki>http://<end point>/Add?a=2&b=3&id=1</nowiki>
+</pre>
+
+==== HTTP Post 方式 ====
+在HTTP Post 方式下的调用参数格式是Json对象格式，含有下面三个属性：
+* '''method'''：被调用方法名；
+* '''params'''：被调用方法的按位置引用的参数列表，总是一个JSON数组
+* '''kwparams'''：被调用方法的按名称引用的参数列表，总是一个JSON对象
+* '''id'''：请求id，可以是任何类型，用于与响应匹配。(异步调用时候必须)
+* '''version''': 【可选】表示要调用方法的版本号，如果没有默认为最新版本。
+
+'''注意'''：params 属性和 kwparams 属性不允许混用，只能选择一种方式传递参数。
+
+如，按位置引用：
+<pre>
+POST /myservice HTTP/1.1 
+User-Agent: Wget/1.6
+Host: www.example.com
+Content-Type: application/json
+Content-Length: 181
+Accept: application/json
+
+{
+    "version" : "1.1",
+    "id": 1,
+    "method"  : "add",
+    "params"  : [ 2, 3 ]
+}
+</pre>
+
+按名称引用：
+<pre>
+POST /myservice HTTP/1.1 
+User-Agent: Wget/1.6
+Host: www.example.com
+Content-Type: application/json
+Content-Length: 181
+Accept: application/json
+
+{
+    "version" : "1.1",
+    "id": 1,
+    "method"  : "add",
+    "kwparams"  : {"a":2,"b":3}
+}
+</pre>
+
+=== 调用返回约定 === 
+当Service API调用完成后，服务器必须给出一个响应，而这个响应也是一个由JSON协议串行化的对象，其含有三个属性：
+
+* '''result'''：是一个由被调用方法返回的对象，如果没有返回值时，则其值为null；
+* '''error''' ：【可选】如果没有错误，该属性可以不存在，或者让其值为null，否则为一个错误信息对象；
+* '''id''' ：与要响应的请求约定的id相同(如果请求方传入了id参数才有)。
+
+ { "result": 5, "error": null, "id": 1} 
+
+==== 错误对象 ====
+
+错误对象有如下三个属性：
+;code: 实际错误的错误号，整数类型
+;message: 错误的简短描述信息。
+;data: 【可选】由应用定义的错误附加信息，如详细错误细节，嵌套错误等等。
+
+例子：
+ {"code": 123, "message": "An error occurred parsing the request object"}
+
+== Data API 调用约定 ==
+=== HTTP Get 方式 ===
+=== HTTP Post 方式 ===
+=== HTTP Put 方式 ===
+=== HTTP Delete 方式 ===
+
+= 系统服务 =
+
+= 服务描述简单规范 =
 
 = References =
 <references/>
@@ -114,6 +267,7 @@ callback������Ϊ�˶�  Web Browser �ṩ����֧����չ�����ӵġ�
 
 [[Category:Remote procedure call]]
 [[Category:Standards]]
+
 2008-7-7
 + Use the MooTools as JavaScript Core OO Library:
   my mootools-1.2-core.js includes: Core, Array, Function, Number, String, Hash, Event, Class, Class.Extras
@@ -164,29 +318,13 @@ Below is a summary of some terminology used in this documentation that can help 
 ;Short connection: 
 ;Long connection: keep the connection open unitl the client logout.
 
-;�ͻ�(Client): API�ĵ��÷�
-;������(Server): ʵ�� API����ķ������������ڲ���������һ������ API���������API����Ĵ������ػ����ߡ�
-;����(Service): �ṩһ������ API���ṩ�ߡ�
-;Service API: ���������ڷ����е�һ��APIԶ�̵��á�������������̣�������Service API����ͬһ����˼��
-;Data API: ���������ڷ����е�һ��������Դ��
-;����(Procedure): �μ� Service API.
-;����(Method): �μ� Service API.
-;����(Call): �ڷ����̵�һ�ι��̵��ý������ڿͻ��ͷ�����֮�䷢��һ������������-��Ӧ����.
-;����(Request): ������Ϣ����API�ĵ��ò�����
-;��Ӧ(Response): ��Ӧ��Ϣ���ص��ý�������۳ɹ���ʧ�ܵĽ����
-;����(Error): ʧ�ܵ��õ�Ӧ��
-;֪ͨ(Notification): һ�ֵ���(����Ͳ���)�ĵ��ã�û���κν����Ҳ����ָʾ����
-;����: ���ͻ���Ҫ���÷����ʱ�򣬷������������������Ϻ������Ͽ����ӡ�ÿ������ִֻ��һ��API������ʱ��϶̡������ֿɷ�Ϊǿ�ƶ����ͷ�ǿ�ƶ�����ǿ�ƶ���Ϊ������ǿ�ƣ���������������������Ͽ���ͻ������ӡ���ǿ�ƶ���Ϊ�ͻ��������������Ծ��ĶϿ�������������ӣ����ж�����������˵����Ϊ��ǿ�ƶ�����
-;����: �ͻ���¼�Ϸ����һֱ��������ӣ�ֱ���ͻ�ע����ÿ������ִ������API������Ҳ����Ͽ���ֱ���ͻ��Լ�ע��������ʱ��ϳ���
-
-
 = Http Header Requirements and Extensions =
     
 == Http Header for Request ==
 the HTTP request message MUST specify the following headers:
 * The User-Agent MUST be specified.
 * For HTTP POST only, the Content-Type MUST be specified and SHOULD read the data format. eg, application/json.
-* For HTTP POST only, The Content-Length MUST be specified and correct according to the guidelines and rules laid out in [http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.4 Section 4.4, ��Message Length��], of the HTTP specification.
+* For HTTP POST only, The Content-Length MUST be specified and correct according to the guidelines and rules laid out in [http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.4 Section 4.4, ¡°Message Length¡±], of the HTTP specification.
 * The Accept MUST be specified and SHOULD read the data format. eg, application/json.
 * [Ext]The Protocol-Version MUST be specified to tell the receiver the version of the HTTP-RPC protocol being used by the client. 
 * [Ext]For Data API only, The Content-Version is OPTIONAL to specify the version of the resource, the latest version of the resource used if it is not specified.
