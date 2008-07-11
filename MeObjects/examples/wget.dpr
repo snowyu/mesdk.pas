@@ -129,7 +129,8 @@ begin
   writeln(vURL);
   try
     GrabUrl(vURL, vStream);
-    GrabUrl(vURL, vStream);
+    //vStream.Size := 0;
+    //GrabUrl(vURL, vStream);
     if (vStrs.count > 0) then
     begin
       WriteLn('-------------------------');
