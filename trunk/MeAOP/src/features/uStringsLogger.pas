@@ -22,6 +22,8 @@ unit uStringsLogger;
 
 interface
 
+{$I MeSetting.inc}
+
 uses
   SysUtils, Classes
   , uMeLog
@@ -36,14 +38,13 @@ type
   protected
     procedure WriteLog(aMsg: string); virtual; //override;
   public
-    constructor Create(const aStrings: TStrings);
+    constructor Create(const aStrings: TStrings {$IFDEF SUPPORTS_DEFAULTPARAMS} = nil {$ENDIF});
     procedure Open; virtual; //override;
     property Strings: TStrings read FStrings write SetStrings;
   end;
   
 
 implementation
-
 
 constructor TStringsLogger.Create(const aStrings: TStrings);
 begin
@@ -53,7 +54,8 @@ end;
 
 procedure TStringsLogger.Open;
 begin
-  FStrings.Clear;
+  if Assigned(FStrings) then
+    FStrings.Clear;
 end;
 
 procedure TStringsLogger.SetStrings(const Value: TStrings);
@@ -73,7 +75,8 @@ end;
 
 procedure TStringsLogger.WriteLog(aMsg: string);
 begin
-  FStrings.Add(aMsg);
+  if Assigned(FStrings) then
+    FStrings.Add(aMsg);
 end;
 
 
