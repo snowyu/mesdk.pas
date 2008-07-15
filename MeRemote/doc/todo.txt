@@ -61,8 +61,19 @@ SNDA-RPC 是基于JSON-RPC<ref name="JSON-RPC">[[JSON-RPC/zh|JSON-RPC]]: http://
 ;长连: 客户登录上服务后，一直与服务连接，直到客户注销。每次连接执行若干API，空闲也不会断开，直到客户自己注销，连接时间较长。
 ;会话(Session): 在一段时间内客户服务器双方保持状态，完成一系列动作/消息的过程。
 
+--------------
+HTTP 协议里的术语
+
+;HTTP 方法(HTTP Method): 客户端发出HTTP请求的方式，用来表示希望服务器如何处理请求的方式，有的地方又称为HTTP 动词（HTTP verb）或HTTP 动作(HTTP action)。本文涉及的HTTP 方法有HTTP GET，HTTP PUT，HTTP POST，HTTP DELETE.
+;路径(Path): 路径是URL中主机名(host name)后面的部分，如： "http://my.com/index.htm"，路径则是“/index.htm”.
+;请求报头(Request headers): 它们是一组关键字-值对（key-value pairs），起到metadata的作用，标识请求方要告诉服务器的一系列信息，HTTP标准请求报头大概有8个，应用程序也可以定义自己的报头。
+;实体正文(entity-body): 也称作文档(document)或表示(Representation)，一般来说，HTTP Get请求的实体正文(entity-body)为空，完成请求的信息全部在路径和请求报头中。
+;HTTP响应 (HTTP response): HTTP 响应可分为三个部分：响应代码；响应报头，和实体正文。
+* HTTP 响应代码(HTTP response code)：是用来告诉客户端应该如何处理响应的数字代码，以及 HTTP 请求是成功还是失败。如：“HTTP/1.1 200 OK”
+* 响应报头(Response headers): 大致与请求报头一样，不过这是服务器告诉客户端的关于实体正文的一系列信息。
+
 = 类型系统 =
-SNDA的类型系统为JSON的类型系统，用于指明API调用中的值。JSON包括四种基本类型：数值(number)，字符串(string)，布尔型(boolean)，和空(null)；两种结构类型：对象(object)和数组(array)。
+SNDA的类型系统为JSON<ref name="JSON"/>的类型系统，用于指明API调用中的值。JSON包括四种基本类型：数值(number)，字符串(string)，布尔型(boolean)，和空(null)；两种结构类型：对象(object)和数组(array)。
 
 ;值(Value): 可以是字符串（string）、数值(number)、布尔值、 空值(null)、对象（object）或者数组（array）。这些结构可以嵌套。 
 ;字符串（string）: 是由双引号包围的任意数量Unicode字符的集合，使用反斜线转义。一个字符（character）即一个单独的字符串（character string）。 字符串（string）与C或者Java的字符串非常相似。 
@@ -124,6 +135,37 @@ callback参数是为了对  Web Browser 提供跨域支持扩展而增加的。
 </code>
 
 = HTTP 状态码 =
+== 成功结果的状态码 ==
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1 200 OK]: 当使用HTTP Get 方式调用成功后，可以返回HTTP 状态码 200。如果本次请求的是被 Cache(如，CDN)的成功验证，则返回响应可以是[http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3.5 304(未修改)]。
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.2 201 Created]: 当使用HTTP Post 方式调用成功后，对于Service API 必须返回HTTP 状态码 200；对于Data API，则应该返回 HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.2 201 Created]，同时在Location字段中返回新创建的资源的URL。
+ 201 Created
+ Location: /products/electronic/pc/10043
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.3 202 Accepted]: 请求被接受，但是不会被马上处理，请求稍后会被处理（可以在Location返回一个URI，以便客户能稍后查询其状态，若无法让客户查询状态，那么至少应该在实体正文(Entity-Body)中提供关于何时能处理请求的估计）。可以用于批处理（事务）请求中的过程，当请求事务执行过程中，每一步成功总是返回HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.3 202 Accepted]表示事务进行中。
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.5 204 No Content]: 表示实体正文(Entity-Body)内容为空。如果是HTTP POST方式返回该状态码表示接受投递的数据；如果是HTTP GET 方式则表示该资源存在，但是正文为空。
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.7 206 Partial Content]: 用于HTTP GET方式中获取部分数据的请求服务（使用Range请求报头的HTTP Get请求）。该部分GET方式常用于大型二进制文件的断点续传。报头需要提供Date。ETag和Content-Location的值应该和正常的Get请求相同。
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.8 207 Multi-Status]: 这是WebDAV对HTTP标准的一个扩展，它用于响应批量请求(Batch request)。当一个请求对多个资源进行操作的时候，可能会出现某些操作成功，某些操作失败的情况，这样单个响应代码不能表达该请求的状态。该响应代码告诉客户端，实体正文是多个HTTP响应代码的列表，批量请求中的每一个操作对应一个响应代码。
+
+== 服务重定向操作的状态码 ==
+
+; HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3.2 301 Moved Permanently]: 如果该服务器不支持客户所请求的API，允许服务器使用HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3.2 301 Moved Permanently]将客户重定向到支持该API服务器上。
+; HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3.3 302 Found]: 操作已经处理，但是正文必须到Location指定的URI中获得。
+; HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3.4 303 See Other]: 请求已经被处理，但是由于该资源URI不是全局规范的URI，所以用Location指明全局规范的URI。这样使得一个资源可以有多个URI。但是资源的全局规范URI只有一个。
+; HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3.5 304 Not Modified]: 用于客户端已经拥有数据，没必要重复发送的情况。返回的实体正文为空。
+; HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3.8 307 Temporary Redirect]: 当服务器当前正忙，允许服务器使用HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3.3 302 Found]将客户重定向到另一服务器.
+; 其它: 有关重定向操作的其它状态码请见HTTP协议规范中重定向状态码[http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3 10.3节]。
+
+== 错误失败的状态码 ==
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.1 400 Bad Request]: 表示客户端发送的请求有问题。
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.2 401 Unauthorized]: 未认证错误，WWW-Authenticate 将会告诉客户端接受哪些认证方式。
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.4 403 Forbidden]: 禁止访问，可能该资源只允许在特定时间段访问或者只允许特定IP地址的用户访问。这隐含该资源存在的意思。如果不想透露该信息，可以谎报一个404（not found）
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5 404 Not Found]: 调用的API没有在该服务器上发现
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.6 405 Method Not Allowed]: 该HTTP方法不支持，比如有的API可能不支持HTTP Get方法。Allow响应报头将列出该API支持的HTTP方法。如："Allow: GET, POST"
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.7 406 Not Acceptable]: 不接受，服务器无法满足客户端的要求。除Head方法外，服务器应该在响应的实体正文中返回能接受的资源列表。
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.9 408 Request Timeout]: 请求超时，客户端和服务器建立连接后，服务器在超时前没有收到请求数据，就会发送该响应代码并关闭连接。
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.11 410 Gone]: 用于服务器知道该资源曾经存在过，但是现在已经不存在了的情况。
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.16 415 Unsupported Media Type]: 服务器不能理解客户端发送的数据格式，比如服务器期望的是JSON格式的数据，但是客户端却发送的是XML的格式。如果数据格式正确，但是里面的内容却有问题，就应该返回 500（Internal Server Error）。
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.5.1 500 Internal Server Error]: 内部服务器错误，其中错误对象的具体错误代码参见《[[#错误号|错误对象中的错误号]]》一节
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.5.4 503 Service Unavailable]: 表示服务器太忙而不能接受服务，服务器可以发送Retry-After响应报头告知客户何时可以重试。
 
 = 命名约定 =
 在SNDA-RPC中的服务、 API、参数的标识名称只能是由如下的字符组成：
@@ -135,6 +177,36 @@ callback参数是为了对  Web Browser 提供跨域支持扩展而增加的。
 
 * Service API：每一个Service API都是远程服务上的一个函数，我们总是用动词或动宾结构来命名Service API，如，登录API我们命名为Login。
 * Data API：已命名的在服务中的一个数据资源，我们用名词来命名Data API，如，相片我们命名为Photo。
+
+== 命名URI ==
+为每一个API命名一个在全局名称空间内唯一的URI，对API使用统一的URI命名规范,（naming scheme）<ref name="URI">URI命名规范是已被标准化的，在全球范围完美运行，并且能被绝大多数人所理解的国际标准规范。</ref>
+
+=== 命名原则 ===
+ 
+* 名称全局唯一
+* 只为值得被暴露的API命名。
+* 资源命名从大类到小类，从聚合到个体
+* 资源(Data API)总是名词结构
+* 远程方法(Service API)总是动词结构
+* 有时将其作为远程方法或是一个资源选择是一个问题
+
+大量聚合类资源（有n多个资源组成）的获取是需要分页获取的，没有指定页号的总是返回第一页的数据。
+
+例子：
+<pre>
+<nowiki>
+## Data API
+http://example.com/customers
+http://example.com/customers/2-     ##返回第二页的顾客Id号列表
+http://example.com/customers/1234   ##返回Id号为1234号的顾客的信息
+http://example.com/orders/2007/10/776654
+http://example.com/products/electronic/computers/pc/4554
+
+## Service API
+http://example.com/customers/getCount ##返回顾客总数
+http://example.com/customers/search?vip=true&p=2 ##返回VIP的顾客Id号列表(第二页)
+</nowiki>
+</pre>
 
 = 调用约定 =
 要想调用某个API我们首先需要知道这个API的名称，以及参数，然后根据API不同的调用方式将其放入请求方(Request)的信息中。对于Service API而言，几乎所有的Service API都是HTTP Get方式（极少数的为HTTP POST）;而对于Data API而言，访问方式则要视你的操作（获取，创建，更新，删除）而定。
@@ -149,6 +221,17 @@ callback参数是为了对  Web Browser 提供跨域支持扩展而增加的。
 * '''params''': 调用参数列表，调用参数可以选择按位置或名称进行引用，但是禁止混合引用。
 ** 按位置引用
 ** 按名称引用
+
+=== 调用参数列表一致性约定 ===
+;参数的一致性: 仅当传递的参数和类型与API定义的参数和类型完全一致的时候，称为参数的完全一致：
+* 定义的所有的参数全部被提供，没有null值存在
+* 没有传递任何额外的参数
+* 每一个参数值类型与定义的参数值类型完全匹配
+
+;参数的模糊性约定: 服务器应该能适应不完全匹配参数的调用，这被称为参数的模糊性约定：
+* 当传递的参数值数目少于定义的参数的时候，没有的参数被当作null值处理
+* 当传递的参数值数目多于定义的参数的时候，多余的参数将被忽略，或者服务器为该API原样传递多余的参数（如：当参数为可变参数列表的时候）
+* 当参数类型与定义的参数类型不一致的时候，需要合理的对参数类型进行转换，应该尽量避免转换后导致的数据或精度丢失。
 
 == Service API 调用约定 ==
 几乎所有的Service API都应该支持HTTP Get和HTTP Post两种方式，仅当在Service API需要发送很多的参数数据到服务器方才只能使用 HTTP Post 方式。
@@ -251,11 +334,39 @@ Accept: application/json
 例子：
  {"code": 123, "message": "An error occurred parsing the request object"}
 
+===== 错误号 =====
+错误号<ref name="ErrCodeNum">对象错误号使用与XML-RPC相同的规范： http://xmlrpc-epi.sourceforge.net/specs/rfc.fault_codes.php</ref>从 -32768 到 -32000（包括该数字） 被保留作为服务器的预定义错误，SNDA-RPC预定义的错误号<ref name="ErrCodeNum"/>如下：
+{| cellspacing="0" border="1"
+! code || message || Meaning
+|-
+| -32700 || Parse error. || Invalid JSON. An error occurred on the server while parsing the JSON text.
+|-
+| -32600 || Invalid Request. || The received JSON not a valid JSON-RPC Request.
+|-
+| -32601 || Method not found. || The requested remote-procedure does not exist / is not available.
+|-
+| -32602 || Invalid params. || Invalid method parameters.
+|-
+| -32603 || Internal error. || Internal JSON-RPC error.
+|-
+| -32099..-32000 || Server error. || Reserved for implementation-defined server-errors.
+|-
+| -32399..-32300 || transport error || Reserved for implementation-defined transport error 
+|-
+| -32499..-32400 || system error || Reserved for implementation-defined system error 
+|-
+| -32500.. || application error || for application defined errors. 
+|}
+
+余下的则作为应用的自定义错误号。
+
 == Data API 调用约定 ==
-=== HTTP Get 方式 ===
-=== HTTP Post 方式 ===
-=== HTTP Put 方式 ===
-=== HTTP Delete 方式 ===
+Data API 吸取了 [[Representational_State_Transfer|RESTful]] 的一些架构思想。我们认为一切 Data API 都是资源，针对资源可能有创建，读取，更新，删除(CRUD)四种操作，除读取外，其余三种操作一般都有权限限制。
+
+=== 读取资源 — HTTP Get 方式 ===
+=== 创建资源 — HTTP Post 方式 ===
+=== 更新资源 — HTTP Put 方式 ===
+=== 删除资源 — HTTP Delete 方式 ===
 
 = 系统服务 =
 
