@@ -305,7 +305,8 @@ type
     //FTerminatingExceptionClass: TClass;
     FOnStopped: TMeNotifyThreadEvent;
     FOnException: TMeExceptionThreadEvent;
-    
+    FOnAfterRun: TMeNotifyThreadEvent;
+
     procedure AfterRun; virtual; //3* not abstract - otherwise it is required
     procedure AfterExecute; virtual;//5 not abstract - otherwise it is required
     procedure BeforeExecute; virtual;//1 not abstract - otherwise it is required
@@ -340,6 +341,7 @@ type
     property Terminated;
     property OnException: TMeExceptionThreadEvent read FOnException write FOnException;
     property OnStopped: TMeNotifyThreadEvent read FOnStopped write FOnStopped;
+    property OnAfterRun: TMeNotifyThreadEvent read FOnAfterRun write FOnAfterRun;
   end;
 
   { Summary : the thread with task supported. }
@@ -1360,6 +1362,10 @@ end;
 
 procedure TMeCustomThread.AfterRun;
 begin
+  if Assigned(FOnAfterRun) then
+  begin
+    FOnAfterRun(@Self);
+  end;
 end;
 
 procedure TMeCustomThread.BeforeExecute;
