@@ -224,11 +224,11 @@ Range头域可以请求实体的一个或者多个子范围。例如，
     property URL: string read FURL write SetURL;
   end;
 
-  TMeTaskDoneEvent = procedure(const aTask: PMeHttpDownloadSimpleTask) of object;
+  //TMeTaskDoneEvent = procedure(const aTask: PMeHttpDownloadSimpleTask) of object;
   TMeHttpDownloadSimpleThreadMgrTask = object(TMeThreadMgrTask)
   protected
     FIdleTasks: PMeThreadSafeList;
-    FOnTaskDone: TMeTaskDoneEvent;
+    //FOnTaskDone: TMeTaskDoneEvent;
     FProxyParameters: TIdProxyConnectionInfo;
 
     procedure DoThreadStopped(const aThread: PMeCustomThread); virtual; //override
@@ -239,7 +239,7 @@ Range头域可以请求实体的一个或者多个子范围。例如，
 
     property ProxyParameters: TIdProxyConnectionInfo read FProxyParameters;
     //this event must support thread-safe.
-    property OnTaskDone: TMeTaskDoneEvent read FOnTaskDone write FOnTaskDone;
+    //property OnTaskDone: TMeTaskDoneEvent read FOnTaskDone write FOnTaskDone;
   end;
 
 implementation
@@ -566,8 +566,8 @@ var
   vTask: PMeHttpDownloadSimpleTask;
 begin
   vTask := PMeHttpDownloadSimpleTask(PMeThread(aThread).Task);
-  if Assigned(FOnTaskDone) then
-    FOnTaskDone(vTask);
+  //if Assigned(FOnTaskDone) then
+    //FOnTaskDone(vTask);
   if (MaxThreads <= 0) or (FIdleTasks.Count < MaxThreads) then
     FIdleTasks.Add(vTask)
   else begin
