@@ -1,7 +1,11 @@
 program client;
+
+{$I MeSetting.inc}
+
 {$AppType Console}
 uses
   Windows, SysUtils
+  , uMeSystem
   , uMeObject
   , uMeTypes
   , uMeProcType
@@ -12,20 +16,13 @@ uses
 
 type
   TAdd = function (const a, b: Integer): Integer of object;
+  TRemoteAdd = class
+    class function Add(const a, b: Integer): Integer;virtual; abstract;
+  end;
 
 function Add(const a, b: Integer): Integer;
 begin
-  asm
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-  end;
+  {$I uMeMakeHole.inc}
   Result := -1;
 end;
 
@@ -46,13 +43,16 @@ begin
    try
     Host := 'localhost';
     Port := 1111;
-    vTransport.KeepAlive := True; //todo: not impl yet.
+    vTransport.KeepAlive := True;
     TMeRemoteFuncFeature.AddTo(@Add, 'add', TypeInfo(TAdd), vTransport);
+    //TMeRemoteFuncFeature.AddTo(@TRemoteAdd.Add, 'add', TypeInfo(TAdd), vTransport);
+
     QueryPerformanceCounter(vBegin);
     vC := Add(vA,vB);
     QueryPerformanceCounter(vEnd);
     writeln(vA,'+',vB,'=',vC);
     writeln('RunTime(QueryPerformanceCount):',vEnd-vBegin);
+    //exit;
 
     //TMeRemoteFuncFeature.AddTo(@Add, 'add', TypeInfo(TAdd), vTransport);
     vA := 33;
