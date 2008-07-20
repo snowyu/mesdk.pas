@@ -86,6 +86,8 @@ type
   TMeThreadPriority = (tpIdle, tpLowest, tpLower, tpNormal, tpHigher, tpHighest,
     tpTimeCritical);
 {$ENDIF}
+  TMeTaskDoneEvent = procedure(const Sender: PMeTask) of object;
+  TMeThreadDoneEvent = procedure(const Sender: PMeThread) of object;
 
   PMeSynchronizeRecord = ^TMeSynchronizeRecord;
   TMeSynchronizeRecord = record
@@ -185,6 +187,7 @@ type
   protected
     FIsRunning: Boolean;
     FBeforeRunDone: Boolean;
+    FOnTaskDone: TMeTaskDoneEvent;
     FTag: Integer;
 
     { Summary: after the task exectution. }
@@ -209,6 +212,8 @@ type
     property BeforeRunDone: Boolean read FBeforeRunDone;
     property IsRunning: Boolean read FIsRunning;
     property Tag: Integer read FTag write FTag;
+
+    property OnTaskDone: TMeTaskDoneEvent read FOnTaskDone write FOnTaskDone;
   end;
 
   TMeYarn = object(TMeDynamicObject)
@@ -415,12 +420,13 @@ type
     FThreadPriority: TMeThreadPriority;
     FFreeTask: Boolean;
     FTerminatingTimeout: LongWord;
+    FOnThreadDone: TMeThreadDoneEvent;
 
-    function CreateThread(const aTask: PMeTask): PMeThread;
+    function CreateThread(const aTask: PMeTask): PMeThread; virtual;
     //some task is done, free the task, the thread is idle.
     procedure DoThreadStopped(const aThread: PMeCustomThread); virtual;
     //if thread Exception then free this thread.
-    procedure DoThreadException(const aThread: PMeCustomThread; const aException: Exception);
+    procedure DoThreadException(const aThread: PMeCustomThread; const aException: Exception); virtual;
 
     procedure Init; virtual; //override
     procedure AfterRun; virtual; //override
@@ -447,6 +453,7 @@ type
     // and the timeout threads will be trigger the aThread.DoException(nil).
     property TerminatingTimeout: LongWord read FTerminatingTimeout write FTerminatingTimeout;
     property ThreadPriority: TMeThreadPriority read FThreadPriority write FThreadPriority;
+    property OnThreadDone: TMeThreadDoneEvent read FOnThreadDone write FOnThreadDone;
   end;
 
   { Summary: the thread run the the TMeThreadMgrTask task.}
@@ -1228,6 +1235,8 @@ procedure TMeTask.DoAfterRun;
 begin
   FIsRunning := False;
   AfterRun;
+  if Assigned(FOnTaskDone) then
+    FOnTaskDone(@Self);
 end;
 
 procedure TMeTask.DoBeforeRun;
@@ -1670,6 +1679,8 @@ begin
     FActiveThreads.Remove(aThread);
     with FThreadPool.LockList^ do
     try
+      if Assigned(FOnThreadDone) then
+        FOnThreadDone(PMeThread(aThread));
       if FFreeTask then
         MeFreeAndNil(PMeThread(aThread).FTask)
       else
