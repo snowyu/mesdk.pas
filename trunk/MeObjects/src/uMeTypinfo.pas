@@ -193,6 +193,9 @@ type
   end;
 
   //the Dynamic method table structure
+  {
+  One of the compiler magic slots in a class¡¯ virtual method table (VMT) is a pointer to that class¡¯ dynamic method table (DMT). A class only has a DMT if it declares or overrides one or more dynamic (or message) methods. The DMT contains a 16-bit (word) Count followed by an array[0..Count-1] of Smallint indices and an array[0..Count-1] of pointers containing  the code address of the dynamic method¡¯s implementation. Note that the arrays are ¡°inline¡± in the DMT structure (there is no pointers to the arrays). One approximate way of representing this structure in Pascal would be:
+  }
   TDMTIndex   = Smallint;
   PDynamicMethodIndexList = ^TDynamicMethodIndexList;
   TDynamicMethodIndexList = array[0..High(Word)-1] of TDMTIndex;
