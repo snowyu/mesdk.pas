@@ -1784,6 +1784,13 @@ function TRegExpr.CompileRegExpr (exp : PRegExprChar) : boolean;
  begin
   Result := false; // life too dark
   ClearMatchedResults;
+  {$IFDEF SubExprName_RegExpr}
+  for len := 0 to NSUBEXP - 1 do 
+  begin
+    FSubExprNames[len] := '';
+  end;
+ {$ENDIF}
+  len := 0;
 
   regparse := nil; // for correct error handling
   regexpbeg := exp;
@@ -1864,7 +1871,7 @@ function TRegExpr.CompileRegExpr (exp : PRegExprChar) : boolean;
     // absence of others.
     if (flags and SPSTART) <> 0 then begin
         longest := nil;
-        len := 0;
+        //len := 0;
         while scan <> nil do begin
           if (PREOp (scan)^ = EXACTLY)
              and (strlen (scan + REOpSz + RENextOffSz) >= len) then begin
@@ -3707,7 +3714,8 @@ begin
    startp [i] := nil;
    endp [i] := nil;
    {$IFDEF SubExprName_RegExpr}
-   FSubExprNames[i] := '';
+   //Bug: when ExecNext this should be clear!
+   //FSubExprNames[i] := '';
    {$ENDIF}
    {$IFDEF CapturingGroup_RegExpr}
    //FCapturingGroup[i] := 0;
