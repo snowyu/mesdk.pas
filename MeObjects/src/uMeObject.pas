@@ -127,6 +127,7 @@ FPC:
 type
   DWord = Longword;
   PMeList = ^TMeList;
+  PMeVMTHelper = ^ TMeVMTHelper;
   PMeDynamicObject = ^ TMeDynamicObject;
 
   TMeObjectMethod = procedure of object;
