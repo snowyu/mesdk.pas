@@ -61,20 +61,20 @@ type
     //##property MaxCount: Integer read FMaxCount write FMaxCount;
   end;
 
-  TFreeNotifyProc = procedure(Instance : TObject) of object;
+  TFreeNotifyProc = procedure(Instance : Pointer) of object;
 
 { Summary: Ensures that aProc is notified that the aInstance is going to be destroyed.}
 {
   Desccription
 Use AddFreeNotification to register aProc that should be notified when the aInstance is about to be destroyed. 
 }
-procedure AddFreeNotification(const aInstance : TObject; const aProc : TFreeNotifyProc);
+procedure AddFreeNotification(const aInstance : Pointer; const aProc : TFreeNotifyProc);
 { Summary: Disables destruction notification that was enabled by AddFreeNotification.}
 {
 Description
 RemoveFreeNotification removes the NotificationProc specified by the aProc parameter from the internal list of procedures to be notified that the aInstance is about to be destroyed. aProc is added to this list by a previous call to the AddFreeNotification function.
 }
-procedure RemoveFreeNotification(const aInstance : TObject; const aProc : TFreeNotifyProc);
+procedure RemoveFreeNotification(const aInstance : Pointer; const aProc : TFreeNotifyProc);
 
 //the thread safe version:
 function FormatDateTimeS(const Format: string; aDateTime: TDateTime): string;
@@ -203,6 +203,7 @@ begin
 end;
 
 type
+  TDestructorProc = procedure(const aInstance: Pointer; const aFlag: Boolean);
   {
   this very simplest to implement the FreeNotify On object.Free.
   it inject the TObject.FreeInstance method and check it here!!
@@ -214,7 +215,7 @@ type
   protected
     FFreeNotifies: PMeList;
   public
-    Instance: TObject;
+    Instance: Pointer;
     //Owner: TFreeNotificationObjects;
     function IndexOfProc(const aProc : TFreeNotifyProc): Integer;
     procedure AddFreeNotification(const aProc : TFreeNotifyProc);
@@ -229,9 +230,11 @@ type
     FLock: PMeCriticalSection;
     {$ENDIF}
     FFreeInstanceInjector: TMeInjector;
-    FFreeInstance: PProcedure;
+    FFreeMeInstanceInjector: TMeInjector;
+    FFreeInstance: PProcedure;//TDestructorProc;
+    FFreeMeInstance: PProcedure;
 
-    procedure Inject(const aInstance : TObject);
+    procedure Inject(const aInstance : Pointer);
 
     procedure Notify(Ptr: Pointer; Action: TListNotification); override;
     function GetItem(const Index: Integer): PFreeNotificationInfo;
@@ -240,9 +243,9 @@ type
     constructor Create;
     {$ENDIF}
     destructor Destroy; override;
-    function Add(const aInstance : TObject): PFreeNotificationInfo;
-    function FindByInstance(const aInstance : TObject): PFreeNotificationInfo;
-    function IndexOfInstance(const aInstance : TObject): Integer;
+    function Add(const aInstance : Pointer): PFreeNotificationInfo;
+    function FindByInstance(const aInstance : Pointer): PFreeNotificationInfo;
+    function IndexOfInstance(const aInstance : Pointer): Integer;
     property Items[const Index: Integer]: PFreeNotificationInfo read GetItem;
   end;
 
@@ -372,6 +375,7 @@ end;
 destructor TFreeNotificationObjects.Destroy;
 begin
   FFreeInstanceInjector.Enabled := False;
+  FFreeMeInstanceInjector.Enabled := False;
   {$IFDEF THREADSAFE_SUPPORT}
   FLock.Free;
   {$ENDIF}
@@ -397,22 +401,48 @@ begin
   end;
 end;
 
-procedure TFreeNotificationObjects.Inject(const aInstance : TObject);
+procedure DoMeObjectFreeInstance(aSelf: Pointer);
+var
+  vInfo: PFreeNotificationInfo;
+begin
+  with FFreeNotificationObjects do
+  begin
+    //if FFreeNotificationObjects <> aSelf then
+    begin
+      vInfo := FindByInstance(aSelf);
+      if Assigned(vInfo) then
+      begin
+        vInfo.NotifyObjectFree();
+        Remove(vInfo);
+      end;
+    end;
+    FFreeMeInstance(aSelf);
+  end;
+end;
+
+procedure TFreeNotificationObjects.Inject(const aInstance : Pointer);
 var
   vMethodIndex: Integer;
 begin
-  if not FFreeInstanceInjector.Enabled and Assigned(aInstance) then
+  if Assigned(aInstance) then
   begin
-    vMethodIndex := Integer(FFreeInstanceInjector.InjectStaticMethod(TObject, @TObject.FreeInstance, @DoObjectFreeInstance));
-    Assert(vMethodIndex <> 0, 'Can not Inject the FreeInstance virtual method.');
-    {
-    vMethodIndex := FindVirtualMethodIndex(TObject, @TObject.FreeInstance);
-    Assert(vMethodIndex >= 0, 'not found the TObject.FreeInstance virtual method');
-    vMethodIndex := Integer(FFreeInstanceInjector.InjectVirtualMethod(aInstance.ClassType, vMethodIndex, @TFreeNotificationObjects.DoObjectFreeInstance));
-    Assert(vMethodIndex <> 0, 'Can not Inject the FreeInstance virtual method.')
-    }
-
-    @FFreeInstance := FFreeInstanceInjector.OriginalProc;
+    if IsObject(aInstance) then
+    begin
+      if not FFreeInstanceInjector.Enabled then
+      begin
+        vMethodIndex := Integer(FFreeInstanceInjector.InjectStaticMethod(TObject, @TObject.FreeInstance, @DoObjectFreeInstance));
+        Assert(vMethodIndex <> 0, 'Can not Inject the TObject.Destroy method.');
+    
+        @FFreeInstance := FFreeInstanceInjector.OriginalProc;
+      end;
+    end
+    else if not FFreeMeInstanceInjector.Enabled then
+    begin
+        vMethodIndex := Integer(FFreeMeInstanceInjector.InjectProcedure(@TMeDynamicObject.DestroyMem, @DoMeObjectFreeInstance));
+        Assert(vMethodIndex <> 0, 'Can not Inject the TMeObject.Destroy method.');
+    
+        @FFreeMeInstance := FFreeMeInstanceInjector.OriginalProc;
+    end;
   end;
 end;
 
@@ -425,7 +455,7 @@ begin
   end;
 end;
 
-function TFreeNotificationObjects.Add(const aInstance : TObject): PFreeNotificationInfo;
+function TFreeNotificationObjects.Add(const aInstance : Pointer): PFreeNotificationInfo;
 begin
   Result := FindByinstance(aInstance);
   if not Assigned(Result) then
@@ -448,7 +478,7 @@ begin
   end;
 end;
 
-function TFreeNotificationObjects.IndexOfInstance(const aInstance : TObject): Integer;
+function TFreeNotificationObjects.IndexOfInstance(const aInstance : Pointer): Integer;
 begin
   {$IFDEF THREADSAFE_SUPPORT}
   FLock.Enter;
@@ -467,7 +497,7 @@ begin
   Result := -1;
 end;
 
-function TFreeNotificationObjects.FindByInstance(const aInstance : TObject): PFreeNotificationInfo;
+function TFreeNotificationObjects.FindByInstance(const aInstance : Pointer): PFreeNotificationInfo;
 var
   i: Integer;
 begin
@@ -483,7 +513,7 @@ begin
   Result := inherited Get(Index);
 end;
 
-procedure AddFreeNotification(const aInstance : TObject; const aProc : TFreeNotifyProc);
+procedure AddFreeNotification(const aInstance : Pointer; const aProc : TFreeNotifyProc);
 var
   vInfo: PFreeNotificationInfo;
 begin
@@ -503,7 +533,7 @@ begin
   end;
 end;
 
-procedure RemoveFreeNotification(const aInstance : TObject; const aProc : TFreeNotifyProc);
+procedure RemoveFreeNotification(const aInstance : Pointer; const aProc : TFreeNotifyProc);
 var
   vInfo: PFreeNotificationInfo;
 begin
