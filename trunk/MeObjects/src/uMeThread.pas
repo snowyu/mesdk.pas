@@ -189,6 +189,7 @@ type
     FBeforeRunDone: Boolean;
     FOnTaskDone: TMeTaskDoneEvent;
     FTag: Integer;
+    FBeginTick: LongWord;
 
     { Summary: after the task exectution. }
     procedure AfterRun; virtual;
@@ -207,6 +208,7 @@ type
     procedure DoBeforeRun;
     function DoRun: Boolean;
     procedure DoException(const Sender: PMeCustomThread; const aException: Exception);
+    procedure Execute;
     // BeforeRunDone property to allow flexibility in alternative schedulers
     // it will be set to true before executing the BeforeRun.
     property BeforeRunDone: Boolean read FBeforeRunDone;
@@ -422,6 +424,9 @@ type
     FThreadPriority: TMeThreadPriority;
     FFreeTask: Boolean;
     FTerminatingTimeout: LongWord;
+    FExecutingTimeout: LongWord;
+    FAutoStopped: Boolean;
+    //FStopMode: TMeThreadStopMode;
     FOnThreadDone: TMeThreadDoneEvent;
 
     function CreateThread(const aTask: PMeTask): PMeThread; virtual;
@@ -448,12 +453,16 @@ type
     //FreeTask when thread done.
     //the default is true.
     property FreeTask: Boolean read FFreeTask write FFreeTask;
+    //auto stopped when no ActieThread running
+    property AutoStopped: Boolean read FAutoStopped write FAutoStopped;
     property TaskQueue: PMeThreadSafeList read FTaskQueue;
     // Open the thread pool when set the FMaxThreads is greater than 0.
     property MaxThreads: Integer read FMaxThreads write FMaxThreads;
     // it will force terminate threads after timeout. the default is INFINITE! 
     // and the timeout threads will be trigger the aThread.DoException(nil).
     property TerminatingTimeout: LongWord read FTerminatingTimeout write FTerminatingTimeout;
+    property ExecutingTimeout: LongWord read FExecutingTimeout write FExecutingTimeout;
+    //property StopMode: TMeThreadStopMode read FStopMode write FStopMode;
     property ThreadPriority: TMeThreadPriority read FThreadPriority write FThreadPriority;
     property OnThreadDone: TMeThreadDoneEvent read FOnThreadDone write FOnThreadDone;
   end;
@@ -1225,6 +1234,27 @@ procedure TMeTask.BeforeRun;
 begin
 end;
 
+procedure TMeTask.Execute;
+var
+ v: Boolean;
+begin
+  DoBeforeRun;
+  try
+    try
+      while DoRun do Sleep(5);
+    except
+      On E: Exception do
+      begin
+        v := False;
+        HandleRunException(nil, E, v);
+        if not v then raise;
+      end;
+    end;
+  finally
+    DoAfterRun;
+  end;
+end;
+
 procedure TMeTask.HandleException(const Sender: PMeCustomThread; const aException: Exception);
 begin
 end;
@@ -1245,6 +1275,7 @@ procedure TMeTask.DoBeforeRun;
 begin
   FBeforeRunDone := True;
   FIsRunning := True;
+  FBeginTick := GetTickCount;
   BeforeRun;
 end;
 
@@ -1638,6 +1669,7 @@ begin
   New(FThreadPool, Create);
   New(FActiveThreads, Create);
   FTerminatingTimeout := INFINITE;
+  FExecutingTimeout := INFINITE;
 end;
 
 destructor TMeThreadMgrTask.Destroy;
@@ -1814,10 +1846,31 @@ function TMeThreadMgrTask.Run: Boolean;
 var
   vThread: PMeThread;
   vTask: PMeTask;
+  //i: Integer;
 begin
+  //Result := True;
+  Result := not FAutoStopped or (FActiveThreads.Count <= 0);
+
+  {if FExecutingTimeout <> INFINITE then
+  //check whether Execute task Timeout
+  with FActiveThreads.LockList^ do
+  try
+    LongWord(vtask) := GetTickCount;
+    for i := 0 to Count - 1 do
+    begin
+      vThread := Items[i];
+      if Assigned(vThread.FTask) then
+      begin
+        if (LongWord(vtask) - vThread.FTask.FBeginTick) > FExecutingTimeout then
+          vThread.Stop;
+      end;
+    end;
+  finally
+    FActiveThreads.UnlockList;
+  end; //}
+
   vThread := nil;
-  //vTask := nil;
-  Result := True;
+
   with FTaskQueue.LockList^ do
   try
     if Count > 0 then
