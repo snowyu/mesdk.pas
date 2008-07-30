@@ -450,6 +450,10 @@ type
     destructor Destroy; virtual; //override;
     function Add(const aTask: PMeTask): Boolean;
 
+    //the current active threads.
+    property ActiveThreads: PMeThreadSafeList read FActiveThreads;
+    //the idle thread list
+    property ThreadPool: PMeThreadSafeList read FThreadPool;
     //FreeTask when thread done.
     //the default is true.
     property FreeTask: Boolean read FFreeTask write FFreeTask;
