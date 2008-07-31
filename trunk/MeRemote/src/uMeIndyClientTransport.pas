@@ -45,9 +45,9 @@ uses
 type
   {Binary protocol
     C: cmd aMethodName<LN>
-    S: 200 //one byte for status, 200 for ok
+    S: 200 //one word for status, 200 for ok
       C: <StreamSize><Stream> //the StreamSize is Int32 (open IOHandler.LargeStream = true for int64)
-      S: <StreamSize><Stream>
+      S: 200<StreamSize><Stream> //one word for status, 200 for ok, if not ok the stream is error info string.
   }
   TMeIndyBinClient = class(TIdTCPClientCustom)
   protected
@@ -87,6 +87,7 @@ procedure TMeIndyBinClient.SendCmd(const aCmd: string; const aRequest: PMeStream
 var
   b: byte;
   vStream: TMeStreamProxy;
+  s: string;
 begin
   CheckConnected;
   IOHandler.WriteLn('cmd '+ aCmd);
@@ -101,10 +102,18 @@ begin
     //pass true means write the stream size first.
     IOHandler.Write(vStream, 0, True);
     CheckConnected;
+    b := IOHandler.ReadByte;
     vStream.MeStream := aReply;
     //b := IOHandler.ReadLongInt;
     //writeln('LoadParamsFromStream:',b);
     IOHandler.ReadStream(vStream);
+    if b <> 200 then
+    begin
+    	SetLength(s, aReply.GetSize);
+    	aReply.SetPosition(0);
+    	aReply.Readbuffer(s[1], Length(s));
+      raise Exception.Create('Execute Cmd: '+ aCmd + ' failed. Error Code:' + IntToStr(b)+' Error:'+ s);
+    end;
   finally
     vStream.Free;
   end;

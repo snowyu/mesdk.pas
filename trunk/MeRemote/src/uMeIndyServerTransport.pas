@@ -56,7 +56,8 @@ type
     FOnCmdSearch: TMeCmdSearchEvent;
 
     function ReadCommandLine(AContext: TIdContext): string;
-    function HandleCommand(const aContext: TIdContext; aLine: string): Boolean;
+    //return 200 means ok, others mwans error code.
+    function HandleCommand(const aContext: TIdContext; aLine: string): WordBool;
     function DoExecute(AContext: TIdContext): Boolean; override;
   public
     constructor Create(aComponent: TComponent); //override;
@@ -69,7 +70,7 @@ type
     FServer: TMeIndyRemoteFunctionServer;
     FRemoteFunctions: PMeRemmoteFunctions;
     function SearchCmd(const aCmd: string): Integer;
-    procedure ExecuteCmd(const aContext: TIdContext; const aCmd: Integer; const aParams: PMeStream; var aSuccessful: Boolean);
+    procedure ExecuteCmd(const aContext: TIdContext; const aCmd: Integer; const aParams: PMeStream; var aSuccessful: WordBool);
   public
     constructor Create();
     destructor Destroy(); override;
@@ -106,7 +107,7 @@ begin
       Result := (vLine <> '');
       if Result then 
       begin
-        Result := HandleCommand(aContext, vLine);
+        Result := Word(HandleCommand(aContext, vLine)) = 200;
       end;
     end;
   //if return false to stop.
@@ -116,11 +117,12 @@ begin
   end;
 end;
 
-function TMeIndyRemoteFunctionServer.HandleCommand(const aContext: TIdContext; aLine: string): Boolean;
+function TMeIndyRemoteFunctionServer.HandleCommand(const aContext: TIdContext; aLine: string): WordBool;
 var
   vCmdId: Integer;
   vStream: PMeMemoryStream;
   vStreamProxy: TMeStreamProxy;
+  s: string;
 begin
   Result := StrFetch(aLine, ' ') = 'cmd';
   if Result then
@@ -144,9 +146,22 @@ begin
           if Assigned(FOnCmdExecute) then
           begin
             vStream.SetPosition(0);
-            FOnCmdExecute(aContext, vCmdId, vStream, Result);
+            try
+              s := '';
+              FOnCmdExecute(aContext, vCmdId, vStream, Result);
+              Word(Result) := 200;
+            except
+              On E: Exception do
+              begin
+              	Word(Result) := 400; //the execution error.
+                s := 'Exception(' + E.ClassName + ') occur :' + E.Message;
+                vStreamProxy.Size := 0;
+                vStreamProxy.WriteBuffer(s[1], Length(s));
+              end;
+            end;
             if Result then
             begin
+            	aContext.Connection.IOHandler.Write(Word(Result));
               vStream.SetPosition(0);
               aContext.Connection.IOHandler.Write(vStreamProxy, 0, True);
             end;
@@ -184,18 +199,18 @@ begin
   inherited;
 end;
 
-procedure TMeIndyServerTransport.ExecuteCmd(const aContext: TIdContext; const aCmd: Integer; const aParams: PMeStream; var aSuccessful: Boolean);
+procedure TMeIndyServerTransport.ExecuteCmd(const aContext: TIdContext; const aCmd: Integer; const aParams: PMeStream; var aSuccessful: WordBool);
 var
   vResult: PMeMemoryStream;
 begin
-  aSuccessful := False;
+  //aSuccessful := False;
   begin
     New(vResult, Create);
     try
       FRemoteFunctions.Execute(aCmd, aParams, vResult);
       aParams.SetSize(0);
       aParams.CopyFrom(vResult, 0);
-      aSuccessful := true;
+      //aSuccessful := true;
     finally
       vResult.Free;
     end;
