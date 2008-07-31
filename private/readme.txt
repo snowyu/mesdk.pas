@@ -325,3 +325,11 @@ SOA·þ„ÕŒ§Ïò¼Ü˜‹ÊÇÒ»·NÐÂÅdµÄÏµ½y¼Ü˜‹Ä£ÐÍ£¬Ö÷Òª¸ÅÄîÊÇá˜Œ¦ŒWÐ£»òÆó˜IÐèÇó½MºÏ¶ø³ÉµÄÒ
 [1] http://dev2dev.bea.com.tw/techdoc/07soa/07soa_040812_01.htm
 [2] http://www.microsoft.com/taiwan/msdn/columns/soa/SOA_overview_2004112901.htm
 
+http://seclab.cs.rice.edu/w2sp/2007/papers/paper-190-z_1282.pdf
+http://www.schneier.com/blog/archives/2005/07/security_skins.html
+http://www.w3.org/2005/Security/usability-ws/papers/37-google/
+Dynamic Security Skins, Dhamija and Tygar. 
+http://www.tygar.net/papers/Battle_against_phishing.pdf
+http://www.bankofamerica.com/privacy/passmark/
+http://www.passmarksecurity.com/main.jsp
+http://security.yahoo.com/article.html?aid=2006102507
