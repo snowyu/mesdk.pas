@@ -360,7 +360,7 @@ end;
 function TMeAbstractRegExpr.GetMacros: PMeStrings;
 begin
   if Assigned(FRoot) then
-    Result := FRoot.Macros
+    Result := FRoot.GetMacros
   else 
   begin
     if not Assigned(FMacros) then
@@ -372,7 +372,7 @@ end;
 function TMeAbstractRegExpr.GetMatchResult: PMeRegExprResult;
 begin
   if Assigned(FRoot) then
-    Result := FRoot.MatchResult
+    Result := FRoot.GetMatchResult
   else 
   begin
     if not Assigned(FMatchResult) then

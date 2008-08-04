@@ -1159,7 +1159,7 @@ begin
  {$IFDEF DEBUG}
     {$IFDEF NamedThread}
       if Self.InheritsFrom(TypeOf(TMeCustomThread)) then
-        SendDebug(TMeCustomThread(Self).FName + ' TMeAbstractThread.Terminate')
+        SendDebug(PMeCustomThread(@Self).FName + ' TMeAbstractThread.Terminate')
       else
         SendDebug('TMeAbstractThread.Terminate');
     {$ELSE}

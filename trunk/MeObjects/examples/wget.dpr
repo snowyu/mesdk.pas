@@ -1,7 +1,9 @@
 program wget;
  
 {Author: Riceball LEE}
- 
+
+{$I MeSetting.inc}
+
 {$AppType Console}
 uses
   Windows,
@@ -70,6 +72,12 @@ begin
   GLogger.info(cWorkModeStr[AWorkMode]+ ' Current: %d', [AWorkCount]);
 end;
 
+{$IFDEF COMPILER8_UP}
+type
+  TMeThreadAccess = object(TMeThread)
+  end;
+{$ENDIF}
+
 var
  vBegin, vEnd: Longword;
 procedure GrabUrl(const aUrl: string; aStream: TStream);
@@ -88,7 +96,11 @@ begin
     vBegin := GetTickCount;
     //vHttp.Get(vURL, vStream);
     vThread.Start;
+    {$IFDEF COMPILER8_UP}
     while not vThread.Terminated do
+    {$ELSE}
+    while not TMeThreadAccess(vThread^).FTerminated do
+    {$ENDIF}
     begin
       Sleep(100);
     end;
