@@ -78,6 +78,7 @@ type
   PMeThreadMgr = ^ TMeThreadMgr;
   PMeScheduler = ^ TMeScheduler;
   PMeThreadYarn = ^ TMeThreadYarn;
+  PMeThreadTimer = ^ TMeThreadTimer;
 
   TMeThreadMethod = procedure of object;
 {$IFDEF IntThreadPriority}
@@ -147,12 +148,14 @@ type
     procedure Resume;
     procedure Suspend;
     procedure Terminate;
+    function TerminateAndWaitFor(const aTimeout: LongWord = INFINITE): LongWord; virtual;
     function WaitFor(const aTimeout: LongWord = INFINITE): LongWord;
     class procedure Queue(aThread: PMeAbstractThread; AMethod: TMeThreadMethod); overload;
     class procedure RemoveQueuedEvents(aThread: PMeAbstractThread; AMethod: TMeThreadMethod);
     class procedure StaticQueue(aThread: PMeAbstractThread; AMethod: TMeThreadMethod);
     class procedure Synchronize(aThread: PMeAbstractThread; AMethod: TMeThreadMethod); overload;
     class procedure StaticSynchronize(aThread: PMeAbstractThread; AMethod: TMeThreadMethod);
+
     property FatalException: TObject read FFatalException;
     property FreeOnTerminate: Boolean read FFreeOnTerminate write FFreeOnTerminate;
 {$IFDEF MSWINDOWS}
@@ -328,7 +331,7 @@ type
     procedure Stop; virtual;
     procedure Synchronize(const Method: TMeThreadMethod);
     procedure Terminate; virtual;
-    function TerminateAndWaitFor(const aTimeout: LongWord = INFINITE): LongWord; virtual;
+    function TerminateAndWaitFor(const aTimeout: LongWord = INFINITE): LongWord; virtual; //override
 
     //Represents the thread or fiber for the scheduler of the thread.
     //it will be free when the thread free or when Cleanup.
@@ -482,6 +485,41 @@ type
     property Task: PMeThreadMgrTask read GetTask;
   end;
 
+  TMeThreadTimer = object(TMeCustomThread)
+  protected
+    //FEnabled:  Boolean;
+    FInterval:  Cardinal;
+    FOnTimer: TMeNotifyEvent;
+
+    procedure Init; virtual; //override
+    procedure Run; virtual; //override
+    procedure SetEnabled(const Value: Boolean);
+    function GetEnabled: Boolean;
+    //procedure DoTimer;
+  public
+    { Summary: Controls whether the timer generates OnTimer events periodically.}
+    { Description
+      Use Enabled to enable or disable the timer. If Enabled is true, the timer responds normally. 
+      If Enabled is false, the timer does not generate OnTimer events. The default is false.
+    }
+    property Enabled:  Boolean read GetEnabled write SetEnabled;
+    { Summary: Determines the amount of time, in milliseconds, that passes before the timer component initiates another OnTimer event.}
+    { Description
+      Interval determines how frequently the OnTimer event occurs. Each time the specified interval passes, the OnTimer event occurs.
+      Use Interval to specify any cardinal value as the interval between OnTimer events. The default value is 1000 (one second).
+
+      Note:	A 0 value is valid, however the timer will not call an OnTimer event for a value of 0.
+    }
+    property Interval:  Cardinal read FInterval write FInterval;
+    { Summary: Occurs when a specified amount of time, determined by the Interval property, has passed.}
+    {
+      Description
+      Write an OnTimer event handler to execute an action at regular intervals.
+
+      The Interval property of a timer determines how frequently the OnTimer event occurs. Each time the specified interval passes, the OnTimer event occurs.
+    }
+    property OnTimer: TMeNotifyEvent read FOnTimer write FOnTimer;
+  end;
 
 { Assign a method to WakeMainThread in order to properly force an event into
   the GUI thread's queue.  This will make sure that non-GUI threads can quickly
@@ -1169,6 +1207,17 @@ begin
 
 end;
 
+function TMeAbstractThread.TerminateAndWaitFor(const aTimeout: LongWord): LongWord;
+begin
+  if FreeOnTerminate then 
+  begin
+    raise EMeError.Create(RsThreadTerminateAndWaitFor);
+  end;
+  Terminate;
+  Resume;
+  Result := WaitFor(aTimeout);
+end;
+
 function TMeAbstractThread.WaitFor(const aTimeout: LongWord): LongWord;
 {$IFDEF MSWINDOWS}
 var
@@ -1380,17 +1429,6 @@ begin
   inherited Destroy; //+WaitFor!
 end;
 
-function TMeCustomThread.TerminateAndWaitFor(const aTimeout: LongWord): LongWord;
-begin
-  if FreeOnTerminate then 
-  begin
-    raise EMeError.Create(RsThreadTerminateAndWaitFor);
-  end;
-  Terminate;
-  Start; //resume
-  Result := WaitFor(aTimeout);
-end;
-
 procedure TMeCustomThread.BeforeRun;
 begin
 end;
@@ -1596,6 +1634,17 @@ end;
 procedure TMeCustomThread.Synchronize(const Method: TMeThreadMethod);
 begin
   inherited iSynchronize(Method);
+end;
+
+function TMeCustomThread.TerminateAndWaitFor(const aTimeout: LongWord): LongWord;
+begin
+  if FreeOnTerminate then 
+  begin
+    raise EMeError.Create(RsThreadTerminateAndWaitFor);
+  end;
+  Terminate;
+  Start; //resume
+  Result := WaitFor(aTimeout);
 end;
 
 { TMeThread }
@@ -2074,6 +2123,57 @@ begin
   //FThreadClass := PMeThread;
 end;
 
+{ TMeThreadTimer }
+procedure TMeThreadTimer.Init;
+begin
+  inherited;
+  FInterval := 1000;
+  FStopMode := smSuspend;
+  FLoop := true;
+  Priority := tpTimeCritical;
+end;
+{
+procedure TMeThreadTimer.DoTimer;
+begin
+  if Assigned(FOnTimer) and (FInterval <> 0) then
+  begin
+    FOnTimer(@Self);
+    Sleep(FInterval);
+  end
+  else 
+    //Sleep(1000);
+    Stop;
+end;
+}
+function TMeThreadTimer.GetEnabled: Boolean;
+begin
+  Result := not GetStopped;
+end;
+
+procedure TMeThreadTimer.Run;
+begin
+  if Assigned(FOnTimer) and (FInterval <> 0) then
+  begin
+    FOnTimer(@Self);
+    Sleep(FInterval);
+  end
+  else 
+    //Sleep(1000);
+    Stop;
+  //DoTimer;
+end;
+
+procedure TMeThreadTimer.SetEnabled(const Value: Boolean);
+begin
+  if Value <> not GetStopped then
+  begin
+    if Value then
+      Start
+    else
+      Stop;
+  end;
+end;
+
 {----------------------------------------------------------------------------}
 
 type
@@ -2367,6 +2467,7 @@ initialization
   SetMeVirtualMethod(TypeOf(TMeYarn), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeThreadMgr), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeThreadMgrTask), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeThreadTimer), ovtVmtClassName, nil);
   {$ENDIF}
   SetMeVirtualMethod(TypeOf(TMeAbstractThread), ovtVmtParent, TypeOf(TMeDynamicObject));
   SetMeVirtualMethod(TypeOf(TMeCustomThread), ovtVmtParent, TypeOf(TMeAbstractThread));
@@ -2375,6 +2476,7 @@ initialization
   SetMeVirtualMethod(TypeOf(TMeYarn), ovtVmtParent, TypeOf(TMeDynamicObject));
   SetMeVirtualMethod(TypeOf(TMeThreadMgr), ovtVmtParent, TypeOf(TMeThread));
   SetMeVirtualMethod(TypeOf(TMeThreadMgrTask), ovtVmtParent, TypeOf(TMeTask));
+  SetMeVirtualMethod(TypeOf(TMeThreadTimer), ovtVmtParent, TypeOf(TMeCustomThread));
 
   InitThreadSynchronization;
 
