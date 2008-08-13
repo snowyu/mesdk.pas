@@ -55,6 +55,16 @@ type
   end;
 
   TTest_MeThread = class(TTest_MeCustomThread)
+  protected
+    procedure SetUp;override;
+  published
+    procedure Test_Run;override;
+  end;
+
+  TTest_MeThreadTimer = class(TTest_MeCustomThread)
+  protected
+    FTick: Integer;
+    procedure DoTimer(const Sender: PMeDynamicObject);
     procedure SetUp;override;
   published
     procedure Test_Run;override;
@@ -121,6 +131,40 @@ begin
   I := -1;
   I := InterlockedExchange(vTask.Count, I);
   CheckEquals(1, I, ' the count is error.');
+  PMeThread(FThread).TerminateAndWaitFor;
+end;
+
+{ TTest_MeThreadTimer }
+procedure TTest_MeThreadTimer.SetUp;
+begin
+  FThread := New(PMeThreadTimer, Create());
+  with PMeThreadTimer(FThread)^ do
+  begin
+    Interval := 50; //最小精度大约为 50 毫秒.
+    PMeThreadTimer(FThread).OnTimer := DoTimer;
+  end;
+end;
+
+procedure TTest_MeThreadTimer.DoTimer(const Sender: PMeDynamicObject);
+begin
+  InterlockedIncrement(FTick);
+  //writeln('FCount=',FTick);
+  //Inc(FTick);
+  //writeln('FCount=',FTick);
+end;
+
+procedure TTest_MeThreadTimer.Test_Run;
+var
+  I: Integer;
+begin
+  //FThread.Priority := tpTimeCritical;
+  FTick := 1;
+  PMeThreadTimer(FThread).Start;
+  Sleep(500);
+  PMeThreadTimer(FThread).Stop;
+  I := -1;
+  I := InterlockedExchange(FTick, I);
+  CheckEquals(500 div 50, I, ' the count is error.');
   PMeThread(FThread).TerminateAndWaitFor;
 end;
 
@@ -224,6 +268,7 @@ Initialization
                 [
                  TTest_MeCustomThread.Suite
                  , TTest_MeThread.Suite
+                 , TTest_MeThreadTimer.Suite
                  , TTest_MeThreadMgr.Suite
                  //, TTest_MeCustomThread.Suite
                 ]);//}
