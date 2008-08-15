@@ -75,6 +75,7 @@ SNDA-RPC描述了两类资源，Service API资源和Data API资源：
 == Non-Goals ==
 以下的方面将在其它专有规范中阐述，不在本规范约定范围之内，包括：
 * 安全策略
+** [[OAuth/zh|OAuth开放认证]]<ref name="OAuth">OAuth开放认证协议规范：是对用户透明的开发认证规范，涵盖了用户验证，用户授权和服务授权等和开放认证的方方面面: http://oauth.net/ 。</ref>
 * 服务的相互关联策略
 * 可靠性策略
 * 会话管理
@@ -99,6 +100,7 @@ SNDA-RPC描述了两类资源，Service API资源和Data API资源：
 ;客户(Client): API的调用方
 ;服务器(Server): 实现 API服务的一个服务器软件，内部可以宿主一个或多个 API服务或者是API服务的代理网关或传输者。
 ;服务(Service): 提供一个或多个 API的提供者。
+;资源(Resource): 提供给用户使用的遵循全球统一资源标识规范的项，如数据(Data API)资源，远程方法(Service API)，服务(Service)资源等。
 ;Service API: 已命名的在服务中的一个API远程调用，我们用一个英文动词来命名Service API，如，登录API我们命名为Login。本文中术语Proceudre，Method，Service API都是同一个意思。
 ;Data API: 已命名的在服务中的一个数据资源，一般我们可以对数据资源进行CRUD(Create, Read, Update, Delete)操作。我们用一个英文名词来命名Data API，如，相片我们命名为Photo。
 ;过程(Procedure): 参见 Service API.
@@ -222,7 +224,26 @@ callback参数是为了对  Web Browser 提供跨域支持扩展而增加的。
 ;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.5.1 500 Internal Server Error]: 内部服务器错误，其中错误对象的具体错误代码参见《[[#错误号|错误对象中的错误号]]》一节
 ;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.5.4 503 Service Unavailable]: 表示服务器太忙而不能接受服务，服务器可以发送Retry-After响应报头告知客户何时可以重试。
 
-= 命名约定 =
+= 资源命名 =
+为每一个暴露的Service资源和API资源命名一个在全局名称空间内唯一的URI，对API使用统一的URI命名规范,（naming scheme）<ref name="URI">Uniform Resource Identifier (URI): URI命名规范是已被标准化的，在全球范围完美运行，并且能被绝大多数人所理解的国际标准规范, URI包括了URL和URN两个规范。URI Generic Syntax: http://www.ietf.org/rfc/rfc3986.txt 。</ref>
+URI 实际上包括两个标准，一个是全球统一资源定位符(URL)<ref name="URL">Uniform Resource Locators (URL): http://www.ietf.org/rfc/rfc1738.txt</ref>，另一个则是全球统一资源名称(URN)<ref name="URN">全球统一资源名称(URN)，英文全称为“Uniform Resource Name”，URN 通过名称而不是位置对资源进行标识。下面是从RFC 1737摘录的部分内容，来说明URNs 的功能需求。
+* 全球普适性：URN是一个全球性的名字，而不是地区性的，其在世界任何地方都有同样的含意。
+* 全球唯一性：同一个URN永远不会指定给两个不同的资源。
+* 永久性：URN的生命周期是永久的。
+* 可伸缩性：URNs能被分配给网上现有的的任何资源，而且数百年仍会有效。
+* 对继承的支持性：设计的方案必须对现有的命名系统提供支持，能继承现有的命名系统。
+* 独立性：只有命名发布机构才有权决定在什么条件下发布一个名字。 
+* 解决方案：由于URNs有相应的URLs,因此必须有一种可行的机制将URN翻译成URL.
+* URN相关国际标准：
+** 统一资源名的功能需要: http://www.rfc-editor.org/rfc/rfc1737.txt 
+** URN语法：http://www.rfc-editor.org/rfc/rfc2611.txt 
+** URN命名空间的定义机制: http://www.rfc-editor.org/rfc/rfc2141.txt
+** A Uniform Resource Name (URN) for Services: http://www.rfc-editor.org/rfc/rfc5031.txt
+</ref>。
+* URL<ref name="URL"/> 定义的是资源的全球唯一访问位置
+* URN<ref name="URN"/> 定义的是资源的全球唯一名称
+
+== 命名约定 ==
 在SNDA-RPC中的服务、 API、参数的标识名称只能是由如下的字符组成：
 * 大写字符 A to Z (U+0041 to U+005A, ASCII 65 to 90)
 * 小写字符 a to z (U+0061 to U+007A, ASCII 97 to 122)
@@ -233,18 +254,16 @@ callback参数是为了对  Web Browser 提供跨域支持扩展而增加的。
 * Service API：每一个Service API都是远程服务上的一个函数，我们总是用动词或动宾结构来命名Service API，如，登录API我们命名为Login。
 * Data API：已命名的在服务中的一个数据资源，我们用名词来命名Data API，如，相片我们命名为Photo。
 
-== 命名URI ==
-为每一个API命名一个在全局名称空间内唯一的URI，对API使用统一的URI命名规范,（naming scheme）<ref name="URI">URI命名规范是已被标准化的，在全球范围完美运行，并且能被绝大多数人所理解的国际标准规范。</ref>
-
-=== 命名原则 ===
+== 命名原则 ==
  
 * 名称全局唯一
-* 只为值得被暴露的API命名。
-* 数据资源命名从大类到小类，从聚合到个体
-* 数据资源(Data API)总是名词结构
-* 远程方法(Service API)总是动词结构
+* 只为值得被暴露的资源命名。
+* 数据资源(Data API)命名从大类到小类，从聚合到个体
+* 数据资源(Data API)和服务(Service)资源总是名词结构
+* 远程方法(Service API)资源总是动词结构
 * "default"和"system"服务名称被系统保留
-* 有时将其作为远程方法或是一个资源选择是一个问题
+* 决定 API 是数据资源(Data API)还是远程方法(Service API)这是一个问题，是getXXX，还是XXX，如果需要很多参数，并且返回结果不能别修改，那么远程方法更适合，反之则是数据资源
+* 决定 API 资源(Data API and Sevice API)是否可被缓存，以及缓存的时限。缓存将使得API充分利用互联网上各种缓存机制(CDN)来降低本身服务的负荷。
 
 大量聚合类资源（有n多个资源组成）的获取是需要分页获取的，没有指定页号的总是返回第一页的数据。
 
@@ -290,7 +309,7 @@ http://example.com/customers/search?vip=true&p=2 ##返回VIP的顾客Id号列表
 * 当参数类型与定义的参数类型不一致的时候，需要合理的对参数类型进行转换，应该尽量避免转换后导致的数据或精度丢失。
 
 === URL参数转义说明 ===
-当置参数于URL<ref name="URL">Uniform Resource Locators (URL): http://www.ietf.org/rfc/rfc1738.txt</ref>上的时候，为了满足URL参数的转义的要求，我们需要对参数的内容进行转义：
+当置参数于URL<ref name="URL"/>上的时候，为了满足URL参数的转义的要求，我们需要对参数的内容进行转义：
 * 所有的非US-ASCII字符必须使用“%”跟两位十六进制数字的形式进行转义。
 * 如下的US-ASCII字符是不安全的，也必须使用“%”跟两位十六进制数字的形式进行转义: 
 ** URL的不安全字符: "<" , ">" , “"”, "%", "#" , "{", "}", "|", "\", "^", "~",  "[", "]", "`"
@@ -357,7 +376,7 @@ http://example.com/customers/search?vip=true&p=2 ##返回VIP的顾客Id号列表
 * '''v''' URL参数: version 表示要调用方法的版本号，如果没有默认为最新版本。
 * '''callback''' URL参数为仅当跨域调用<ref name="CrossSiteScript">Cross Site Script hack方式的跨域调用应该在未来[http://www.w3.org/TR/access-control/ W3C Access Control](跨域安全检测请求规范)完全执行后废弃</ref>的时候使用的回调函数，以后可能会被废弃。
 * '''key''' URL参数: API_Key 仅当跨域调用<ref name="CrossSiteScript" />需要，以后可能会被废弃。其含义请参阅[[#请求方(Request)|HTTP Header字段]]中的对API_Key相关描述。
-* '''date''' URL参数仅当跨域调用<ref name="CrossSiteScript" />需要，以后可能会被废弃。'''注意'''：这里的日期格式采用ISO8601<ref name="ISO8601">[[WikiMedia:ISO_8601|ISO8601]] 日期时间格式: http://www.iso.org/iso/date_and_time_format</ref>日期时间格式, 如："20081022T234350Z",表示格林威治时间2008年10月22号23点43分50秒。
+* '''date''' URL参数仅当跨域调用<ref name="CrossSiteScript" />需要，以后可能会被废弃。'''注意'''：这里的日期格式采用ISO8601<ref name="ISO8601">[[WikiMedia:ISO_8601|ISO8601]] 日期时间格式: http://www.iso.org/iso/date_and_time_format</ref>日期时间格式, 如："20081022T234350Z",表示格林威治时间2008年10月22号23点43分50秒。 
 * '''其它'''URL参数为被调的API的参数
 
 
@@ -551,20 +570,7 @@ Http Delete方式用于删除已有的资源。
 服务描述是一个简单的JSON对象，通过该对象的属性描述了服务的名称，版本，说明等内容：
 ;name: 服务本身的名称，如“myservice”。
 ;URL: 服务的URL地址，如：“api.sdo.com/myservice”
-;URN: 服务的URN（全球统一资源名称），采用Uniform Resource Name(URN)<ref name="URN">全球统一资源名称(URN)，英文全称为“Uniform Resource Name”，URN 通过名称而不是位置对资源进行标识。下面是从RFC 1737摘录的部分内容，来说明URNs 的功能需求。
-* 全球普适性：URN是一个全球性的名字，而不是地区性的，其在世界任何地方都有同样的含意。
-* 全球唯一性：同一个URN永远不会指定给两个不同的资源。
-* 永久性：URN的生命周期是永久的。
-* 可伸缩性：URNs能被分配给网上现有的的任何资源，而且数百年仍会有效。
-* 对继承的支持性：设计的方案必须对现有的命名系统提供支持，能继承现有的命名系统。
-* 独立性：只有命名发布机构才有权决定在什么条件下发布一个名字。 
-* 解决方案：由于URNs有相应的URLs,因此必须有一种可行的机制将URN翻译成URL.
-* URN相关国际标准：
-** 统一资源名的功能需要: http://www.rfc-editor.org/rfc/rfc1737.txt 
-** URN语法：http://www.rfc-editor.org/rfc/rfc2611.txt 
-** URN命名空间的定义机制: http://www.rfc-editor.org/rfc/rfc2141.txt
-** A Uniform Resource Name (URN) for Services: http://www.rfc-editor.org/rfc/rfc5031.txt
-</ref>国际标准命名，如： “urn:service:myservice.system”。【URN一般由Service中心根据服务名称(name)自动生成。】
+;URN: 服务的URN（全球统一资源名称），采用Uniform Resource Name(URN)<ref name="URN"/>国际标准命名，如： “urn:service:myservice.system”。【URN一般由Service中心根据服务名称(name)自动生成。】
 ;IsDefault: 【可选】是否为主服务（默认服务），布尔类型。如没有则默认为False。
 ;version: 【可选】以字符串表示的服务版本号。
 ;description: 【可选】服务的描述性文字。
@@ -729,6 +735,7 @@ Content-Type: application/json; charset=utf-8; version=1.1
 ## method: 表示方法名称的字符串
 ## params: 该方法的参数值数组（按位置引用）或对象（按名称引用）
 ; 返回结果: 返回各个调用是否成功的执行结果数组。
+; 注意: 该API不可缓存，除非必要，无需实现——可能加重你的服务负荷。
 ; 使用举例:
 <pre>
 请求：
@@ -838,6 +845,19 @@ A remote procedure call is made by sending a request to a remote service using e
 
 == Http Method ==
 
+=== GET ===
+Almost all the service API and Data API support the GET Http method.
+
+<pre>
+GET /myservice/sum?a=17&b=25 HTTP/1.1 
+User-Agent: Wget/1.6
+Host: www.example.com
+Content-Version: 1.0
+Accept: application/json
+Revision: 1.0
+</pre>
+
+
 === POST ===
 In the case of HTTP POST, the procedure call is carried in the body of the HTTP message whereas in the case of HTTP GET, it is expressed along the path and query components of the HTTP Request-URI, and the parameters must be encoded via ur data format. And u must appy the http-header parameters to specify the data format and HTTP-RPC protocol version, eg:
 <pre>
@@ -845,6 +865,8 @@ Content-Type: application/json
 Accept: application/json
 Protocol-Version: 1.0
 </pre>
+
+[Or can the common parameters put into the http header field? only the bigger content is put into entity-body.]
 
 Suppose that a service exposes a procedure named sum that takes two Number parameters, as in sum(a, b), and returns their sum which carry the data via Json. The HTTP POST to call this procedure call would be as follows:
 <pre>
@@ -865,20 +887,10 @@ Protocol-Version: 1.0
 
 In this example, the method being targeted is provided by a service located at http://www.example.com/myservice. The call is expressed as a JSON Object in the body of the HTTP POST message. The "ver" member of this object tells the receiver the version of the HTTP-RPC protocol being used by the client. The Content-Version of the Http Header Field tells the receiver the version of the method being called by the client. if not means current version method.
 
-=== GET ===
-
-<pre>
-GET /myservice/sum?a=17&b=25 HTTP/1.1 
-User-Agent: Wget/1.6
-Host: www.example.com
-Content-Version: 1.0
-Accept: application/json
-Revision: 1.0
-</pre>
-
 = Data API (Request) =
 the Data API represents a RESTful data resource.
-
+快学快用，难题攻关，此为专；
+分门别类，梳理架构，此为成。
 2008-6-27
   the prototype of MeRemote RPC can work now.
   but a lot of things need to do.
