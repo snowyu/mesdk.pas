@@ -75,6 +75,7 @@ end;
 
 procedure TStringsLogger.WriteLog(aMsg: string);
 begin
+  //Note: jf u uses the TMemo etc VCL control, u should call SetIdleProc to Process Messages.
   if Assigned(FStrings) then
     FStrings.Add(aMsg);
 end;
