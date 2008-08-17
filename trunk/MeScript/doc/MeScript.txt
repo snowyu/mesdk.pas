@@ -1,0 +1,104 @@
+MeSDK - MeScript Engine
+
+the mini functional dynamic language script engine.
+
+MeScript Prototype V1:
+Purpose:
+  1. Function, Variable, Object
+  2. AutoBinding, ManualBinding, LaterBinding
+  3. Operator(can be defined via user)
+  4. No Expression, all r functions.
+
+ScriptFunction
+  Prototype: PMeScriptCustomObject;
+
+ScriptObject
+  Attributes: PMeScriptAttributes
+
+ScriptAttribute:
+  Name
+  Value: TMeScriptValue;
+  Kind : TMeScriptAttributeKinds (akReadOnly, akDontEnum, akDontDelete)
+
+ScriptValue:
+  Ctor: PMeScriptCustomFunction;
+  Value: TMeScriptValueRecord(value and type)
+
+
+uMeScript.pas
+
+Architecture:
+the dynamic language  is small enough, it can be treat as the pure interpreter language.ipt 中。
+
+the min execution unit: Script Block
+TMeScriptCustomBlock： Abstract Script Block
+  TMeScriptBlock： Script Code Block，Supports the local variables，no parameters
+    TMeScriptFunction：Script Function，Supports the Prototype and parameters
+      TMeScriptGlobalFunction： the Global Script Function , this is the script execution main entry，
+	     Stack, Virtual CPU States
+  TMeScriptCustomFunction： Abstract Custom Function, supports the Prototype and parameters.
+    TMeScriptInternalFunction： the pre-defined internal function,
+       register by TMeScriptFunction.RegisterFunction method.
+
+Script Object:
+  TMeScriptCustomObject: Abstract Object，the internal script object and the pure script object should
+      derived from here.
+    TMeScriptObject: the pure script oject, supports the attribute list.
+
+Value：
+  TMeScriptValue： No name, only value, type and Ctor
+
+Stack: Data Stack, Return Stack, this pointer Stack. all stacks are in the TMeScriptGlobalFunction.
+
+Data Stack(FDataStack)：the data in the Data Stack is the MeScriptValue(point to the MeScriptValue) pointer. 
+   nil means undefined data.
+Return Stack(FReturnStack): we have to save the data(local variables, the PC address, parameters etc) of the current block before enter a script block. 
+   , these data are pushed into the return stack. (PushPC in InitExecution) (the PopPC, free localvars and parameters in FinalizeExecution)。
+   local variables: only exists in block, no name, no runtime-binding.s
+   Parameters: 
+
+
+Function Identityfier Scope(Search order):  XXX()
+  Compile-time:
+   该函数原型对象链中搜索
+   if SearchAttr and Assigned(FGlobalFunction._this) 那么搜索this中的属性是否有
+   [如果是函数则]最后搜索内部定义的函数表，然后再是父函数的内部函数表。
+  Run-Time:
+
+TMeScriptValue.Ctor -> TMeScriptFunction
+TMeScriptFunction.prototype -> TMeScriptObject
+
+Car1.Ctor -> Car()
+Car().prototype -> CarProtoTypeObject(the TypeInfo Object)
+CarProtoTypeObject.Ctor -> Car()
+实际上 prototype 就是类型信息！
+
+
+最小指令集：
+    , opHalt       // ( -- )
+    , opCallBlock   // opCallBlock pBlock (  --  )
+    , opCallFunc    // opCallFunc pFunction ( Arguments -- pResultValue )
+    , opCall        // opCall ( Arguments pFuncValue -- pResultValue )
+    , opCallBind    // opCallBind <StrLen:byte>FuncNameStr ( Arguments -- pResultValue ) the runtime error raised if function is not exists at runtime
+    , opObjectBind  // opObjectBind <StrLen:byte>ObjNameStr ( -- pObject)
+    , opLoadAttrById   // opLoadAttrById ( pObject <Id:Int32> -- pValue)  if not found return nil
+    , opLoadAttr // opLoadAttr ( pObject <Len:Byte>AttrNameStr -- pValue) if not found return nil
+    , opAssign     // opAssign pVar ( pValue -- )
+    , opPush       // opPush Int32 ( -- Int32)
+    , opPushDouble // opPushDouble Double ( -- pValue)
+    , opPushString // opPushString <cnt:Longword>string ( -- pValue)
+    , opPushObject // opPushObject pObject ( -- pValue)
+    , opPushFunction // opPushFunction pFunc ( -- pValue)
+    , opPop        // opPop         (Int32 -- )
+    , opLoadArg    // opLoadArg <index> ( -- pValue)  load local argument
+    , opLoadArgFar // opLoadArgFar <stackIndex> <index> ( -- pValue)  load parent argument which argument in return stack:  FReturnStack[_RP - stackIndex].Arguments.Attributes[index]
+    , opLoadVar    // opLoadVar <index> (-- pValue)  load loal varaible
+    , opLoadVarFar // opLoadVarFar <stackIndex> <index> ( -- pValue)  load parent varaible which varaible in return stack:  FReturnStack[_RP - stackIndex].Varaibles.Items[index]
+    , opLoadBind   // opCallBind <Len:byte>NameStr ( -- pValue ) the runtime error raised if function is not exists at runtime
+    , opDeclareVar//  opDeclareVar:  decalre a local variable. allocate the space for variable.
+
+
+Todo:
+10:05 2008-08-17
+* Seperate the VM Execution and script.
+  you can set by SetVMExecutorProc() procedure.
