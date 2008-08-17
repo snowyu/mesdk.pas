@@ -244,7 +244,7 @@ type
     function iParserCallFunctionRef(const aTokenizer: PMeTokenizer): Boolean;
     //it's a localVar or attribute or constant
     function iParserValueRef(const aTokenizer: PMeTokenizer): Boolean; virtual;
-    //eg, var var1, var2;
+    //parse to the declaration  of the local variables.  eg, var var1, var2;
     function iParserDeclareVar(const aTokenizer: PMeTokenizer): Boolean;
     //eg, function aFunc(a,b) {};
     function iParserDeclareFunc(const aTokenizer: PMeTokenizer): Boolean;virtual;
@@ -408,8 +408,12 @@ type
     property IsRunning: Boolean read GetIsRunning write SetIsRunning;   
   end;
 
+  TMeVMInstructionProc = procedure(const aGlobalFunction: PMeScriptGlobalFunction);
+
 procedure ClearMeScriptDynaValues(aList: TMeScriptDynaValues);
 procedure ClearMeScriptObjects(aList: TMeScriptDynaObjects);
+
+procedure SetVMExecutorProc(const aCoreProc: TMeVMInstructionProc);
 
 implementation
 
@@ -422,19 +426,24 @@ type
   public
   end;
 
-  TMeVMInstructionProc = procedure(const aGlobalFunction: PMeScriptGlobalFunction);
   //the Core VM instructions List
   {: 核心虚拟指令表 } 
-  TMeScriptCoreWords = array [TMeVMInstruction] of TMeVMInstructionProc;
+  //TMeScriptCoreWords = array [TMeVMInstruction] of TMeVMInstructionProc;
 
 var
-  GMeScriptCoreWords: TMeScriptCoreWords;
+  //GMeScriptCoreWords: TMeScriptCoreWords;
+  iVMNext: TMeVMInstructionProc;
 
-{$IFDEF PUREPASCAL}
-  {$I uMeScript_Interpreter_inc.pas}
-{$ELSE}
-  {$I uMeScript_X86Interpreter_inc.pas}
-{$ENDIF}
+procedure SetVMExecutorProc(const aCoreProc: TMeVMInstructionProc);
+begin
+  iVMNext := aCoreProc;
+end;
+
+//{$IFDEF PUREPASCAL}
+//  {$I uMeScript_Interpreter_inc.pas}
+//{$ELSE}
+//  {$I uMeScript_X86Interpreter_inc.pas}
+//{$ENDIF}
 
 //get dynamic Arguments from DataStack and Generate Arguments Object
 function GenerateArgumentsObject(const aGlobalFunction: PMeScriptGlobalFunction): PMeScriptArguments;
@@ -898,9 +907,10 @@ begin
 end;
 
 {
-  1、查属性对象
-  2、查局部变量
-  3、查函数，返回的是函数地址。
+  1. 查是否函数调用, 标识符后跟括号。
+  2. 查属性对象
+  3. 查局部变量
+  4. 查函数，返回的是函数地址。
 }
 function TMeScriptBlock.iParserValueRef(const aTokenizer: PMeTokenizer): Boolean;
 var
@@ -1123,7 +1133,8 @@ end;
 
 procedure TMeScriptBlock.iExecute();
 begin
-  iVMNext(FGlobalFunction);
+  if Assigned(iVMNext) then 
+    iVMNext(FGlobalFunction);
 end;
 
 procedure TMeScriptBlock.InitExecution(const aParams: PMeScriptArguments);
@@ -1461,7 +1472,8 @@ begin
   if IsRunning then
     raise EMeError.CreateRes(@rsMeScriptAlreayRunningError);
   Reset;
-  iVMNext(@Self);
+  if Assigned(iVMNext) then
+    iVMNext(@Self);
 end;
 
 function TMeScriptGlobalFunction.GetIsRunning(): Boolean;
