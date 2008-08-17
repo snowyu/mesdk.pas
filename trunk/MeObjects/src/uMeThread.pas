@@ -53,6 +53,7 @@ uses
   , uMeSystem
   , uMeSyncObjs
   , uMeSysUtils
+  , uMeLog
   ;
 
 resourcestring
@@ -594,6 +595,12 @@ procedure LeaveMainThread;
 function NewThreadTask(const aTask: PMeTask): PMeThread; overload;
 procedure ThreadSynchronize(ASyncRec: PMeSynchronizeRecord; QueueEvent: Boolean {$IFDEF SUPPORTS_DEFAULTPARAMS}= False{$ENDIF});
 
+type
+  TMeIdleProcedure = procedure(const aSleepTime: Cardinal);
+//for Main thread to process message..
+procedure SetMeIdleProc(const aIdleProc: TMeIdleProcedure);
+procedure MeSleep(const aSleepTime: Cardinal);
+
 implementation
 
 {$IFDEF MSWINDOWS}
@@ -620,6 +627,24 @@ var
   SyncList: PMeList = nil;
   ThreadLock: TRTLCriticalSection;
   ThreadCount: Integer;
+  FIdleProcessProc: TMeIdleProcedure = nil;
+
+procedure MeSleep(const aSleepTime: Cardinal);
+var
+  v: Integer;
+begin
+  v := GetTickCount;
+  if Assigned(FIdleProcessProc) then
+    FIdleProcessProc(aSleepTime);
+  v := aSleepTime - (GetTickCount - v);
+  if v > 0 then
+    Sleep(v);
+end;
+
+procedure SetMeIdleProc(const aIdleProc: TMeIdleProcedure);
+begin
+  FIdleProcessProc := aIdleProc;
+end;
 
 function NewThreadTask(const aTask: PMeTask): PMeThread;
 begin
@@ -1294,7 +1319,7 @@ begin
   DoBeforeRun;
   try
     try
-      while DoRun do Sleep(5);
+      while DoRun do MeSleep(50);
     except
       On E: Exception do
       begin
@@ -1351,7 +1376,7 @@ begin
     begin
       Break;
     end;
-    Sleep(cWaitAllThreadsTerminatedStep);
+    MeSleep(cWaitAllThreadsTerminatedStep);
     AMSec := AMSec - cWaitAllThreadsTerminatedStep;
   end;
 end;
@@ -1812,6 +1837,7 @@ var
   vEndTick : LongWord;
 begin
   vEndTick := 0;
+  //GLogger.Info({$IFDEF NamedThread}v.FName+{$ENDIF}'.AfterRun= ');
   while FActiveThreads.Count > 0 do
   begin
     c := FThreadPool.Count;
@@ -1821,7 +1847,9 @@ begin
     {$IFDEF DEBUG}
     SendDebug({$IFDEF NamedThread}v.FName+{$ENDIF}'.Stopped= '+IntToStr(Integer(v.GetStopped)));
     {$ENDIF}
+    //GLogger.Info({$IFDEF NamedThread}v.FName+{$ENDIF}'.Stopped= '+IntToStr(Integer(v.GetStopped)));
     //Sleep(50);
+    MeSleep(50);
 
     if FTerminatingTimeout <> INFINITE then
     try
@@ -1831,7 +1859,7 @@ begin
       vEndTick := 0;
     end;
     While ((FTerminatingTimeout = INFINITE) or (vEndTick > GetTickCount)) and (c = FThreadPool.Count)  do
-      Sleep(20);
+      MeSleep(20);
     
     if c = FThreadPool.Count then
     begin
@@ -1902,7 +1930,7 @@ var
   //i: Integer;
 begin
   //Result := True;
-  Result := not FAutoStopped or (FActiveThreads.Count <= 0);
+  Result := not FAutoStopped or (FActiveThreads.Count > 0);
 
   {if FExecutingTimeout <> INFINITE then
   //check whether Execute task Timeout
@@ -1931,7 +1959,10 @@ begin
       vTask := Popup;
     end
     else
+    begin
+      //if FAutoStopped then Result := False;
       exit;
+    end
   finally
     FTaskQueue.UnlockList;
   end;
@@ -1949,12 +1980,16 @@ begin
   finally
     FThreadPool.UnlockList;
   end;
+
   if Assigned(vThread) then
   begin
     FActiveThreads.Add(vThread);
     vThread.Start;
+    //corrects the result
+    if not Result then
+      Result := True;
   end;
-  Sleep(50);
+  MeSleep(500);
 end;
 
 function TMeThreadMgrTask.Add(const aTask: PMeTask): Boolean;
@@ -2047,7 +2082,7 @@ begin
       FActiveYarns.UnlockList; 
     end;
     //TODO: Put terminate timeout check back
-    Sleep(500); // Wait a bit before looping to prevent thrashing
+    MeSleep(500); // Wait a bit before looping to prevent thrashing
   end; //while
 end;
 
@@ -2155,7 +2190,7 @@ begin
   if Assigned(FOnTimer) and (FInterval <> 0) then
   begin
     FOnTimer(@Self);
-    Sleep(FInterval);
+    MeSleep(FInterval);
   end
   else 
     //Sleep(1000);
