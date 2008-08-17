@@ -426,17 +426,12 @@ type
   public
   end;
 
-  //the Core VM instructions List
-  {: ºËÐÄÐéÄâÖ¸Áî±í } 
-  //TMeScriptCoreWords = array [TMeVMInstruction] of TMeVMInstructionProc;
-
 var
-  //GMeScriptCoreWords: TMeScriptCoreWords;
-  iVMNext: TMeVMInstructionProc;
+  iVMExec: TMeVMInstructionProc;
 
 procedure SetVMExecutorProc(const aCoreProc: TMeVMInstructionProc);
 begin
-  iVMNext := aCoreProc;
+  iVMExec := aCoreProc;
 end;
 
 //{$IFDEF PUREPASCAL}
@@ -1133,8 +1128,8 @@ end;
 
 procedure TMeScriptBlock.iExecute();
 begin
-  if Assigned(iVMNext) then 
-    iVMNext(FGlobalFunction);
+  if Assigned(iVMExec) then 
+    iVMExec(FGlobalFunction);
 end;
 
 procedure TMeScriptBlock.InitExecution(const aParams: PMeScriptArguments);
@@ -1472,8 +1467,8 @@ begin
   if IsRunning then
     raise EMeError.CreateRes(@rsMeScriptAlreayRunningError);
   Reset;
-  if Assigned(iVMNext) then
-    iVMNext(@Self);
+  if Assigned(iVMExec) then
+    iVMExec(@Self);
 end;
 
 function TMeScriptGlobalFunction.GetIsRunning(): Boolean;
