@@ -1,7 +1,7 @@
 {Summary MeScript VM Execution Core .}
 {
    @author  Riceball LEE(riceballl@hotmail.com)
-   @version $Revision: 291 $
+   @version $Revision$
 
   License:
     * The contents of this file are released under a dual \license, and
