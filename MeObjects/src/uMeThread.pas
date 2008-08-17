@@ -598,6 +598,29 @@ procedure ThreadSynchronize(ASyncRec: PMeSynchronizeRecord; QueueEvent: Boolean 
 type
   TMeIdleProcedure = procedure(const aSleepTime: Cardinal);
 //for Main thread to process message..
+{
+  eg,
+var
+  FMainThread: THandle;
+
+procedure IdleProcess(const aSleepTime: Cardinal);
+var
+  v: Cardinal;
+begin
+  v := 0;
+  if aSleepTime <> 0 then
+    v := GetTickCount;
+  if FMainThread = GetCurrentThread then
+  repeat
+    Application.ProcessMessages;
+  until (aSleepTime = 0) or (GetTickCount >= v + aSleepTime);
+end;
+
+initialization
+  FMainThread := GetCurrentThread;
+  SetMeIdleProc(IdleProcess);
+end.
+}
 procedure SetMeIdleProc(const aIdleProc: TMeIdleProcedure);
 procedure MeSleep(const aSleepTime: Cardinal);
 
