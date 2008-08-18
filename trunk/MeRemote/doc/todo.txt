@@ -1,3 +1,10 @@
+2008-8-18
+Service.Method();
+Service.Data.Get();
+Service.Data.Create(); //Post
+Service.Data.Update(); //put
+Service.Data.Delete();
+
 2008-7-21
 Patameter Type Limits:
   Simple Types allowed
