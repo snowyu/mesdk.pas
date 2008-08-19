@@ -374,6 +374,15 @@ type
     //processed in the CALL instruction.
     FThisPtrStack: PMeList;
     //_Func: PMeScriptBlock;
+    ParamStackBase: Pointer;
+    ParamStackTop: Pointer;
+    ParamStackSize: tsInt; //bytes
+    ParamStackBottom: tsInt;
+    ReturnStackBase: Pointer;
+    ReturnStackTop: Pointer; //
+    ReturnStackSize: tsInt; //bytes
+    //if halt with errHalt then the ReturnStackBottom will be the Old RSP.   
+    ReturnStackBottom: tsInt;
     _PC: TMeScriptPC;
     //the ReturnStack Pointer. it is the index of FReturnStack
     _RP: tsInt;
@@ -402,6 +411,7 @@ type
     BindingMode: TMeScriptCompilerBindingMode;
     CompilerOptions: TMeScriptCompilerOptions;
     LastErrorCode: TMeScriptProcessorErrorCode;
+
     property DataStack: PMeScriptValues read FDataStack;
     //property Strings: PMeStrings read FStrings;
     {: the States in [psRunning, psStepping]}
