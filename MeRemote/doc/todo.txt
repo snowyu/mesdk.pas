@@ -1,3 +1,65 @@
+﻿2008-8-20
+Request:
+  url
+    IsCrossSite
+  options
+    IsAsync
+  httpMethod
+  method
+  parameters
+
+My Error Obj: {code: number, message: ''}  
+
+Js Client SDK:
+the JS Client SDK
+  1. the Core Orient-Object Frame<done>
+  2. the Core functions
+    2.1 Core functions to operate the Object.<Partly Done>
+    2.2 Core functions to operate the Selector (like the JQuery).
+  3. the Core Objects
+    3.1 Array
+    3.2 Function
+    3.3 Number
+    3.4 String
+    3.5 Hash
+    3.6 Event
+    3.7 JSON<!>
+    3.8 Request<!>
+  4. the RpcClient Objects<!>
+    4.1 the RpcClient Object<!>
+    4.2 the Abstract RpcClient.Service Class<!>
+    4.3 the RpcClient.SDService class<!>
+      var myService = new RpcClient.SDService(['games', 'users', 'methods']);
+      var gameList  = myService.games.Get();
+      myService.games.Delete('SohuGame');
+
+      //the asynchronous call:
+      myService.games.Get({onSuccess: doGameListSuccess});
+      function doGameListSuccess(result){
+        gamesList = result;
+      };
+  5. the international languages
+  6. the template engine
+  7. UI
+
+2008-8-19
+http://jquerycomet.googlecode.com/svn/trunk/
+Use the MooTools Core(exclude Request and FX).
+I have to modify the Requst class to obey the new rules. (request.js)
+
+  var jsonRequest = new Request.JSON({url: vServiceURL, onComplete: function(result){
+  	$("result").set('text', JSON.encode(result));
+   }});
+
+  jsonRequest[vHttpMethod]({method: vMethodName, params: vParamList, id: requestId});
+
+
+.NET 2 SP1
+.NET 3.5 SP1
+Windows 集群服务
+VMare Workstation & VPC 2007
+
+    
 2008-8-18
 Service.Method();
 Service.Data.Get();
