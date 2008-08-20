@@ -10,6 +10,8 @@
 		<title>JSON/XML-RPC Server Test Console</title>
 		<script type="text/javascript" src="firebug/firebug.js"></script>
 		<script type="text/javascript" src="base64.js"></script>
+		<script type="text/javascript" src="mootools-1.2-core-NoReq+FX.js"></script>
+		<script type="text/javascript" src="request.js"></script>
 		<script type="text/javascript" src="rpc_client.js"></script>
 
 		<style type="text/css">
@@ -44,8 +46,27 @@
 
 
 <script>
-  var vDemoService = new RpcClient.Service("http://localhost:81/demo.ashx", {IsAsync: false, Sanitize: true/*, Methods: ['counter']*/}); 
+Request.Count++;
+var m = new Request();
+Request.Count++;
+alert('m:'+Request.Count);
 
+var my = {};
+my.a = function() { alert('a') };
+my.a['b'] = function() { alert('b')};
+my.a.b();
+my.a();
+//RpcClient.toErrorString({id:1, msg:'sfsdf'});
+  try {
+    throw({id:1, msg:"hello"});
+  }
+  catch(e) {
+    alert(RpcClient.toErrorString(e));
+  }
+
+//  var vDemoService = new RpcClient.Service("http://localhost:81/demo.ashx", {IsAsync: false, Sanitize: true/*, Methods: ['counter']*/}); 
+
+/*
   try {
     var vResult = vDemoService.wadd(10,2);
     alert(vResult);
@@ -53,7 +74,6 @@
   catch(e){
     alert("Unable to execute because: " + e);
   }
-
 
   //RpcClient.setAsynchronous(vDemoService, true);
   vDemoService.setAsynchronous(true);
@@ -68,7 +88,7 @@
                      //any 'final' logic
                   }
   });
-
+*/
 </script>
 </body>
 </html>
