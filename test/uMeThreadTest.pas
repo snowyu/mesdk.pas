@@ -23,6 +23,7 @@ uses
   , uMeObject
   , uMeStrUtils
   , uMeThread
+  , uMeObjectTest
   ;
 
 type
@@ -33,16 +34,21 @@ type
   public
   end;
 
-  TTest_MeCustomThread = class(TTestCase)
+  TTest_MeCustomThread = class(TTest_MeObject)
   protected
-    FThread: PMeAbstractThread;
+    //FThread: PMeAbstractThread;
 
     procedure SetUp;override;
-    procedure TearDown;override;
+    //procedure TearDown;override;
 
+    procedure CreateMeObject;override;
+    {$IFDEF MeRTTI_SUPPORT}
+    procedure CheckObjectClassName;override;
+    {$ENDIF}
   public
   published
     procedure Test_Run;virtual;
+    procedure Test_InheritsFrom;override;
   end;
 
   PMyTask = ^ TMyTask;
@@ -56,18 +62,22 @@ type
 
   TTest_MeThread = class(TTest_MeCustomThread)
   protected
-    procedure SetUp;override;
+    //procedure SetUp;override;
+    procedure CreateMeObject;override;
   published
     procedure Test_Run;override;
+    procedure Test_InheritsFrom;override;
   end;
 
   TTest_MeThreadTimer = class(TTest_MeCustomThread)
   protected
     FTick: Integer;
     procedure DoTimer(const Sender: PMeDynamicObject);
-    procedure SetUp;override;
+    //procedure SetUp;override;
+    procedure CreateMeObject;override;
   published
     procedure Test_Run;override;
+    procedure Test_InheritsFrom;override;
   end;
 
   TTest_MeThreadMgr = class(TTestCase)
@@ -111,12 +121,25 @@ begin
 end;
 
 { TTest_MeThread }
-procedure TTest_MeThread.SetUp;
+procedure TTest_MeThread.CreateMeObject;
 var
   vTask: PMyTask;
 begin
   New(vTask, Create);
-  FThread := New(PMeThread, Create(vTask));
+  //FThread := New(PMeThread, Create(vTask));
+  FMeObject := New(PMeThread, Create(vTask));
+{$IFDEF MeRTTI_SUPPORT}
+  CheckObjectClassName;
+{$ENDIF}
+end;
+
+procedure TTest_MeThread.Test_InheritsFrom;
+begin
+  Inherited;
+  CheckEquals(True, FMeObject.InheritsFrom(TypeOf(TMeThread)), 'the object should Inherit From TMeThread.');
+  CheckEquals(True, MeInheritsFrom(FMeObject.ClassType, TypeOf(TMeThread)), 'MeInheritsFrom: the object should Inherit From TMeThread.');
+
+  CheckEquals(False, FMeObject.InheritsFrom(TypeOf(TMeList)), 'the object should not Inherit From TMeList.');
 end;
 
 procedure TTest_MeThread.Test_Run;
@@ -124,25 +147,37 @@ var
   I: Integer;
   vTask: PMyTask;
 begin
-  FThread.Priority := tpTimeCritical;
-  vTask := PMyTask(PMeThread(FThread).Task);
-  PMeThread(FThread).Start;
+  PMeThread(FMeObject).Priority := tpTimeCritical;
+  vTask := PMyTask(PMeThread(FMeObject).Task);
+  PMeThread(FMeObject).Start;
   Sleep(50);
   I := -1;
   I := InterlockedExchange(vTask.Count, I);
   CheckEquals(1, I, ' the count is error.');
-  PMeThread(FThread).TerminateAndWaitFor;
+  PMeThread(FMeObject).TerminateAndWaitFor;
 end;
 
 { TTest_MeThreadTimer }
-procedure TTest_MeThreadTimer.SetUp;
+procedure TTest_MeThreadTimer.CreateMeObject;
 begin
-  FThread := New(PMeThreadTimer, Create());
-  with PMeThreadTimer(FThread)^ do
+  FMeObject := New(PMeThreadTimer, Create());
+  with PMeThreadTimer(FMeObject)^ do
   begin
     Interval := 50; //最小精度大约为 50 毫秒.
-    PMeThreadTimer(FThread).OnTimer := DoTimer;
+    PMeThreadTimer(FMeObject).OnTimer := DoTimer;
   end;
+{$IFDEF MeRTTI_SUPPORT}
+  CheckObjectClassName;
+{$ENDIF}
+end;
+
+procedure TTest_MeThreadTimer.Test_InheritsFrom;
+begin
+  Inherited;
+  CheckEquals(True, FMeObject.InheritsFrom(TypeOf(TMeCustomThread)), 'the object should Inherit From TMeCustomThread.');
+  CheckEquals(True, MeInheritsFrom(FMeObject.ClassType, TypeOf(TMeCustomThread)), 'MeInheritsFrom: the object should Inherit From TMeCustomThread.');
+
+  CheckEquals(False, FMeObject.InheritsFrom(TypeOf(TMeList)), 'the object should not Inherit From TMeList.');
 end;
 
 procedure TTest_MeThreadTimer.DoTimer(const Sender: PMeDynamicObject);
@@ -158,14 +193,14 @@ var
   I: Integer;
 begin
   //FThread.Priority := tpTimeCritical;
-  FTick := 1;
-  PMeThreadTimer(FThread).Start;
+  FTick := 0;
+  PMeThreadTimer(FMeObject).Start;
   Sleep(500);
-  PMeThreadTimer(FThread).Stop;
+  PMeThreadTimer(FMeObject).Stop;
   I := -1;
   I := InterlockedExchange(FTick, I);
   CheckEquals(500 div 50, I, ' the count is error.');
-  PMeThread(FThread).TerminateAndWaitFor;
+  PMeThread(FMeObject).TerminateAndWaitFor;
 end;
 
 procedure TMeT.Execute;
@@ -187,30 +222,52 @@ begin
 end;
 
 { TTest_MeCustomThread }
-procedure TTest_MeCustomThread.SetUp;
+procedure TTest_MeCustomThread.Setup;
 begin
-  FThread := New(PMeT, Create(True));
+  if not Assigned(FMeObject) then
+  begin
+    CreateMeObject;
+  end;
 end;
 
-procedure TTest_MeCustomThread.TearDown;
+procedure TTest_MeCustomThread.CreateMeObject;
 begin
-  //FThread.Terminate;
-  //wait for thread Terminated.
-  //FThread.WaitFor;
-  //Sleep(100); 
-  MeFreeAndNil(FThread);
+  FMeObject := New(PMeT, Create(True));
+{$IFDEF MeRTTI_SUPPORT}
+  CheckObjectClassName;
+{$ENDIF}
+end;
+
+{$IFDEF MeRTTI_SUPPORT}
+procedure TTest_MeCustomThread.CheckObjectClassName;
+begin
+  //CheckEquals('TMeDynamicObject', FMeObject.ClassName, 'the MeObject classname is mismatch.');
+  
+  //CheckEquals(Integer(FMeObject), Integer(FindMeObject('TMeDynamicObject')), 'the FindMeObject is Error.');
+end;
+{$ENDIF}
+
+procedure TTest_MeCustomThread.Test_InheritsFrom;
+begin
+  Inherited;
+  //writeln('Test_InheritsFrom');
+  CheckEquals(True, FMeObject.InheritsFrom(TypeOf(TMeAbstractThread)), 'the object should Inherit From TMeAbstractThread.');
+  CheckEquals(True, MeInheritsFrom(FMeObject.ClassType, TypeOf(TMeAbstractThread)), 'MeInheritsFrom: the object should Inherit From TMeAbstractThread.');
+
+  CheckEquals(False, FMeObject.InheritsFrom(TypeOf(TMeList)), 'the object should not Inherit From TMeList.');
 end;
 
 procedure TTest_MeCustomThread.Test_Run();
 var
   I: Integer;
 begin
-  FThread.Priority := tpTimeCritical;
-  FThread.Resume;
+  PMeAbstractThread(FMeObject).Priority := tpTimeCritical;
+  PMeAbstractThread(FMeObject).Resume;
   Sleep(50);
+  //FThread.
   I := -1;
   I := InterlockedExchange(GCount, I);
-  //FThread.Terminate;
+  //PMeAbstractThread(FMeObject).Terminate;
   CheckEquals(1, I, ' the count is error.');
 end;
 
@@ -236,7 +293,7 @@ var
   //vMgr: PMeThreadMgrTask;
 begin
   //vMgr := PMeThreadMgrTask(FThreadMgr.Task);
-  FThreadMgr.Task.TerminatingTimeout := 10;
+  FThreadMgr.Task.TerminatingTimeout := 100;
   FThreadMgr.Start;
   for i := 1 to 3 do
   begin
@@ -259,9 +316,9 @@ end;
 
 Initialization
   {$IFDEF MeRTTI_SUPPORT}
-//  SetMeVirtualMethod(TypeOf(TMeAbstractThread), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeT), ovtVmtClassName, nil);
   {$ENDIF}
-//  SetMeVirtualMethod(TypeOf(TMeAbstractThread), ovtVmtParent, TypeOf(TMeDynamicObject));
+  SetMeVirtualMethod(TypeOf(TMeT), ovtVmtParent, TypeOf(TMeAbstractThread));
 
   AppPath := ExtractFilePath(ParamStr(0));
   RegisterTests('MeThread suites',

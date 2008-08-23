@@ -1244,6 +1244,7 @@ begin
   FTerminated := True;
  {$IFDEF DEBUG}
     {$IFDEF NamedThread}
+      SendDebug('TMeAbstractThread.Terminate');
       if Self.InheritsFrom(TypeOf(TMeCustomThread)) then
         SendDebug(PMeCustomThread(@Self).FName + ' TMeAbstractThread.Terminate')
       else
@@ -1691,7 +1692,7 @@ begin
     raise EMeError.Create(RsThreadTerminateAndWaitFor);
   end;
   Terminate;
-  Start; //resume
+  Resume;
   Result := WaitFor(aTimeout);
 end;
 
@@ -1805,6 +1806,10 @@ begin
   //if not FFreeTask then
     //PMeThread(aThread).Task := nil;
   aThread.FreeOnTerminate := True;
+  
+ {$IFDEF DEBUG}
+  SendDebug('TMeThreadMgrTask.DoThreadException')
+ {$ENDIF}
 end;
 
 procedure TMeThreadMgrTask.DoThreadStopped(const aThread: PMeCustomThread);
@@ -1816,18 +1821,21 @@ begin
  {$ENDIF}
 
     FActiveThreads.Remove(aThread);
-    with FThreadPool.LockList^ do
-    try
-      if Assigned(FOnThreadDone) then
-        FOnThreadDone(PMeThread(aThread));
-      if FFreeTask then
-        MeFreeAndNil(PMeThread(aThread).FTask)
-      else
-        PMeThread(aThread).FTask := nil;
-      Add(aThread);
-    finally
-      FThreadPool.UnlockList;
-    end;
+    //if FIsRunning then
+      with FThreadPool.LockList^ do
+      try
+        if Assigned(FOnThreadDone) then
+          FOnThreadDone(PMeThread(aThread));
+        if FFreeTask then
+          MeFreeAndNil(PMeThread(aThread).FTask)
+        else
+          PMeThread(aThread).FTask := nil;
+        
+        if IndexOf(aThread) < 0 then
+          Add(aThread);
+      finally
+        FThreadPool.UnlockList;
+      end;
   end;
 end;
 
@@ -1882,15 +1890,23 @@ begin
       vEndTick := 0;
     end;
     While ((FTerminatingTimeout = INFINITE) or (vEndTick > GetTickCount)) and (c = FThreadPool.Count)  do
-      MeSleep(20);
+      MeSleep(50);
     
-    if c = FThreadPool.Count then
-    begin
-      //Stopped Timeout
-      FThreadPool.Add(v);
-      {$IFDEF DEBUG}
-      SendDebug({$IFDEF NamedThread}v.FName+{$ENDIF} ' ThreadStop Timeout Force to add the ThreadPool:');
-      {$ENDIF}
+    with FThreadPool.LockList^ do
+    try
+      if c = Count then
+      begin
+        //Stopped Timeout
+        v.OnStopped := nil;
+        v.OnException := nil;
+        if IndexOf(v) < 0 then
+          Add(v);
+        {$IFDEF DEBUG}
+        SendDebug({$IFDEF NamedThread}v.FName+{$ENDIF} ' ThreadStop Timeout Force to add the ThreadPool:');
+        {$ENDIF}
+      end;
+    finally
+      FThreadPool.UnlockList;
     end;
     //while not v.Stopped do //use this will raise Exception !!!
       //Sleep(10);
@@ -1951,6 +1967,30 @@ var
   vThread: PMeThread;
   vTask: PMeTask;
   //i: Integer;
+  procedure RunTask(aTask: PMeTask);
+  begin
+    if Assigned(aTask) then
+    with FThreadPool.LockList^ do
+    try
+      vThread := Popup;
+      if Assigned(vThread) then
+        vThread.Task := aTask
+      else if (FMaxThreads <= 0) or (Count < FMaxThreads) then
+      begin
+        vThread := CreateThread(aTask);
+      end;
+    finally
+      FThreadPool.UnlockList;
+    end;
+    if Assigned(vThread) then
+    begin
+      FActiveThreads.Add(vThread);
+      vThread.Start;
+      //corrects the result
+      if not Result then
+        Result := True;
+    end;
+  end;
 begin
   //Result := True;
   Result := not FAutoStopped or (FActiveThreads.Count > 0);
@@ -1977,42 +2017,24 @@ begin
 
   with FTaskQueue.LockList^ do
   try
-    if Count > 0 then
+    //if Count > 0 then
+    while Count > 0 do
     begin
       vTask := Popup;
+      RunTask(vTask);
     end
+    {
     else
     begin
       //if FAutoStopped then Result := False;
       exit;
-    end
+    end//}
   finally
     FTaskQueue.UnlockList;
   end;
 
-  if Assigned(vTask) then
-  with FThreadPool.LockList^ do
-  try
-    vThread := Popup;
-    if Assigned(vThread) then
-      vThread.Task := vTask
-    else if (FMaxThreads <= 0) or (Count < FMaxThreads) then
-    begin
-      vThread := CreateThread(vTask);
-    end;
-  finally
-    FThreadPool.UnlockList;
-  end;
 
-  if Assigned(vThread) then
-  begin
-    FActiveThreads.Add(vThread);
-    vThread.Start;
-    //corrects the result
-    if not Result then
-      Result := True;
-  end;
-  MeSleep(500);
+  MeSleep(100);
 end;
 
 function TMeThreadMgrTask.Add(const aTask: PMeTask): Boolean;

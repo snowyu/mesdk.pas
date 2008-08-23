@@ -1689,5 +1689,4 @@ initialization
   //SetMeVirtualMethod(TypeOf(TMeScriptCustomExecutor), ovtVmtClassName, nil);
   {$ENDIF}
 
-  InitMeScriptCoreWordList;
 end.
