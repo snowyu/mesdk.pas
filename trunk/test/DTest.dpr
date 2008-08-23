@@ -38,11 +38,11 @@ program DTest;
 
 uses
   {$IFDEF MemCheck}
-    {$IFNDEF COMPILER10_UP}
+    {.$IFNDEF COMPILER10_UP}
       {$IFNDEF CLR}
       FastMM4,
       {$ENDIF}
-    {$ENDIF}
+    {.$ENDIF}
   {$ENDIF}
   {$IFNDEF FPC}
   FastCode,
