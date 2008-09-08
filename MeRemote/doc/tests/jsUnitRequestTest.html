@@ -1,0 +1,70 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>Tests for Request.js</title>
+    <link rel="stylesheet" type="text/css" href="../css/jsUnitStyle.css">
+    <script type="text/javascript" src="../app/jsUnitCore.js"></script>
+		<script type="text/javascript" src="../mootools-1.2-core-NoReq+FX.js"></script>
+    <script type="text/javascript" src="../jsUnitAjax.js"></script>
+    <script type="text/javascript" src="../request.js"></script>
+    <script type="text/javascript">
+
+        Browser.Request = function(){
+      	  return new MockXmlHttpRequest();
+        };
+
+        Browser.Features.xhr = !!(Browser.Request());
+
+        var req;
+
+        function setUp() {
+          req = new Request({url:"http://www.example.com"});
+            //request = new Request();
+        }
+
+        function checkDefaultParams(aReq) {
+        		var headers = {
+        			'X-Requested-With': 'XMLHttpRequest',
+        			'Accept': 'text/javascript, text/html, application/xml, text/xml, */*'
+        		};
+
+            assertEquals("http://www.example.com", aReq.options.url);
+            assertEquals("post", aReq.options.method);
+            assertEquals('callback error:', "callback", aReq.options.CallbackParamName);
+            assertObjectEquals('header error:', headers, aReq.options.headers);
+            assertTrue(aReq.options.async);
+            //assertEquals(true, aReq.options.async);
+            assertEquals(false, aReq.options.emulation);
+        }
+        
+        function checkWithXHR(aReq, aXHR) {
+            assertEquals('xhr url error', aReq.options.url, aXHR.url);
+            assertEquals('xhr http method error', aReq.options.method, aXHR.method.toLowerCase());
+            aReq.headers.each(function(value, key){
+              assertEquals(value, aXHR.requestHeaderNamesToValues[key]);
+            });
+        }
+
+        function testSendRequest() {
+            var vData = "this is a hEllo world data!!";
+            checkDefaultParams(req);
+            assertTrue('IsCrossSite should be true', req.FIsCrossSite);
+            req.FIsCrossSite = false; //Fake to SameSite
+            req.send({data: vData});
+            assertTrue('xhr.sendCalled should be true', req.xhr.sendCalled);
+            assertObjectEquals('data error!', req.toSerialize(vData), req.xhr.data);
+            checkWithXHR(req, req.xhr);
+        }
+
+    </script>
+
+</head>
+
+<body>
+<h1>JsSNDA Request Tests</h1>
+<div align="right">Architect: Riceball LEE(riceballl@hotmail.com)</div>
+
+<p>This page contains tests for the JsSNDA Request library. To see them, take a look at the source.</p>
+</body>
+</html>

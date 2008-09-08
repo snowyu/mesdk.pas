@@ -1,9 +1,13 @@
 /*
 Script: Request.js
-	Powerful all purpose Request Class. Uses XMLHTTPRequest.
+	Powerful all purpose Request Class. Uses XMLHTTPRequest and  Cross-Site Script.
+@Author:   original come from mootools 1.2
+@Author:   Riceball LEE(riceballl@hotmail.com )
 
 License:
 	MIT-style license.
+
+
 */
 
 var cErrorNeedAsyncForCrossSite = 3;
@@ -15,43 +19,83 @@ var cErrorResponseIdUnkonwn = 12;
 //var RequestCount = 0;
 
 var Request = new Class({
+/**
+          实现了对 Http 的GET, POST, PUT, DELETE 请求的功能包装.
+          通过Cross-Site Scrpit实现跨域请求的支持。
+
+          @lends  Http 请求的功能包装类
+          @extends  Chain, Event, Options
+*/
 
   Implements: [Chain, Events, Options],
 
+	/**
+       (object)请求的参数数据
+	*/
 	options: {
-		/*onRequest: $empty,
-		onSuccess: $empty,
-		onFailure: $empty,
-		onException: $empty,*/
+	/**
+		@field url                                 (string: 默认为 null))待请求的URL.
+	*/
 		url: '',
+	/**
+	*/
 		data: '',
+	/**
+		@field headers  	                  (object) 请求发送的HTTP 报头数据
+	*/
 		headers: {
 			'X-Requested-With': 'XMLHttpRequest',
 			'Accept': 'text/javascript, text/html, application/xml, text/xml, */*'
 		},
-    //XSS hack ----------
-    CallbackParamName: 'callback',
-    //XSS hack ----------
+    	//XSS hack ----------
+	/**
+		@field·CallbackParamName   (string: 默认为 "callback"))回调函数名
+	*/
+   	CallbackParamName: 'callback',
+    	//XSS hack ----------
+	/**
+		@field async                           (boolean 默认为 true)是否异步执行调用（跨域总是异步，而且跨域只能是GET）
+	*/
 		async: true,
+	/**
+           @field method                         (string: 默认为 'post') HTTP请求方法, 可以是: get, post, put, delete
+	*/
 		method: 'post',
+	/**
+	*/
 		link: 'ignore',
+	/**
+           @field isSuccess                   (function) 可覆盖内置的isSuccess函数,可自定义请求成功的规则
+	*/
 		isSuccess: null,
-		emulation: true,
+	/**
+	*/
+		emulation: false,
+	/**
+	*/
 		urlEncoded: true,
+	/**
+	*/
 		encoding: 'utf-8',
+	/**
+	*/
 		evalScripts: false,
 		evalResponse: false
 	},
 
+	/*
+           本类中可以被国际化的字符串资源,。
+	*/
   rs: {
     ErrorNeedAsyncForCrossSite : "It is not possible to establish a synchronous connection to a cross-site request.",
     ErrorCrossSiteSupportGetMethodOnly : 'the cross-site request supports the http GET method only.',
     ErrorResponseObject : "The server did not respond with a response object.",
     ErrorResponseIdMissed : "The server did not respond with the required response id for asynchronous calls.",
-    ErrorResponseIdUnkonwn : "Fatal error with RpcClient code: no such ID found in pendingRequests."
+    ErrorResponseIdUnkonwn : "Fatal error with Request code: no such ID found in pendingRequests."
 	},
 
-	initialize: function(options){
+	/** @constructs */
+  initialize: function(options){
 		this.setOptions(options);
 		this.options.isSuccess = this.options.isSuccess || this.isSuccess;
 		this.headers = new Hash(this.options.headers);
@@ -75,11 +119,15 @@ var Request = new Class({
 });
 //XSS hack ----------
 //add the static field.
+//Request.prototype.pendingRequests = {};
+//Request.prototype.Count = 0;
+//Request.prototype.callbacks = {};
 Request['Count'] = 0;
 Request['pendingRequests'] = {};
 Request['callbacks'] = {};
 //XSS hack ----------
 
+//Request 类实现的方法
 Request.implement({
 	onStateChange: function(){
 		if (this.xhr.readyState != 4 || !this.running) return;
@@ -111,7 +159,8 @@ Request.implement({
 		this.onSuccess(this.processScripts(text), xml);
 	},
 	
-	onSuccess: function(){
+	onSuccess: function(a,b){
+     //console.log('OnSuccess: %s',JSON.encode(b))
 		this.fireEvent('complete', arguments).fireEvent('success', arguments).callChain();
 	},
 	
@@ -150,44 +199,6 @@ Request.implement({
 			case 'hash': 
 			  data = Hash.toQueryString(data, method);
 		}
-	  return data;
-	},
-
-	send: function(options){
-    function XRSSend(url, method, data) {
-      this.xhr.open(method.toUpperCase(), url, this.options.async);
-
-  		this.xhr.onreadystatechange = this.onStateChange.bind(this);
-
-  		this.headers.each(function(value, key){
-  			if (!$try(function(){
-  				this.xhr.setRequestHeader(key, value);
-  				return true;
-  			}.bind(this))) this.fireEvent('exception', [key, value]);
-  		}, this);
-
-  		this.fireEvent('request');
-  		this.xhr.send(data);
-  		if (!this.options.async) this.onStateChange();
-    }
-
-		if (!this.check(arguments.callee, options)) return this;
-
-    //XSS hack -------------------------------
-		if (this.FIsCrossSite && options.method != 'get')
-			throw Error({code: cErrorCrossSiteSupportGetMethodOnly, message: this.rs.ErrorCrossSiteSupportGetMethodOnly});
-    //XSS hack -------------------------------
-
-		this.running = true;
-
-		var type = $type(options);
-		if (type == 'string' || type == 'element') options = {data: options};
-
-		var old = this.options;
-		options = $extend({data: old.data, url: old.url, method: old.method}, options);
-		var data = options.data, url = options.url, method = options.method;
-
-    data = this.toSerialize(data, method);
 
 		if (this.options.emulation && ['put', 'delete'].contains(method)){
 			var _method = '_method=' + method;
@@ -200,12 +211,60 @@ Request.implement({
 			this.headers.set('Content-type', 'application/x-www-form-urlencoded' + encoding);
 		}
 
+	  return data;
+	},
+
+  XRSSend: function (url, method, data) {
+    this.xhr.open(method.toUpperCase(), url, this.options.async);
+
+    this.xhr.onreadystatechange = this.onStateChange.bind(this);
+
+    this.headers.each(function(value, key){
+      if (!$try(function(){
+        this.xhr.setRequestHeader(key, value);
+        return true;
+      }.bind(this))) this.fireEvent('exception', [key, value]);
+    }, this);
+
+    this.fireEvent('request');
+    this.xhr.send(data);
+    if (!this.options.async) this.onStateChange();
+  },
+
+	send: function(options){
+
+		if (!this.check(arguments.callee, options)) return this;
+
+    //XSS hack -------------------------------
+		if (this.FIsCrossSite && options.method != 'get')
+			throw Error({code: cErrorCrossSiteSupportGetMethodOnly, message: this.rs.ErrorCrossSiteSupportGetMethodOnly});
+    //XSS hack -------------------------------
+
+		this.running = true;
+    Request.Count++;
+
+		var type = $type(options);
+		if (type == 'string' || type == 'element') options = {data: options};
+
+		var old = this.options;
+		options = $extend({data: old.data, url: old.url, method: old.method}, options);
+		var data = options.data, url = options.url, method = options.method;
+    if (data.params) {
+      if (data.params.CallbackParamName) delete data.params.CallbackParamName;
+      if (!data.params.id) data.params.id = Request.Count;
+    }
+    //console.log('data.CallbackParamName=%s, exists=%s', data['CallbackParamName'], data.hasOwnProperty('CallbackParamName'));
+    //console.log('data type =%s', $type(data));
+
+    //console.log('data:%s', JSON.encode(data));
+    data = this.toSerialize(data, method);
+    //console.log('data:%s', data);
+
 		if (data && method == 'get'){
 			url = url + (url.contains('?') ? '&' : '?') + data;
 			data = null;
 		}
 
-    Request.Count++;
 		//XSS hack ----------------------------------
     if (this.FIsCrossSite) {
   		this.fireEvent('request');
@@ -230,11 +289,11 @@ Request.implement({
       script.setAttribute('src', url);
       script.setAttribute('id', 'RpcClient' + Request.Count);
       var head = document.getElementsByTagName('head')[0];
-      Request.pendingRequests[Request.Count].scriptElement = script;
+      Request.pendingRequests[Request.Count] = script;
       head.appendChild(script);
     }
     else {
-      XRSSend(url, method, data);
+      this.XRSSend(url, method, data);
     }
 		//XSS hack ----------------------------------
 
@@ -265,8 +324,8 @@ Request.implement({
   		throw Error({code: cErrorResponseIdUnkonwn, message: rsErrorResponseIdUnkonwn});
   	
   	//Remove the SCRIPT element from the DOM tree for cross-site (JSON-in-Script) requests
-  	if(Request.pendingRequests[response.id].scriptElement){
-  		var script = Request.pendingRequests[response.id].scriptElement;
+  	if(Request.pendingRequests[response.id]){
+  		var script = Request.pendingRequests[response.id];
   		script.parentNode.removeChild(script);
   	}
   	//Remove the ad hoc cross-site callback function
@@ -294,11 +353,13 @@ Request.implement({
   	}
   	else {
     	//Process the valid result
-			this.response = {text: response, xml: null};
- 			this.success(response, null);
+      //console.log("success!");
+			this.response = {text: response, xml: response};
+ 			this.success(response);
+      //console.log("The success response(%d): %s", requestId, JSON.encode(response));
   	}
   	
-  	delete RpcClient.pendingRequests[response.id];
+  	delete Request.pendingRequests[response.id];
   	
   	//Merge any exception raised by onComplete into the previous one(s) and throw it
   	if(uncaughtExceptions.length){
@@ -318,6 +379,7 @@ Request.implement({
   		}
   		var err = new Error(message);
   		err.code = code;	
+      //console.log("The err response(%d): %s", requestId, message);
   		throw err;
   	}
   }
@@ -489,10 +551,26 @@ Request.JSON = new Class({
       default :
   	    return this.parent(data, method);
     }
+
+		if (this.options.emulation && ['put', 'delete'].contains(method)){
+			var _method = '_method=' + method;
+			data = (data) ? _method + '&' + data : _method;
+			method = 'post';
+		}
+
+		if (this.options.urlEncoded && method == 'post'){
+			var encoding = (this.options.encoding) ? '; charset=' + this.options.encoding : '';
+			this.headers.set('Content-type', 'application/x-www-form-urlencoded' + encoding);
+		}
+    
 	},
 
 	success: function(text){
-		this.response.json = JSON.decode(text, this.options.secure);
+    //console.log('Success: %s',JSON.encode(text))
+    if (!text instanceof Object)
+		  this.response.json = JSON.decode(text, this.options.secure)
+    else
+      this.response.json = text;
 		this.onSuccess(this.response.json, text);
 	},
 
