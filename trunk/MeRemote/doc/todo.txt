@@ -1,4 +1,16 @@
-﻿2008-8-20
+﻿2008-9-8
+
+2008-9-3
+* dynamic services discovering
+* remote error monitor
+* distributed services manager
+
+mootools(不包括Request).
+
+http://www.scalix.com/
+http://elgg.org/
+
+2008-8-20
 Request:
   url
     IsCrossSite
