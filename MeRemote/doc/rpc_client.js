@@ -1,20 +1,12 @@
 /*
- * JSON/XML-RpcClient JavaScript Client for WebBrowser
+ * the RpcClient JavaScript  for WebBrowser
  * Version: 1.0.0.0 (2008-6-28)
- * Copyright: 2007, Weston Ruter <http://weston.ruter.net/>
  * Copyright: 2008, Riceball LEE
  * The Original Code is $RCSfile: RpcClient.js ,v $.
  * License: GNU General Public License, Free Software Foundation<http://creativecommons.org/licenses/GPL/2.0/>
  *          or LGPL3 GNU LESSER GENERAL PUBLIC LICENSE<http://www.opensource.org/licenses/lgpl-3.0.html>
  *          or MPL 1.1 Mozilla Public License<http://www.mozilla.org/MPL/MPL-1.1.html>
  *
- * Original inspiration for the design of this implementation is from jsolait, from which 
- * are taken the "Service" name and the interface for synchronous method calls.
- * 
- * See the following specifications:
- *   - XML-RpcClient: <http://www.xmlrpc.com/spec>
- *   - JSON-RpcClient 1.0: <http://json-RpcClient.org/wiki/specification>
- *   - JSON-RpcClient 1.1 (draft): <http://json-RpcClient.org/wd/JSON-RpcClient-1-1-WD-20060807.html>
  *
  * Usage:
  * var rpc = new RpcClient.Service("/app/service", {
@@ -48,184 +40,13 @@
 
  */
 
-/** helper function for inject */
-function Arguments(args) {
-  //convert arguments object to array
-  this.value = [].slice.call(args);
-}
-/**
-  @desc  inject the function
-  @param aOrgFunc     the original function to be injected.
-  @param aBeforeExec  this is called before the execution of the aOrgFunc.
-                      you must return the arguments(new Arguments(arguments)) if you wanna modify the arguments value of the aOrgFunc.
-                      it will stop the execution of the aOrgFunc if you return a value not an Arguments object nor a undefined value 
-  @param aAtferExec   this is called after the execution of the aOrgFunc.
-                      you must add a result argument at the last argument of the aAtferExec function if you wanna get the result value of the aOrgFunc.
-                      you must add a isDenied argument following the result argument if you wanna know whether the aOrgFunc is executed.
-                      you must return the result if you wanna modify the result value of the aOrgFunc .
 
-  @Usage  Obj.prototype.Method = Inject(Obj.prototype.Method, aFunctionBeforeExec[, aFunctionAtferExec]);
-  @version 1.1
-  @author  Aimingoo&Riceball
-  @history
-    V1.0 -- fiest released.
-    V1.1 -- 
-      Supports to denie the aOrgFunc execution in aBeforeExec.
-      Supports around in the aAtferExec, the aAtferExec be always executed even though denie the aOrgFunc execution in aBeforeExec.
-        + isDenied argument to the aAtferExec function. notice the aAtferExec whether the aOrgFunc is executed
-
-  eg:
-  var doTest = function (a) {return a};
-  function beforeTest(a) { alert('before exec: a='+a); a += 3; return new Arguments(arguments);};
-  function afterTest(a, result, isDenied) { alert('after exec: a='+a+'; result='+result+';isDenied='+isDenied); return result+5;};
-  
-  doTest = Inject(doTest, beforeTest, afterTest);
-  
-  alert (doTest(2));
-  the result should be 10.
-
-*/
-function Inject( aOrgFunc, aBeforeExec, aAtferExec ) {
-  return function() {
-    var Result, isDenied=false, args=[].slice.call(arguments);
-    if (typeof(aBeforeExec) == 'function') {
-      Result = aBeforeExec.apply(this, args);
-      if (Result instanceof Arguments) //(Result.constructor === Arguments)
-        args = Result.value;
-      else if (isDenied = Result !== undefined)
-        args.push(Result)
-    }
-
-    !isDenied && args.push(aOrgFunc.apply(this, args)); //if (!isDenied) args.push(aOrgFunc.apply(this, args));
-
-    if (typeof(aAtferExec) == 'function')
-      Result = aAtferExec.apply(this, args.concat(isDenied));
-    else 
-      Result = undefined;
-
-    return (Result !== undefined ? Result : args.pop());
-  }
-};
-
-var cErrorCanNotSanitized = 1;
-var cErrorXMLCanNotCrossSite = 2;
-var cErrorNeedAsyncForCrossSite = 3;
-var cErrorAPINamesRequired  = 4;
-var cErrorSuccessHandler    = 5;
-var cErrorExceptionHandler  = 6;
-var cErrorCompleteHandler   = 7;
-var cErrorAsyncParamType    = 8;
-var cErrorXMLParamsType     = 9;
-var cErrorResponseObject    = 10;
-var cErrorResponseIdMissed  = 11;
-var cErrorResponseIdUnkonwn = 12;
-var cErrorQueryStringParamType = 13;
-var cErrorQueryStringParamNestedType = 14;
-var cErrorQueryStringParamObjectType = 15;
-var cErrorXMLDoubleTypeInvalid = 16;
-var cErrorXMLBoolTypeInvalid   = 17;
-var cErrorXMLISODateTypeInvalid = 18;
-var cErrorBase64FuncNotInstalled = 19;
-var cErrorXMLArrayDataMissed = 20;
-var cErrorXMLArrayValueMissed = 21;
-var cErrorXMLArrayIllegalElement = 22;
-var cErrorXMLDocRequired = 23;
-var cErrorXMLRpcDocInvalid = 24;
-var cErrorXMLMethodResponse = 25;
-
-
- /*
- * the function createXMLHttp() modified from
- * http://webfx.eae.net/dhtml/xmlextras/xmlextras.html and
- * http://www.ugia.cn/?p=85
- */
-//patch the Browser.Request of the Mootools .
-Browser['__XHRNameCache'] = null;
-Browser.Request = function () {
-  if (window.XMLHttpRequest) {
-      var objXMLHttp = new XMLHttpRequest();
-      // some older versions of Moz did not support the readyState property
-      // and the onreadystate event so we patch it!
-      if (objXMLHttp.readyState == null) {
-          objXMLHttp.readyState = 0;
-          objXMLHttp.addEventListener(
-              "load",
-              function () {
-                  objXMLHttp.readyState = 4;
-                  if (typeof(objXMLHttp.onreadystatechange) == "function") {
-                      objXMLHttp.onreadystatechange();
-                  }
-              },
-              false
-          );
-      }
-      return objXMLHttp;
-  }
-  else if (Browser.__XHRNameCache != null) {
-      // Use the cache name first.
-       return new ActiveXObject(Browser.__XHRNameCache);
-  }
-  else {
-      var MSXML = ['MSXML2.XMLHTTP.6.0',
-                   'MSXML2.XMLHTTP.5.0',
-                   'MSXML2.XMLHTTP.4.0',
-                   'MSXML2.XMLHTTP.3.0',
-                   'MsXML2.XMLHTTP.2.6',
-                   'MSXML2.XMLHTTP',
-                   'Microsoft.XMLHTTP.1.0',
-                   'Microsoft.XMLHTTP.1',
-                   'Microsoft.XMLHTTP'];
-      var n = MSXML.length;
-      for(var i = 0; i < n; i++) {
-          try {
-              objXMLHttp = new ActiveXObject(MSXML[i]);
-              // Cache the XMLHttp ActiveX object name.
-              Browser.__XHRNameCache = MSXML[i];
-              return objXMLHttp;
-          }
-          catch(e) {}
-      }
-      return null;
-  }
-};
-Browser.Features.xhr = !!(Browser.Request());
-
-var RpcClient = {
+ var RpcClient = {
   //public members
 	Version:"1.0.0.0",	
-	RequestCount: 0,
   //resource stirng
   rs: {
-    ErrorCanNotSanitized : "You are attempting to access a service on another site, and the JSON data returned " +
-            "by cross-site requests cannot be sanitized. You must therefore explicitly set the " +
-            "'Sanitize' option to false (it is true by default) in order to proceed with making " +
-            "potentially insecure cross-site RpcClient calls.",
-    ErrorXMLCanNotCrossSite : "Unable to use the XML-RpcClient protocol to access services on other domains.",
-    ErrorNeedAsyncForCrossSite : "It is not possible to establish a synchronous connection to a cross-site RpcClient service.",
-    ErrorAPINamesRequired : "You must manually supply the service's method names since auto-introspection is not permitted for cross-site services.",
-    ErrorAsyncHandler : "The asynchronous handler callback function you provided is invalid",
-    ErrorAsyncParamType : "When making asynchronous calls, the parameters for the method must be passed as an array (or a hash)",
-    ErrorXMLParamsType :  "Unable to pass associative arrays to XML-RpcClient services.",
-    ErrorResponseObject : "The server did not respond with a response object.",
-    ErrorResponseIdMissed : "The server did not respond with the required response id for asynchronous calls.",
-    ErrorResponseIdUnkonwn : "Fatal error with RpcClient code: no such ID found in pendingRequests.",
-    ErrorQueryStringParamType : "You must supply either an array ,date or object type to convert into a query string. ",
-    ErrorQueryStringParamNestedType : "Unable to pass nested arrays nor objects as parameters while in making a cross-site request.",
-    ErrorBase64FuncNotInstalled : "Not able to parse base64 data yet.",
-    ErrorXMLArrayDataMissed : "XML-Rpc Parse Error: Expected 'data' element as sole child element of 'array'.",
-    ErrorXMLArrayIllegalElement : "XML-RpcClient Parse Error: Illegal element.",
-    ErrorXMLDocRequired : "Malformed XML document.",
-    ErrorXMLRpcDocInvalid : "Invalid XML-Rpc document.",
-    ErrorXMLMethodResponse : "Malformed XML-Rpc methodResponse document.",
-    ErrorQueryStringParamObjectType : "Unable to pass objects as parameters while in making a cross-site request."
   },
-
-  //This acts as a lookup table for the response callback to execute the user-defined
-  //   callbacks and to clean up after a request
-  pendingRequests: {},
-  //Ad hoc cross-site callback functions keyed by request ID; when a cross-site request
-  //   is made, a function is created 
-  callbacks: {},
 
   //Takes an array or hash and coverts it into a query string, converting dates to ISO8601
   //   and throwing an exception if nested hashes or nested arrays appear.
@@ -310,10 +131,10 @@ var RpcClient = {
     var result = 'ERROR occur, the error';
     switch ($type(e)) {
       case 'object' :
-        result += 'id:'+ e['id'] + ' msg:' + e['msg'];
+        result += 'id:'+ e['code'] + ' msg:' + e['message'];
         break;
       case 'string':
-        result += ' msg:' + e;
+        result += ' message:' + e;
         break;
     };
     return result;
@@ -322,66 +143,34 @@ var RpcClient = {
 
 
 RpcClient.Service = new Class({
-  RequestCount: 0,
 	Implements: [Chain, Events, Options],
-  
 	options: {
-		//url: '',
-		data: '',
-		headers: {
-			'X-Requested-With': 'XMLHttpRequest',
-			'Accept': 'text/javascript, text/html, application/xml, text/xml, */*'
-		},
-		IsAsync: true,
-		format: false,
-		methods: '',
-		link: 'ignore',
-		isSuccess: null,
-		emulation: true,
-		urlEncoded: true,
     Sanitize: true,
     User: null,
     Password: null,
-    CallbackParamName: 'JSON-response-callback',
     DateEncoding: 'ISO8601',
-    DecodeISO8601: true,
-		encoding: 'utf-8',
-		evalScripts: false,
-		evalResponse: false
+    DecodeISO8601: true
 	},
   
-  initialize: function(serviceURL, options){
+  initialize: function(options){
 		//this.xhr = new Browser.Request();
+    this.request = new Request(options);
 		this.setOptions(options);
-    this.FServiceURL = serviceURL;
-    //this.options.url = serviceURL;
-		this.options.isSuccess = this.options.isSuccess || this.isSuccess;
-		this.headers = new Hash(this.options.headers);
-  
-  	this.FIsCrossSite = false;
-  	var vUrlParts = this.FServiceURL.match(/^(\w+:)\/\/([^\/]+?)(?::(\d+))?(?:$|\/)/);
-  	if(vUrlParts){
-  		this.FIsCrossSite = (
-  			location.protocol !=  vUrlParts[1] ||
-  			document.domain   !=  vUrlParts[2] ||
-  			location.port     != (vUrlParts[3] || "")
-  		);
-  	};
-		if (!this.options.IsAsync && this.FIsCrossSite)
-			throw Error({id: cErrorNeedAsyncForCrossSite, msg: RpcClient.rs.ErrorNeedAsyncForCrossSite});
+
 
     var vProvidedMethodList = options.Methods;
 
   	if(this.FIsCrossSite){
   		if(this.options.Sanitize){
-  			throw Error({id: cErrorCanNotSanitized, msg: RpcClient.rs.ErrorCanNotSanitized});
+  			throw Error({code: cErrorCanNotSanitized, message: RpcClient.rs.ErrorCanNotSanitized});
   		}
   	}
 
   	//Obtain the list of methods made available by the server
   	if(this.FIsCrossSite && !vProvidedMethodList)
-  		throw Error({id: cErrorAPINamesRequired, msg: RpcClient.rs.ErrorAPINamesRequired});
-  	if(vProvidedMethodList)
+  		throw Error({code: cErrorAPINamesRequired, message: RpcClient.rs.ErrorAPINamesRequired});
+
+    if(vProvidedMethodList)
   		this.FMethodList = vProvidedMethodList;
   	else {
   		//Introspection must be performed synchronously
