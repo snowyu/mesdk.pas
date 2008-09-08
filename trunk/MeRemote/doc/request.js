@@ -1,8 +1,9 @@
 /*
 Script: Request.js
-	Powerful all purpose Request Class. Uses XMLHTTPRequest and  Cross-Site Script.
+@fileOverview Powerful all purpose Request Class. Uses XMLHTTPRequest and  Cross-Site Script.
 @Author:   original come from mootools 1.2
 @Author:   Riceball LEE(riceballl@hotmail.com )
+@version   1.0.0.0
 
 License:
 	MIT-style license.
@@ -10,11 +11,21 @@ License:
 
 */
 
+/**@constant */
 var cErrorNeedAsyncForCrossSite = 3;
+/**@constant */
 var cErrorCrossSiteSupportGetMethodOnly = 4;
+/**@constant */
 var cErrorResponseObject    = 10;
+/**@constant */
 var cErrorResponseIdMissed  = 11;
+/**@constant */
 var cErrorResponseIdUnkonwn = 12;
+/**@constant */
+var cErrorReturnStatusCode  = 13;
+/**@constant */
+var cErrorCanNotSetRequestHeader = 14;
+
 
 //var RequestCount = 0;
 
@@ -25,6 +36,18 @@ var Request = new Class({
 
           @lends  Http 请求的功能包装类
           @extends  Chain, Event, Options
+          @example
+	           var vRequest = new Request({url: vServiceURL+"/"+vMethodName, CallbackParamName:'callback', onComplete: function(aResult){
+	  	      $("result").set('text', JSON.encode(aResult));
+		}});
+		or
+	           var vRequest = new Request({url: vServiceURL+"/"+vMethodName, CallbackParamName:'callback' });
+		function onComplete(aResult){
+	  	      $("result").set('text', JSON.encode(aResult));
+		}
+		vRequest.addEvent('complete', onComplete);
+	@events
+	  onException, onComplete, onFailure
 */
 
   Implements: [Chain, Events, Options],
@@ -66,6 +89,7 @@ var Request = new Class({
 		link: 'ignore',
 	/**
            @field isSuccess                   (function) 可覆盖内置的isSuccess函数,可自定义请求成功的规则
+		   isSuccess(this, this.Status): Boolean
 	*/
 		isSuccess: null,
 	/**
@@ -85,13 +109,16 @@ var Request = new Class({
 
 	/*
            本类中可以被国际化的字符串资源,。
+           @constant
 	*/
   rs: {
     ErrorNeedAsyncForCrossSite : "It is not possible to establish a synchronous connection to a cross-site request.",
     ErrorCrossSiteSupportGetMethodOnly : 'the cross-site request supports the http GET method only.',
     ErrorResponseObject : "The server did not respond with a response object.",
     ErrorResponseIdMissed : "The server did not respond with the required response id for asynchronous calls.",
-    ErrorResponseIdUnkonwn : "Fatal error with Request code: no such ID found in pendingRequests."
+    ErrorResponseIdUnkonwn : "Fatal error with Request code: no such ID found in pendingRequests.",
+	ErrorReturnStatusCode : 'Fatal Return Status Code Error:',
+	ErrorCanNotSetRequestHeader : 'Error Can not Set RequestHeader'
 	},
 
 	/** @constructs */
@@ -102,7 +129,7 @@ var Request = new Class({
 
   	//XSS hack----------------------------------
     this.FIsCrossSite = false;
-  	var vUrlParts = this.options.url.match(/^(\w+:)\/\/([^\/]+?)(?::(\d+))?(?:$|\/)/);
+  	var vUrlParts = this.options.url.match(/^(\w+:)\/\/([^\/:]+?)(?::(\d+))?(?:$|\/)/);
   	if(vUrlParts){
   		this.FIsCrossSite = (
   			location.protocol !=  vUrlParts[1] ||
@@ -110,6 +137,7 @@ var Request = new Class({
   			location.port     != (vUrlParts[3] || "")
   		);
   	};
+    //console.log(this.FIsCrossSite);
 		if (!this.options.async && this.FIsCrossSite)
 			throw Error({code: cErrorNeedAsyncForCrossSite, message: this.rs.ErrorNeedAsyncForCrossSite});
     //XSS hack -------------------------------
@@ -119,9 +147,7 @@ var Request = new Class({
 });
 //XSS hack ----------
 //add the static field.
-//Request.prototype.pendingRequests = {};
-//Request.prototype.Count = 0;
-//Request.prototype.callbacks = {};
+/** 类变量 请求发生的次数  */
 Request['Count'] = 0;
 Request['pendingRequests'] = {};
 Request['callbacks'] = {};
@@ -136,18 +162,30 @@ Request.implement({
 		$try(function(){
 			this.status = this.xhr.status;
 		}.bind(this));
-		if (this.options.isSuccess.call(this, this.status)){
-			this.response = {text: this.xhr.responseText, xml: this.xhr.responseXML};
-			this.success(this.response.text, this.response.xml);
-		} else {
-			this.response = {text: null, xml: null};
-			this.failure();
+		try{
+			if (this.options.isSuccess.call(this, this.status)){
+				this.response = {text: this.xhr.responseText, xml: this.xhr.responseXML};
+				this.success(this.response.text, this.response.xml);
+			} else {
+				this.response = {text: null, xml: null};
+				this.failure({code: cErrorReturnStatusCode, message: this.rs.ErrorReturnStatusCode + this.status, object: this.xhr});
+			}
+		}
+		catch(e) {
+		  this.failure(e);
+		  //this.fireEvent('exception', e);
 		}
 		this.xhr.onreadystatechange = $empty;
 	},
 
 	isSuccess: function(){
-		return ((this.status >= 200) && (this.status < 300));
+	    if ((this.status >= 200) && (this.status < 300))
+		  return true
+		else {
+		  throw Error({code: cErrorReturnStatusCode, message: this.rs.ErrorReturnStatusCode + this.status});
+		  return false;
+		}
+
 	},
 
 	processScripts: function(text){
@@ -158,18 +196,18 @@ Request.implement({
 	success: function(text, xml){
 		this.onSuccess(this.processScripts(text), xml);
 	},
-	
-	onSuccess: function(a,b){
+
+	onSuccess: function(){
      //console.log('OnSuccess: %s',JSON.encode(b))
 		this.fireEvent('complete', arguments).fireEvent('success', arguments).callChain();
 	},
-	
-	failure: function(){
-		this.onFailure();
+
+	failure: function(aError){
+		this.onFailure(aError);
 	},
 
 	onFailure: function(){
-		this.fireEvent('complete').fireEvent('failure', this.xhr);
+		this.fireEvent('complete', arguments).fireEvent('failure', arguments);
 	},
 
 	setHeader: function(name, value){
@@ -195,8 +233,8 @@ Request.implement({
 	toSerialize: function(data, method){
 		switch ($type(data)){
 			case 'element': data = $(data).toQueryString(); break;
-			case 'object': 
-			case 'hash': 
+			case 'object':
+			case 'hash':
 			  data = Hash.toQueryString(data, method);
 		}
 
@@ -223,7 +261,7 @@ Request.implement({
       if (!$try(function(){
         this.xhr.setRequestHeader(key, value);
         return true;
-      }.bind(this))) this.fireEvent('exception', [key, value]);
+      }.bind(this))) this.failure({code: cErrorCanNotSetRequestHeader, message: ErrorCanNotSetRequestHeader+ ' Key:'+ key +  ' value:'+ value});//this.fireEvent('exception', {code: cErrorCanNotSetRequestHeader, message: ErrorCanNotSetRequestHeader+ ' Key:'+ key +  ' value:'+ value});
     }, this);
 
     this.fireEvent('request');
@@ -231,7 +269,11 @@ Request.implement({
     if (!this.options.async) this.onStateChange();
   },
 
-	send: function(options){
+	/**
+        Send(someData);
+        Send({data: someData, url:'api.sdo.com'}
+      */
+  send: function(options){
 
 		if (!this.check(arguments.callee, options)) return this;
 
@@ -281,7 +323,7 @@ Request.implement({
           }
         }
       })(this, Request.Count);
-      
+
       //Make the request by adding a SCRIPT element to the page
       var script = document.createElement('script');
       script.setAttribute('type', 'text/javascript');
@@ -303,6 +345,8 @@ Request.implement({
 	cancel: function(){
 		if (!this.running) return this;
 		this.running = false;
+    if (this.FIsCrossSite) {
+    }
 		this.xhr.abort();
 		this.xhr.onreadystatechange = $empty;
 		this.xhr = new Browser.Request();
@@ -322,7 +366,7 @@ Request.implement({
   	if(!Request.pendingRequests[response.id])
   	  //'Fatal error with RpcClient code: no such ID "' + response.id + '" found in pendingRequests.'
   		throw Error({code: cErrorResponseIdUnkonwn, message: rsErrorResponseIdUnkonwn});
-  	
+
   	//Remove the SCRIPT element from the DOM tree for cross-site (JSON-in-Script) requests
   	if(Request.pendingRequests[response.id]){
   		var script = Request.pendingRequests[response.id];
@@ -331,9 +375,9 @@ Request.implement({
   	//Remove the ad hoc cross-site callback function
   	if(Request.callbacks[response.id])
   		delete Request.callbacks['r' + response.id];
-  	
+
   	var uncaughtExceptions = [];
-  	
+
   	//Handle errors returned by the server
   	if(response.error !== undefined){
   		var err = new Error(response.error.message);
@@ -358,9 +402,9 @@ Request.implement({
  			this.success(response);
       //console.log("The success response(%d): %s", requestId, JSON.encode(response));
   	}
-  	
+
   	delete Request.pendingRequests[response.id];
-  	
+
   	//Merge any exception raised by onComplete into the previous one(s) and throw it
   	if(uncaughtExceptions.length){
 			this.response = {text: null, xml: null};
@@ -378,7 +422,7 @@ Request.implement({
   				code = uncaughtExceptions[i].code;
   		}
   		var err = new Error(message);
-  		err.code = code;	
+  		err.code = code;
       //console.log("The err response(%d): %s", requestId, message);
   		throw err;
   	}
@@ -449,9 +493,9 @@ Request.HTML = new Class({
 	processHTML: function(text){
 		var match = text.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
 		text = (match) ? match[1] : text;
-		
+
 		var container = new Element('div');
-		
+
 		return $try(function(){
 			var root = '<root>' + text + '</root>', doc;
 			if (Browser.Engine.trident){
@@ -472,27 +516,27 @@ Request.HTML = new Class({
 
 	success: function(text){
 		var options = this.options, response = this.response;
-		
+
 		response.html = text.stripScripts(function(script){
 			response.javascript = script;
 		});
-		
+
 		var temp = this.processHTML(response.html);
-		
+
 		response.tree = temp.childNodes;
 		response.elements = temp.getElements('*');
-		
+
 		if (options.filter) response.tree = response.elements.filter(options.filter);
 		if (options.update) $(options.update).empty().adopt(response.tree);
 		if (options.evalScripts) $exec(response.javascript);
-		
+
 		this.onSuccess(response.tree, response.elements, response.html, response.javascript);
 	}
 
 });
 
 Element.Properties.load = {
-	
+
 	set: function(options){
 		var load = this.retrieve('load');
 		if (load) send.cancel();
@@ -510,7 +554,7 @@ Element.Properties.load = {
 };
 
 Element.implement({
-	
+
 	load: function(){
 		this.get('load').send(Array.link(arguments, {data: Object.type, url: String.type}));
 		return this;
@@ -562,7 +606,7 @@ Request.JSON = new Class({
 			var encoding = (this.options.encoding) ? '; charset=' + this.options.encoding : '';
 			this.headers.set('Content-type', 'application/x-www-form-urlencoded' + encoding);
 		}
-    
+
 	},
 
 	success: function(text){
@@ -581,8 +625,8 @@ Request.JSON = new Class({
       //alert('key='+key+' value=' + value);
 			var result;
 			switch ($type(value)){
-				case 'object': 
-          result = Hash.toQueryString(value); 
+				case 'object':
+          result = Hash.toQueryString(value);
           break;
 				case 'array':
 					var qs = {};
@@ -591,12 +635,12 @@ Request.JSON = new Class({
 					});
 					result = Hash.toQueryString(value);
 				  break;
-				default: 
+				default:
           result = key + '=' + encodeURIComponent(value);
 			}
 			if (value != undefined) queryString.push(result);
 		});
-		
+
 		return queryString.join('&');
 	},
 
@@ -611,5 +655,5 @@ Request.JSON = new Class({
   	//}
   	//throw Error("Unable to convert to an array the value: " + String(value));
   }
-  
+
 });
