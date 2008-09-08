@@ -1,4 +1,4 @@
-/*
+ï»¿/*
 Script: Request.js
 @fileOverview Powerful all purpose Request Class. Uses XMLHTTPRequest and  Cross-Site Script.
 @Author:   original come from mootools 1.2
@@ -29,42 +29,44 @@ var cErrorCanNotSetRequestHeader = 14;
 
 //var RequestCount = 0;
 
-var Request = new Class({
 /**
-          ÊµÏÖÁË¶Ô Http µÄGET, POST, PUT, DELETE ÇëÇóµÄ¹¦ÄÜ°ü×°.
-          Í¨¹ıCross-Site ScrpitÊµÏÖ¿çÓòÇëÇóµÄÖ§³Ö¡£
+          å®ç°äº†å¯¹ Http çš„GET, POST, PUT, DELETE è¯·æ±‚çš„åŠŸèƒ½åŒ…è£….
+          é€šè¿‡Cross-Site Scrpitå®ç°è·¨åŸŸè¯·æ±‚çš„æ”¯æŒã€‚
 
-          @lends  Http ÇëÇóµÄ¹¦ÄÜ°ü×°Àà
-          @extends  Chain, Event, Options
+          @name Request
+          @class  Http è¯·æ±‚çš„åŠŸèƒ½åŒ…è£…ç±»
+          //extends  Chain, Event, Options
           @example
-	           var vRequest = new Request({url: vServiceURL+"/"+vMethodName, CallbackParamName:'callback', onComplete: function(aResult){
-	  	      $("result").set('text', JSON.encode(aResult));
-		}});
-		or
-	           var vRequest = new Request({url: vServiceURL+"/"+vMethodName, CallbackParamName:'callback' });
-		function onComplete(aResult){
-	  	      $("result").set('text', JSON.encode(aResult));
-		}
-		vRequest.addEvent('complete', onComplete);
+ var vRequest = new Request({url: vServiceURL, CallbackParamName:'callback'
+   , onComplete: function(aResult){
+  $("result").set('text', JSON.encode(aResult));
+  }});
+          @example
+ var vRequest = new Request({url: vServiceURL, CallbackParamName:'callback' });
+  function onComplete(aResult){
+          $("result").set('text', JSON.encode(aResult));
+  }
+  vRequest.addEvent('complete', onComplete);
 	@events
 	  onException, onComplete, onFailure
 */
+var Request = new Class({
 
   Implements: [Chain, Events, Options],
 
 	/**
-       (object)ÇëÇóµÄ²ÎÊıÊı¾İ
+       (object)è¯·æ±‚çš„å‚æ•°æ•°æ®
 	*/
 	options: {
 	/**
-		@field url                                 (string: Ä¬ÈÏÎª null))´ıÇëÇóµÄURL.
+		       (string: é»˜è®¤ä¸º null))å¾…è¯·æ±‚çš„URL.
 	*/
 		url: '',
 	/**
 	*/
 		data: '',
 	/**
-		@field headers  	                  (object) ÇëÇó·¢ËÍµÄHTTP ±¨Í·Êı¾İ
+		(object) è¯·æ±‚å‘é€çš„HTTP æŠ¥å¤´æ•°æ®
 	*/
 		headers: {
 			'X-Requested-With': 'XMLHttpRequest',
@@ -72,23 +74,23 @@ var Request = new Class({
 		},
     	//XSS hack ----------
 	/**
-		@field¡¤CallbackParamName   (string: Ä¬ÈÏÎª "callback"))»Øµ÷º¯ÊıÃû
+		   (string: é»˜è®¤ä¸º "callback"))å›è°ƒå‡½æ•°å
 	*/
    	CallbackParamName: 'callback',
     	//XSS hack ----------
 	/**
-		@field async                           (boolean Ä¬ÈÏÎª true)ÊÇ·ñÒì²½Ö´ĞĞµ÷ÓÃ£¨¿çÓò×ÜÊÇÒì²½£¬¶øÇÒ¿çÓòÖ»ÄÜÊÇGET£©
+		(boolean é»˜è®¤ä¸º true)æ˜¯å¦å¼‚æ­¥æ‰§è¡Œè°ƒç”¨ï¼ˆè·¨åŸŸæ€»æ˜¯å¼‚æ­¥ï¼Œè€Œä¸”è·¨åŸŸåªèƒ½æ˜¯GETï¼‰
 	*/
 		async: true,
 	/**
-           @field method                         (string: Ä¬ÈÏÎª 'post') HTTPÇëÇó·½·¨, ¿ÉÒÔÊÇ: get, post, put, delete
+           string: é»˜è®¤ä¸º 'post') HTTPè¯·æ±‚æ–¹æ³•, å¯ä»¥æ˜¯: get, post, put, delete
 	*/
 		method: 'post',
 	/**
 	*/
 		link: 'ignore',
 	/**
-           @field isSuccess                   (function) ¿É¸²¸ÇÄÚÖÃµÄisSuccessº¯Êı,¿É×Ô¶¨ÒåÇëÇó³É¹¦µÄ¹æÔò
+           (function) å¯è¦†ç›–å†…ç½®çš„isSuccesså‡½æ•°,å¯è‡ªå®šä¹‰è¯·æ±‚æˆåŠŸçš„è§„åˆ™
 		   isSuccess(this, this.Status): Boolean
 	*/
 		isSuccess: null,
@@ -108,7 +110,7 @@ var Request = new Class({
 	},
 
 	/*
-           ±¾ÀàÖĞ¿ÉÒÔ±»¹ú¼Ê»¯µÄ×Ö·û´®×ÊÔ´,¡£
+           æœ¬ç±»ä¸­å¯ä»¥è¢«å›½é™…åŒ–çš„å­—ç¬¦ä¸²èµ„æº,ã€‚
            @constant
 	*/
   rs: {
@@ -121,7 +123,10 @@ var Request = new Class({
 	ErrorCanNotSetRequestHeader : 'Error Can not Set RequestHeader'
 	},
 
-	/** @constructs */
+	/** 
+     @construct 
+	@memberOf Request
+    */
   initialize: function(options){
 		this.setOptions(options);
 		this.options.isSuccess = this.options.isSuccess || this.isSuccess;
@@ -147,13 +152,13 @@ var Request = new Class({
 });
 //XSS hack ----------
 //add the static field.
-/** Àà±äÁ¿ ÇëÇó·¢ÉúµÄ´ÎÊı  */
+/** ç±»å˜é‡ è¯·æ±‚å‘ç”Ÿçš„æ¬¡æ•°  */
 Request['Count'] = 0;
 Request['pendingRequests'] = {};
 Request['callbacks'] = {};
 //XSS hack ----------
 
-//Request ÀàÊµÏÖµÄ·½·¨
+//Request ç±»å®ç°çš„æ–¹æ³•
 Request.implement({
 	onStateChange: function(){
 		if (this.xhr.readyState != 4 || !this.running) return;
@@ -269,10 +274,15 @@ Request.implement({
     if (!this.options.async) this.onStateChange();
   },
 
-	/**
+  /**
+         @function
+         @name Send
+         @param options (object) the send data or options.
+        @memberOf Request
+        @example
+        Send({data: someData, url:'api.sdo.com'})
         Send(someData);
-        Send({data: someData, url:'api.sdo.com'}
-      */
+        */
   send: function(options){
 
 		if (!this.check(arguments.callee, options)) return this;
