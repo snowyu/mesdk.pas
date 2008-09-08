@@ -48,7 +48,12 @@
 
  */
 
-/*
+/** helper function for inject */
+function Arguments(args) {
+  //convert arguments object to array
+  this.value = [].slice.call(args);
+}
+/**
   @desc  inject the function
   @param aOrgFunc     the original function to be injected.
   @param aBeforeExec  this is called before the execution of the aOrgFunc.
@@ -80,10 +85,6 @@
   the result should be 10.
 
 */
-function Arguments(args) {
-  //convert arguments object to array
-  this.value = [].slice.call(args);
-}
 function Inject( aOrgFunc, aBeforeExec, aAtferExec ) {
   return function() {
     var Result, isDenied=false, args=[].slice.call(arguments);
