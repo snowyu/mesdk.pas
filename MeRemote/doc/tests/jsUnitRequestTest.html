@@ -5,7 +5,7 @@
     <title>Tests for Request.js</title>
     <link rel="stylesheet" type="text/css" href="../css/jsUnitStyle.css">
     <script type="text/javascript" src="../app/jsUnitCore.js"></script>
-		<script type="text/javascript" src="../mootools-1.2-core-NoReq+FX.js"></script>
+		<script type="text/javascript" src="../mootools-1.2-core-NoReq.js"></script>
     <script type="text/javascript" src="../jsUnitAjax.js"></script>
     <script type="text/javascript" src="../request.js"></script>
     <script type="text/javascript">
@@ -17,9 +17,13 @@
         Browser.Features.xhr = !!(Browser.Request());
 
         var req;
+        var r = {fc: false, ff: false};
 
         function setUp() {
           req = new Request({url:"http://www.example.com"});
+          r = {fc: false, ff: false};
+          //var vUrlParts = req.options.url.match(/^(\w+:)\/\/([^\/:]+?)(?::(\d+))?(?:$|\/)/);
+          //assertTrue('setUp: IsCrossSite should be true:'+vUrlParts, req.FIsCrossSite);
             //request = new Request();
         }
 
@@ -46,15 +50,21 @@
             });
         }
 
+
         function testSendRequest() {
+            function onComplete() {
+              r.fc = true;
+            }
             var vData = "this is a hEllo world data!!";
             checkDefaultParams(req);
             assertTrue('IsCrossSite should be true', req.FIsCrossSite);
             req.FIsCrossSite = false; //Fake to SameSite
+            req.addEvent('complete', onComplete);
             req.send({data: vData});
             assertTrue('xhr.sendCalled should be true', req.xhr.sendCalled);
             assertObjectEquals('data error!', req.toSerialize(vData), req.xhr.data);
             checkWithXHR(req, req.xhr);
+            assertTrue('the complete event is not be triggered', r.fc);
         }
 
     </script>
