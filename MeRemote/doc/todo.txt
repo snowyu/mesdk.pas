@@ -1,4 +1,8 @@
-﻿2008-9-8
+﻿2008-9-9
+! Server Exception Process [need take out as common feature]
+! MeApp --> MeServices
+
+2008-9-8
 ! how to recognize the get, post, put, delete http method to rebuild?
   keep the post, put, delete as the reserved keywords. (the get is default)
   if the api is not post, put, delete means the service api.
@@ -11,7 +15,7 @@
 RpcClient
   Service:
 
-  
+
 2008-9-3
 * dynamic services discovering
 * remote error monitor
