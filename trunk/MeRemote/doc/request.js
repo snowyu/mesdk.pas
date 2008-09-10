@@ -56,11 +56,10 @@ var Request = new Class({
 
 	/**
        (object)请求的参数数据
+        @memberOf Request
 	*/
 	options: {
-	/**
-		       (string: 默认为 null))待请求的URL.
-	*/
+	/**    (string: 默认为 null))待请求的URL. */
 		url: '',
 	/**
 	*/
