@@ -23,6 +23,7 @@ uses
   , uMeTokenizer
   , uMeScriptConsts
   , uMeScript
+  , uMeScriptInterpreter
   ;
 
 type

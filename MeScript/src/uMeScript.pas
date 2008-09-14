@@ -374,15 +374,15 @@ type
     //processed in the CALL instruction.
     FThisPtrStack: PMeList;
     //_Func: PMeScriptBlock;
-    ParamStackBase: Pointer;
-    ParamStackTop: Pointer;
-    ParamStackSize: tsInt; //bytes
-    ParamStackBottom: tsInt;
-    ReturnStackBase: Pointer;
-    ReturnStackTop: Pointer; //
+    //ParamStackBase: Pointer;
+    //ParamStackTop: Pointer;
+    ParamStackSize: tsInt;
+    //ParamStackBottom: tsInt;
+    //ReturnStackBase: Pointer;
+    //ReturnStackTop: Pointer; //
     ReturnStackSize: tsInt; //bytes
     //if halt with errHalt then the ReturnStackBottom will be the Old RSP.   
-    ReturnStackBottom: tsInt;
+    //ReturnStackBottom: tsInt;
     _PC: TMeScriptPC;
     //the ReturnStack Pointer. it is the index of FReturnStack
     _RP: tsInt;
@@ -1369,6 +1369,7 @@ begin
       end;
       vToken := ReadToken;
     end; //while
+    if Result then Result := iParser(aTokenizer);
   end;
 end;
 
@@ -1464,10 +1465,12 @@ begin
   New(FDataStack, Create);
   //New(FStrings, Create);
   New(FThisPtrStack, Create);
-  SetLength(FReturnStack, cMeScriptMaxReturnStackSize);
+  ParamStackSize := cMeScriptMaxDataStackSize;
+  ReturnStackSize := cMeScriptMaxReturnStackSize;
+  SetLength(FReturnStack, ReturnStackSize);
   //SetLength(FArgumentsStack, cMeScriptMaxReturnStackSize);
-  FDataStack.Count := cMeScriptMaxDataStackSize;
-  FillListIn(FDataStack^, 0, cMeScriptMaxDataStackSize, 0);
+  FDataStack.Count := ParamStackSize;
+  FillListIn(FDataStack^, 0, ParamStackSize, 0);
   FGlobalFunction := @Self;
     _this := nil;
 end;
@@ -1512,10 +1515,10 @@ procedure TMeScriptGlobalFunction.Reset;
 begin
   if not IsRunning then
   begin
-    SetLength(FReturnStack, cMeScriptMaxReturnStackSize);
+    SetLength(FReturnStack, ReturnStackSize);
     //SetLength(FArgumentsStack, cMeScriptMaxReturnStackSize);
     FDataStack.Clear;
-    FDataStack.Count := cMeScriptMaxDataStackSize;
+    FDataStack.Count := ParamStackSize;
     _SP := 0; //Integer(ParamStackTop) + ParamStackSize * SizeOf(tsInt);
     _RP := 0; //Integer(ReturnStackTop) + ReturnStackSize * SizeOf(Pointer);
     //_BP := 0;

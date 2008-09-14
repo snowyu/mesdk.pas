@@ -37,6 +37,7 @@ uses
 implementation
 
 type
+  PPMeScriptBlock = ^PMeScriptBlock;
   PMeScriptGlobalFunctionAccess = ^TMeScriptGlobalFunctionAccess;
   TMeScriptGlobalFunctionAccess = object(TMeScriptGlobalFunction)
   end;
@@ -50,11 +51,12 @@ var
 
 {## the VM instructions ## }
 procedure iVMNext(const aGlobalFunction: PMeScriptGlobalFunction); forward;
+procedure _iVMHalt(const aGlobalFunction: PMeScriptGlobalFunctionAccess; ErrorCode: TMeScriptProcessorErrorCode); forward;
 
 procedure iVMNext(const aGlobalFunction: PMeScriptGlobalFunction);
 var
   vInstruction: TMeVMInstruction; //the instruction.
-  vProc: TMeVMInstructionProc;
+  vProc: TMeVMInstructionProcA;
 begin
   with PMeScriptGlobalFunctionAccess(aGlobalFunction)^ do
     {$IFDEF FPC}
@@ -63,16 +65,16 @@ begin
     While (psRunning in TMeScriptProcessorStates(States)) do
     {$ENDIF}
     begin
-      vInstruction := PMeVMInstruction(aGlobalFunction._PC.Mem)^;
-      Inc(aGlobalFunction._PC.Mem);
+      vInstruction := PMeVMInstruction(_PC.Mem)^;
+      Inc(_PC.Mem);
       vProc := GMeScriptCoreWords[vInstruction];
       if Assigned(vProc) then
       begin
-        vProc(aGlobalFunction);
+        vProc(PMeScriptGlobalFunctionAccess(aGlobalFunction));
       end
       else begin
         //BadOpError
-        //_iVMHalt(errBadInstruction);
+        _iVMHalt(PMeScriptGlobalFunctionAccess(aGlobalFunction), errBadInstruction);
         //break;
       end;
     end;
@@ -96,7 +98,7 @@ begin
     Include(TMeScriptProcessorStates(States), psHalt);
     {$ENDIF}
     //cmpare the RP and ReturnStackBottom, it should be equ.
-    if _RP <> ReturnStackBottom then //not same so halt error
+    if _RP <> 0 then //not same so halt error
     begin
       {$IFDEF FPC}
       Include(vStates, psHaltError);
@@ -113,6 +115,19 @@ begin
     {$IFDEF FPC}
     States := Byte(LongWord(vStates)); 
     {$ENDIF}
+  end;
+end;
+
+procedure VMCallBlock(const aGlobalFunction: PMeScriptGlobalFunctionAccess);
+var
+  vBlock: PMeScriptBlock;
+begin
+  with aGlobalFunction^ do
+  begin
+    vBlock := PPMeScriptBlock(_PC.Mem)^;
+    Inc(_PC.Mem, SizeOf(tsInt));
+    //Todo: Valid the vBlock before execution.
+    vBlock.Execute();
   end;
 end;
 
