@@ -1,0 +1,19 @@
+asynchronous  (“Ï≤Ω)
+synchronous   (Õ¨≤Ω)
+
+
+Message - Publisher Subscriber 
+Event   - Register Listener
+
+Object.Dispatch(var Message);
+  SendMsg: synchronous
+  PostMsg: asynchronous
+
+DOM event model
+
+ActionScript 3.0 event model
+
+EventId(MsgId)
+addEventListener(MouseEvent.CLICK, clickHander);
+
+how to pass the event parameters?
