@@ -36,6 +36,7 @@ uses
   Windows,
   {$ENDIF MSWINDOWS}
   SysUtils, Classes
+  , uMeSystem  //EMeError
   , uMeObject
   , uMeTransport
   , uMeRemoteUtils
@@ -95,7 +96,7 @@ begin
   CheckConnected;
   b := IOHandler.ReadByte;
   if b <> 200 then
-    raise Exception.Create('Can not Execute Cmd: '+ aCmd + ' Error Status:' + IntToStr(b));
+    raise EMeError.Create('Can not Execute Cmd: '+ aCmd + ' Error Status:' + IntToStr(b));
   CheckConnected;
   vStream := TMeStreamProxy.Create(aRequest);
   try
@@ -112,7 +113,7 @@ begin
     	SetLength(s, aReply.GetSize);
     	aReply.SetPosition(0);
     	aReply.Readbuffer(s[1], Length(s));
-      raise Exception.Create('Execute Cmd: '+ aCmd + ' failed. Error Code:' + IntToStr(b)+' Error:'+ s);
+      raise EMeError.Create('Execute Cmd: '+ aCmd + ' failed. Error Code:' + IntToStr(b)+' Error:'+ s);
     end;
   finally
     vStream.Free;

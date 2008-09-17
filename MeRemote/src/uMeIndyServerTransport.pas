@@ -49,7 +49,7 @@ uses
 type
   //return -1 means not found.
   TMeCmdSearchEvent = function(const aCmd: string): Integer of object;
-  TMeCmdExecuteEvent = procedure(const aContext: TIdContext; const aCmd: Integer; const aParams: PMeStream; var aSuccessful: Boolean) of object;
+  TMeCmdExecuteEvent = procedure(const aCmd: Integer; const aParams: PMeStream; var aSuccessful: Boolean) of object;
   TMeIndyRemoteFunctionServer = class(TIdCustomTCPServer)
   protected
     FOnCmdExecute: TMeCmdExecuteEvent;
@@ -70,7 +70,7 @@ type
     FServer: TMeIndyRemoteFunctionServer;
     FRemoteFunctions: PMeRemmoteFunctions;
     function SearchCmd(const aCmd: string): Integer;
-    procedure ExecuteCmd(const aContext: TIdContext; const aCmd: Integer; const aParams: PMeStream; var aSuccessful: WordBool);
+    procedure ExecuteCmd(const aCmd: Integer; const aParams: PMeStream; var aSuccessful: WordBool);
   public
     constructor Create();
     destructor Destroy(); override;
@@ -148,7 +148,7 @@ begin
             vStream.SetPosition(0);
             try
               s := '';
-              FOnCmdExecute(aContext, vCmdId, vStream, Result);
+              FOnCmdExecute(vCmdId, vStream, Result);
               Word(Result) := 200;
             except
               On E: Exception do
@@ -199,7 +199,7 @@ begin
   inherited;
 end;
 
-procedure TMeIndyServerTransport.ExecuteCmd(const aContext: TIdContext; const aCmd: Integer; const aParams: PMeStream; var aSuccessful: WordBool);
+procedure TMeIndyServerTransport.ExecuteCmd(const aCmd: Integer; const aParams: PMeStream; var aSuccessful: WordBool);
 var
   vResult: PMeMemoryStream;
 begin
