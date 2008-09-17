@@ -17,11 +17,11 @@
         Browser.Features.xhr = !!(Browser.Request());
 
         var req;
-        var r = {fc: false, ff: false};
+        var vReqResult = {bCompleted: false, bFailed: false};
 
         function setUp() {
           req = new Request({url:"http://www.example.com"});
-          r = {fc: false, ff: false};
+          vReqResult = {bCompleted: false, bFailed: false};
           //var vUrlParts = req.options.url.match(/^(\w+:)\/\/([^\/:]+?)(?::(\d+))?(?:$|\/)/);
           //assertTrue('setUp: IsCrossSite should be true:'+vUrlParts, req.FIsCrossSite);
             //request = new Request();
@@ -53,7 +53,7 @@
 
         function testSendRequest() {
             function onComplete() {
-              r.fc = true;
+              vReqResult.bCompleted = true;
             }
             var vData = "this is a hEllo world data!!";
             checkDefaultParams(req);
@@ -64,7 +64,7 @@
             assertTrue('xhr.sendCalled should be true', req.xhr.sendCalled);
             assertObjectEquals('data error!', req.toSerialize(vData), req.xhr.data);
             checkWithXHR(req, req.xhr);
-            assertTrue('the complete event is not be triggered', r.fc);
+            assertTrue('the complete event is not be triggered', vReqResult.bCompleted);
         }
 
     </script>

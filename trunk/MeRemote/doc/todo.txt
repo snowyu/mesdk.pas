@@ -1,6 +1,12 @@
 ﻿2008-9-9
 ! Server Exception Process [need take out as common feature]
-! MeApp --> MeServices
+! MeApp --> MeFactory(MeServices)
+  these services can be plugin the MeFactory(MeServices) automatically.
+    mdl(method define language  -- RTTI)
+    MeFactoryFeature -- > MeLocalFactory(DLLFactory), MeRemoteFactory(all remote services register here)
+  MeApp
+    Factories: FactoryFeatures
+    Services: ; Services[]
 
 2008-9-8
 ! how to recognize the get, post, put, delete http method to rebuild?
