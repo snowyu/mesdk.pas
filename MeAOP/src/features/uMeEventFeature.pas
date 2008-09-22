@@ -48,6 +48,8 @@ type
   TMeEventInfo = object(TMeDynamicObject)
   protected
     procedure Init; virtual; //override
+    procedure ListenerFreeNotify(Instance : Pointer);
+    
   public
     destructor Destroy; virtual; //override;
     procedure Dispatch(const Sender: TObject; var aEvent);
@@ -83,6 +85,7 @@ type
     procedure PublisherFreeNotify(Instance : Pointer);
     function IndexOfPublisher(const Instance : TObject): Integer;
     function FindPublisher(const Instance : TObject): PMePublisherInfo;
+    procedure ClearPublishers;
     procedure DeletePublisher(const Instance : TObject);
 
     procedure BeforeExecute(Sender: TObject; MethodItem:
@@ -111,9 +114,36 @@ begin
 end;
 
 destructor TMeEventInfo.Destroy; 
+var
+  i: Integer;
 begin
+  with Subscribers.LockList^ do
+  try
+    for i := 0 to Count - 1 do
+    begin
+      RemoveFreeNotification(Items[i], ListenerFreeNotify);
+    end;
+  finally
+    Subscribers.UnLockList;
+  end;
+
   MeFreeAndNil(Subscribers);
   inherited;
+end;
+
+procedure TMeEventInfo.AddListener(const aListener: TObject);
+begin
+  if Assigned(aListener) then
+    with Subscribers.LockList^ do
+    try
+      if IndexOf(aListener) < 0 then
+      begin
+        AddFreeNotification(aListener, ListenerFreeNotify);
+        Add(aListener);
+      end;
+    finally
+      Subscribers.UnLockList;
+    end;
 end;
 
 procedure TMeEventInfo.Dispatch(const Sender: TObject; var aEvent);
@@ -123,10 +153,17 @@ begin
   with Subscribers.LockList^ do
   try
     for i := 0 to Count - 1 do
+    begin
       TObject(Items[i]).Dispatch(aEvent);
+    end;
   finally
     Subscribers.UnLockList;
   end;
+end;
+
+procedure TMeEventInfo.ListenerFreeNotify(Instance : Pointer);
+begin
+  Subscribers.Remove(Instance);
 end;
 
 { TMePublisherInfo }
@@ -191,7 +228,8 @@ end;
 
 destructor TMeCustomEventFeature.Destroy;
 begin
-  FPublisherInfoList.FreeMeObjects;
+  ClearPublishers;
+  //FPublisherInfoList.FreeMeObjects;
   MeFreeAndNil(FPublisherInfoList);
   inherited;
 end;
@@ -212,6 +250,28 @@ begin
   end;
 end;
 
+procedure TMeCustomEventFeature.ClearPublishers;
+var
+  i: Integer;
+  vItem: PMePublisherInfo;
+begin
+  with FPublisherInfoList.LockList^ do
+  try
+    for i := Count -1 downto 0 do
+    begin
+      vItem := PMePublisherInfo(Items[i]);
+      if Assigned(vItem) then
+      begin
+        RemoveFreeNotification(vItem, PublisherFreeNotify);
+        vItem.Free;
+        Delete(i);
+      end;
+    end; //for
+  finally
+    FPublisherInfoList.UnLockList;
+  end;
+end;
+
 procedure TMeCustomEventFeature.DeletePublisher(const Instance : TObject);
 var
   i: Integer;
@@ -219,13 +279,15 @@ var
 begin
   with FPublisherInfoList.LockList^ do
   try
-    for i := 0 to Count -1 do
+    for i := Count -1 downto 0 do
     begin
       vItem := PMePublisherInfo(Items[i]);
       if Assigned(vItem) and (vItem.Publisher  = Instance) then
       begin
+        RemoveFreeNotification(vItem, PublisherFreeNotify);
         vItem.Free;
         Delete(i);
+        Exit;
       end;
     end; //for
   finally
@@ -271,7 +333,8 @@ end;
 
 procedure TMeCustomEventFeature.PublisherFreeNotify(Instance : Pointer);
 begin
-  DeletePublisher(Instance);
+  FPublisherInfoList.Remove(Instance);
+  //DeletePublisher(Instance);
 end;
 
 procedure TMeCustomEventFeature.RegisterEvent(const aPublisher: TObject; const aEventId: TEventId);
