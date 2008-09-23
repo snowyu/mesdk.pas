@@ -46,8 +46,9 @@ type
     procedure Init; virtual; //override
   public
     destructor Destroy; virtual;
-    procedure Add(const Item: Pointer);
+    functions Add(const Item: Pointer): Integer;
     procedure Clear;
+    procedure Delete(const Index: Integer);
     function  LockList: PMeList;
     function Count: Integer;
     function Last: Pointer;
@@ -569,12 +570,13 @@ begin
   end;
 end;
 
-procedure TMeThreadSafeList.Add(const Item: Pointer);
+function TMeThreadSafeList.Add(const Item: Pointer): Integer;
 begin
+  Result := -1;
   LockList;
   try
     if (Duplicates = dupAccept) or (FList.IndexOf(Item) = -1) then
-      FList.Add(Item)
+      Result := FList.Add(Item)
     else if Duplicates = dupError then
       FList.Error(@SDuplicateItem, Integer(Item));
   finally
@@ -597,6 +599,16 @@ begin
   LockList;
   try
     Result := FList.Count;
+  finally
+    UnlockList;
+  end;
+end;
+
+procedure TMeThreadSafeList.Delete(const Index: Integer);
+begin
+  LockList;
+  try
+    FList.Delete(Index);
   finally
     UnlockList;
   end;
