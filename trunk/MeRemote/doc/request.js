@@ -118,8 +118,8 @@ var Request = new Class({
     ErrorResponseObject : "The server did not respond with a response object.",
     ErrorResponseIdMissed : "The server did not respond with the required response id for asynchronous calls.",
     ErrorResponseIdUnkonwn : "Fatal error with Request code: no such ID found in pendingRequests.",
-	ErrorReturnStatusCode : 'Fatal Return Status Code Error:',
-	ErrorCanNotSetRequestHeader : 'Error Can not Set RequestHeader'
+    ErrorReturnStatusCode : 'Fatal Return Status Code Error:',
+    ErrorCanNotSetRequestHeader : 'Error Can not Set RequestHeader'
 	},
 
 	/** 
