@@ -71,6 +71,7 @@ type
     function FindEvent(var aEvent): PMeEventInfo; virtual;
     {: must override }
     function RetrieveEventId(var aEvent): TEventId; virtual; abstract;
+    function RegisterEvent(const aEventId: TEventId): Integer;
   public
     Publisher: TObject;
     Events: PMeList; //List of PMeEventInfo
@@ -213,6 +214,21 @@ begin
   Result := IndexOfEvent(aEventId) >= 0;
 end;
 
+function TMePublisherInfo.RegisterEvent(const aEventId: TEventId): Integer;
+var
+  vItem: PMeEventInfo;
+begin
+  Result := IndexOfEvent(aEventId);
+  if Result < 0 then
+  begin
+    New(vItem, Create);
+    vItem.EventId := aEventId;
+    Result := Events.Add(vItem);
+  end
+  else 
+    Result := -1;
+end;
+
 {
 function TMePublisherInfo.RetrieveEventId(var aEvent): TEventId;
 begin
@@ -332,13 +348,26 @@ begin
 end;
 
 procedure TMeCustomEventFeature.PublisherFreeNotify(Instance : Pointer);
+var
+  i: Integer;
 begin
-  FPublisherInfoList.Remove(Instance);
+  i := IndexOfPublisher(Instance);
+  if i >= 0 then
+    FPublisherInfoList.Delete(i);
   //DeletePublisher(Instance);
 end;
 
 procedure TMeCustomEventFeature.RegisterEvent(const aPublisher: TObject; const aEventId: TEventId);
+var
+  i: Integer;
 begin
+  i := IndexOfPublisher(Instance);
+  if i < 0 then
+  begin
+    i := FPublisherInfoList.Add(aPublisher);
+    if i >= 0 then
+      PMePublisherInfo(FPublisherInfoList.Get(i)).RegisterEvent(aEventId);
+  end;
 end;
 
 initialization
