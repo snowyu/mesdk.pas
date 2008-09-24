@@ -46,7 +46,7 @@ type
     procedure Init; virtual; //override
   public
     destructor Destroy; virtual;
-    functions Add(const Item: Pointer): Integer;
+    function Add(const Item: Pointer): Integer;
     procedure Clear;
     procedure Delete(const Index: Integer);
     function  LockList: PMeList;

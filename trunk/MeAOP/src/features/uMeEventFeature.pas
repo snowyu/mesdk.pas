@@ -49,7 +49,7 @@ type
   protected
     procedure Init; virtual; //override
     procedure ListenerFreeNotify(Instance : Pointer);
-    
+
   public
     destructor Destroy; virtual; //override;
     procedure Dispatch(const Sender: TObject; var aEvent);
@@ -62,15 +62,14 @@ type
   {: the abstract Publisher Info object.}
   TMePublisherInfo = object(TMeDynamicObject)
   protected
+    FOwner: TMeCustomEventFeature;
     procedure Init; virtual; //override
   public
     destructor Destroy; virtual; //override;
     {: Is the event exists }
     function IsExists(aEventId: TEventId): Boolean; virtual;
     function IndexOfEvent(aEventId: TEventId): Integer;
-    function FindEvent(var aEvent): PMeEventInfo; virtual;
-    {: must override }
-    function RetrieveEventId(var aEvent): TEventId; virtual; abstract;
+    function FindEvent(const aEvent): PMeEventInfo; virtual;
     function RegisterEvent(const aEventId: TEventId): Integer;
   public
     Publisher: TObject;
@@ -88,11 +87,14 @@ type
     function FindPublisher(const Instance : TObject): PMePublisherInfo;
     procedure ClearPublishers;
     procedure DeletePublisher(const Instance : TObject);
+    {: must override }
+    function GetPublisherInfoClass: TMeClass; virtual; abstract;
+    function RetrieveEventId(const aEvent): TEventId; virtual; abstract;
 
     procedure BeforeExecute(Sender: TObject; MethodItem:
             TMeInterceptedMethodItem; const Params: PMeProcParams = nil);
             override;
-    function IsValidEvent(const aPublisher: TObject; const aEvent: Pointer): Boolean;
+    //function IsValidEvent(const aPublisher: TObject; const aEvent: Pointer): Boolean;
   public
     constructor Create; override;
     destructor Destroy; override;
@@ -103,9 +105,27 @@ type
 
   { Summary: 基于Window 消息的多投事件的功能。 }
   TMeWindowMessageFeature = class(TMeCustomEventFeature)
+  protected
+    function GetPublisherInfoClass: TMeClass; override;
+    function RetrieveEventId(const aEvent): TEventId; override;
   end;
 
+function GMeWindowMessageFeature: TMeWindowMessageFeature;
+
 implementation
+
+var
+  FMeWindowMessageFeature: TMeWindowMessageFeature;
+
+type
+  TDispatchProc = procedure (var Message) of object;
+function GMeWindowMessageFeature: TMeWindowMessageFeature;
+begin
+  if not Assigned(FMeWindowMessageFeature) then
+    FMeWindowMessageFeature := TMeWindowMessageFeature(TMeWindowMessageFeature.AddTo(TObject, @TObject.Dispatch, 'Dispatch', TypeInfo(TDispatchProc)));
+
+  Result := FMeWindowMessageFeature;
+end;
 
 { TMeEventInfo }
 procedure TMeEventInfo.Init;
@@ -181,7 +201,7 @@ begin
   inherited;
 end;
 
-function TMePublisherInfo.FindEvent(var aEvent): PMeEventInfo;
+function TMePublisherInfo.FindEvent(const aEvent): PMeEventInfo;
 var
   i: Integer;
 begin
@@ -189,7 +209,7 @@ begin
     for i := 0 to Count - 1 do
     begin
       Result := PMeEventInfo(Items[i]);
-      if Assigned(Result) and (Result.EventId = RetrieveEventId(aEvent)) then
+      if Assigned(Result) and (Result.EventId = FOwner.RetrieveEventId(aEvent)) then
         exit;
     end;
   Result := nil;
@@ -254,15 +274,16 @@ procedure TMeCustomEventFeature.BeforeExecute(Sender: TObject; MethodItem:
   TMeInterceptedMethodItem; const Params: PMeProcParams);
 var
   vItem: PMePublisherInfo;
-  vEvent: PMeEventInfo;
+  v: Pointer;
+  vEventInfo: PMeEventInfo;
 begin
   vItem := FindPublisher(Sender);
   if Assigned(vItem) then
   begin
-    
-    vEvent := vItem.FindEvent(Params.Items[0].AsPointer);
-    if Assigned(vEvent) then
-      vEvent.Dispatch(Sender, vEvent);
+    v := Params.Items[0].AsPointer;
+    vEventInfo := vItem.FindEvent(v);
+    if Assigned(vEventInfo) then
+      vEventInfo.Dispatch(Sender, v);
   end;
 end;
 
@@ -337,7 +358,7 @@ begin
   try
     for Result := 0 to Count -1 do
     begin
-      vItem := PMePublisherInfo(Items[i]);
+      vItem := PMePublisherInfo(Items[Result]);
       if Assigned(vItem) and (vItem.Publisher  = Instance) then
         exit;
     end;
@@ -360,16 +381,65 @@ end;
 procedure TMeCustomEventFeature.RegisterEvent(const aPublisher: TObject; const aEventId: TEventId);
 var
   i: Integer;
+  vPublisherInfo: PMePublisherInfo;
 begin
-  i := IndexOfPublisher(Instance);
+  i := IndexOfPublisher(aPublisher);
   if i < 0 then
   begin
-    i := FPublisherInfoList.Add(aPublisher);
+    vPublisherInfo := PMePublisherInfo(NewMeObject(GetPublisherInfoClass));
+    vPublisherInfo.FOwner := Self;
+    i := FPublisherInfoList.Add(vPublisherInfo);
     if i >= 0 then
-      PMePublisherInfo(FPublisherInfoList.Get(i)).RegisterEvent(aEventId);
+      vPublisherInfo.RegisterEvent(aEventId);
   end;
 end;
 
+procedure TMeCustomEventFeature.UnRegisterEvent(const aPublisher: TObject; const aEventId: TEventId);
+var
+  i: Integer;
+  vPublisherInfo: PMePublisherInfo;
+begin
+  i := IndexOfPublisher(aPublisher);
+  if i >= 0 then
+  begin
+    vPublisherInfo := FPublisherInfoList.Get(i);
+    i := IndexOfEvent(aEventId);
+    if i >= 0 then
+    begin
+      vPublisherInfo.Events.Items[i].Free;
+      vPublisherInfo.Events.Delete(i);
+    end;
+  end;
+end;
+
+{ TMeWindowMessageFeature }
+function TMeWindowMessageFeature.GetPublisherInfoClass: TMeClass;
+begin
+  Result := TypeOf(TMePublisherInfo);
+end;
+
+type
+  TMessage = packed record
+    Msg: Cardinal;
+    case Integer of
+      0: (
+        WParam: Longint;
+        LParam: Longint;
+        Result: Longint);
+      1: (
+        WParamLo: Word;
+        WParamHi: Word;
+        LParamLo: Word;
+        LParamHi: Word;
+        ResultLo: Word;
+        ResultHi: Word);
+  end;
+function TMeWindowMessageFeature.RetrieveEventId(const aEvent): TEventId; 
+begin
+  Result :=  TMessage(aEvent).Msg;
+end;
+
 initialization
+  FMeWindowMessageFeature := nil;
 finalization
 end.
