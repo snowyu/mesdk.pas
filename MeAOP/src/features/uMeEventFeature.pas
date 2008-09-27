@@ -99,7 +99,7 @@ type
     constructor Create; override;
     destructor Destroy; override;
 
-    procedure RegisterEvent(const aPublisher: TObject; const aEventId: TEventId);
+    function RegisterEvent(const aPublisher: TObject; const aEventId: TEventId): PMeEventInfo;
     procedure UnRegisterEvent(const aPublisher: TObject; const aEventId: TEventId);
   end;
 
@@ -115,7 +115,7 @@ function GMeWindowMessageFeature: TMeWindowMessageFeature;
 implementation
 
 var
-  FMeWindowMessageFeature: TMeWindowMessageFeature;
+  FMeWindowMessageFeature: TMeWindowMessageFeature  = nil;
 
 type
   TDispatchProc = procedure (var Message) of object;
@@ -378,11 +378,12 @@ begin
   //DeletePublisher(Instance);
 end;
 
-procedure TMeCustomEventFeature.RegisterEvent(const aPublisher: TObject; const aEventId: TEventId);
+function TMeCustomEventFeature.RegisterEvent(const aPublisher: TObject; const aEventId: TEventId): PMeEventInfo;
 var
   i: Integer;
   vPublisherInfo: PMePublisherInfo;
 begin
+  Result := nil;
   i := IndexOfPublisher(aPublisher);
   if i < 0 then
   begin
@@ -390,7 +391,11 @@ begin
     vPublisherInfo.FOwner := Self;
     i := FPublisherInfoList.Add(vPublisherInfo);
     if i >= 0 then
-      vPublisherInfo.RegisterEvent(aEventId);
+    begin
+      i := vPublisherInfo.RegisterEvent(aEventId);
+      if i >= 0 then
+        Result := PMeEventInfo(vPublisherInfo.Events.Items[i]);
+    end;
   end;
 end;
 
@@ -403,10 +408,10 @@ begin
   if i >= 0 then
   begin
     vPublisherInfo := FPublisherInfoList.Get(i);
-    i := IndexOfEvent(aEventId);
+    i := vPublisherInfo.IndexOfEvent(aEventId);
     if i >= 0 then
     begin
-      vPublisherInfo.Events.Items[i].Free;
+      PMeEventInfo(vPublisherInfo.Events.Items[i]).Free;
       vPublisherInfo.Events.Delete(i);
     end;
   end;
@@ -418,28 +423,20 @@ begin
   Result := TypeOf(TMePublisherInfo);
 end;
 
-type
-  TMessage = packed record
-    Msg: Cardinal;
-    case Integer of
-      0: (
-        WParam: Longint;
-        LParam: Longint;
-        Result: Longint);
-      1: (
-        WParamLo: Word;
-        WParamHi: Word;
-        LParamLo: Word;
-        LParamHi: Word;
-        ResultLo: Word;
-        ResultHi: Word);
+{ TObject.Dispatch accepts any data type as its Message parameter.  The
+  first 2 bytes of the data are taken as the message id to search for
+  in the object's message methods.  TDispatchMessage is an example of
+  such a structure with a word field for the message id.
+  TDispatchMessage = record
+    MsgID: Word;
   end;
+}
 function TMeWindowMessageFeature.RetrieveEventId(const aEvent): TEventId; 
 begin
-  Result :=  TMessage(aEvent).Msg;
+  Result :=  TDispatchMessage(aEvent).MsgId;
 end;
 
 initialization
-  FMeWindowMessageFeature := nil;
+  //FMeWindowMessageFeature := nil;
 finalization
 end.
