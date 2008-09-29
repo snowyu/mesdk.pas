@@ -199,7 +199,7 @@ begin
   PMeThreadTimer(FMeObject).Stop;
   I := -1;
   I := InterlockedExchange(FTick, I);
-  CheckEquals(500 div 50, I, ' the count is error.');
+  CheckEquals(500 / 50, I, 1.0, ' the count is error.');
   PMeThread(FMeObject).TerminateAndWaitFor;
 end;
 
