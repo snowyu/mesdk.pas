@@ -111,8 +111,8 @@ end;
 procedure TTest_MeEventFeature.Test_WindowMessageEvent();
 var
   vPublisher: TTestPublisher;
-  vListeners: array[0..1] of TTestListener;
-  i: Integer;
+  vListeners: array[0..2] of TTestListener;
+  i, j: Integer;
   vEventInfo: PMeEventInfo;
   vMsg: TMessage;
 begin
@@ -130,21 +130,26 @@ begin
     begin
       vEventInfo.AddListener(vListeners[i]);
     end;
+
+    for j := 0 to 6 do
+    begin
     FillChar(vMsg, SizeOf(vMsg), 0);
     with TWMChar(vMsg) do
     begin
       Msg := WM_CHAR;
-      CharCode := 4;
+      CharCode := Random(255);
     end;
     //writeln('WM_CHAR:',WM_CHAR);
     //writeln('char:',TWMChar(vMsg).CharCode);
+    FTriggeredCount := 0;
     vPublisher.WndProc(vMsg);
     CheckEquals(High(vListeners)+1, FTriggeredCount , ' TriggeredCount is error.');
     for i := 0 to High(vListeners) do
     begin
       CheckEqualsMem(@vMsg, @vListeners[i].LastMsg, SizeOf(vMsg), ' The Msg content is error.');
-      vEventInfo.AddListener(vListeners[i]);
     end;
+    end;
+
   finally
     vPublisher.Free;
     for i := 0 to High(vListeners) do
