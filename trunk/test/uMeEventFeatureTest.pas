@@ -29,7 +29,8 @@ type
   protected
     procedure WMChar(var Message: TWMChar); message WM_CHAR;
   public
-    CharCode: Word;
+    LastMsg: TMessage;
+    //CharCode: Word;
     //fake dispatch
     procedure WndProc(var Message: TMessage);
   end;
@@ -41,7 +42,7 @@ type
     procedure WMChar(var Message: TWMChar); message WM_CHAR;
   public
     Id: Integer;
-    CharCode: Word;
+    LastMsg: TMessage;
     property OnChar: TWinMessageEvent read FOnChar write FOnChar;
   end;
 
@@ -56,7 +57,7 @@ type
 
   public
   published
-    procedure Test_Event;
+    procedure Test_WindowMessageEvent;
   end;
 
 implementation
@@ -68,25 +69,33 @@ var
 { TTestPublisher }
 procedure TTestPublisher.WMChar(var Message: TWMChar);
 begin
-  CharCode := Message.CharCode;
+  LastMsg := TMessage(Message);
+  //CharCode := Message.CharCode;
+  //writeln('TTestPublisher.WMChar:', Message.CharCode);
 end;
 
 procedure TTestPublisher.WndProc(var Message: TMessage);
 begin
-  CharCode := 0;
+  //CharCode := 0;
+  FillChar(LastMsg, SizeOf(LastMsg), 0);
   Dispatch(Message);
 end;
 
 { TTestListener }
 procedure TTestListener.WMChar(var Message: TWMChar);
 begin
-  CharCode := Message.CharCode;
+  //CharCode := Message.CharCode;
+  LastMsg := TMessage(Message);
+  //writeln('TTestListener.msg:',Message.msg);
+  //writeln('TTestListener.WMChar:',Message.CharCode);
+  if Assigned(FOnChar) then FOnChar(Self, TMessage(Message));
 end;
 
 { TTest_MeEventFeature }
 procedure TTest_MeEventFeature.Setup;
 begin
   //New(FScript, Create);
+  FTriggeredCount := 0;
 end;
 
 procedure TTest_MeEventFeature.TearDown;
@@ -99,11 +108,13 @@ begin
   Inc(FTriggeredCount);
 end;
 
-procedure TTest_MeEventFeature.Test_Event();
+procedure TTest_MeEventFeature.Test_WindowMessageEvent();
 var
   vPublisher: TTestPublisher;
   vListeners: array[0..1] of TTestListener;
   i: Integer;
+  vEventInfo: PMeEventInfo;
+  vMsg: TMessage;
 begin
   vPublisher := TTestPublisher.Create;
   for i := 0 to High(vListeners) do
@@ -113,7 +124,27 @@ begin
     vListeners[i].OnChar := DoMessage;
   end;
   try
-    GMeWindowMessageFeature.RegisterEvent(vPublisher, WM_CHAR);
+    vEventInfo := GMeWindowMessageFeature.RegisterEvent(vPublisher, WM_CHAR);
+    CheckEquals(true, Assigned(vEventInfo), ' vEventInfo is not assiged.');
+    for i := 0 to High(vListeners) do
+    begin
+      vEventInfo.AddListener(vListeners[i]);
+    end;
+    FillChar(vMsg, SizeOf(vMsg), 0);
+    with TWMChar(vMsg) do
+    begin
+      Msg := WM_CHAR;
+      CharCode := 4;
+    end;
+    //writeln('WM_CHAR:',WM_CHAR);
+    //writeln('char:',TWMChar(vMsg).CharCode);
+    vPublisher.WndProc(vMsg);
+    CheckEquals(High(vListeners)+1, FTriggeredCount , ' TriggeredCount is error.');
+    for i := 0 to High(vListeners) do
+    begin
+      CheckEqualsMem(@vMsg, @vListeners[i].LastMsg, SizeOf(vMsg), ' The Msg content is error.');
+      vEventInfo.AddListener(vListeners[i]);
+    end;
   finally
     vPublisher.Free;
     for i := 0 to High(vListeners) do

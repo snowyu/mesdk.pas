@@ -118,7 +118,9 @@ var
   FMeWindowMessageFeature: TMeWindowMessageFeature  = nil;
 
 type
-  TDispatchProc = procedure (var Message) of object;
+  TDispatchProc = procedure (const Message: Integer) of object;
+  PDispatchMessage = ^ TDispatchMessage;
+
 function GMeWindowMessageFeature: TMeWindowMessageFeature;
 begin
   if not Assigned(FMeWindowMessageFeature) then
@@ -173,9 +175,11 @@ var
 begin
   with Subscribers.LockList^ do
   try
+    //writeln('Subscribers.conunt:',Count);
+    //writeln('EventId:',PDispatchMessage(aEvent).MsgId);
     for i := 0 to Count - 1 do
     begin
-      TObject(Items[i]).Dispatch(aEvent);
+      TObject(Items[i]).Dispatch(PDispatchMessage(aEvent)^);
     end;
   finally
     Subscribers.UnLockList;
@@ -270,17 +274,38 @@ begin
   inherited;
 end;
 
+Type
+  PMessage = ^TMessage;
+  TMessage = packed record
+
+    Msg: Cardinal;
+    case Integer of
+      0: (
+        WParam: Longint;
+        LParam: Longint;
+        Result: Longint);
+      1: (
+        WParamLo: Word;
+        WParamHi: Word;
+        LParamLo: Word;
+        LParamHi: Word;
+        ResultLo: Word;
+        ResultHi: Word);
+
+  end;
 procedure TMeCustomEventFeature.BeforeExecute(Sender: TObject; MethodItem:
   TMeInterceptedMethodItem; const Params: PMeProcParams);
 var
   vItem: PMePublisherInfo;
-  v: Pointer;
+  v: PDispatchMessage;
   vEventInfo: PMeEventInfo;
 begin
+  //if Assigned(Sender) and (Sender.ClassName= 'TTestPublisher') then write('Dispatch.BeforeExecute:'+Sender.ClassName);
   vItem := FindPublisher(Sender);
   if Assigned(vItem) then
   begin
-    v := Params.Items[0].AsPointer;
+    v := PDispatchMessage(Params.Items[0].AsPointer);
+    //writeln(' found(', TWMKey(v^).Charcode, ')');
     vEventInfo := vItem.FindEvent(v);
     if Assigned(vEventInfo) then
       vEventInfo.Dispatch(Sender, v);
@@ -389,13 +414,20 @@ begin
   begin
     vPublisherInfo := PMePublisherInfo(NewMeObject(GetPublisherInfoClass));
     vPublisherInfo.FOwner := Self;
+    vPublisherInfo.Publisher := aPublisher;
     i := FPublisherInfoList.Add(vPublisherInfo);
-    if i >= 0 then
+    if i < 0 then
     begin
-      i := vPublisherInfo.RegisterEvent(aEventId);
-      if i >= 0 then
-        Result := PMeEventInfo(vPublisherInfo.Events.Items[i]);
+      MeFreeAndNil(vPublisherInfo);
     end;
+  end
+  else
+    vPublisherInfo := PMePublisherInfo(FPublisherInfoList.Get(i));
+  if Assigned(vPublisherInfo) then
+  begin
+    i := vPublisherInfo.RegisterEvent(aEventId);
+    if i >= 0 then
+      Result := PMeEventInfo(vPublisherInfo.Events.Items[i]);
   end;
 end;
 
@@ -433,7 +465,8 @@ end;
 }
 function TMeWindowMessageFeature.RetrieveEventId(const aEvent): TEventId; 
 begin
-  Result :=  TDispatchMessage(aEvent).MsgId;
+  Result :=  PDispatchMessage(aEvent)^.MsgId;
+  //writeln('MsgId:', Result);
 end;
 
 initialization
