@@ -1,0 +1,39 @@
+#summary Multi-Cast Event Feature
+
+= Introduction =
+
+;TMeCustomEventFeature: the abstract multicast event feature class. 
+;TMeWindowMessageFeature: the windows message multi-cast event feature class. 
+
+
+= TMeWindowMessageFeature =
+
+add the ability to multi-cast windows message.
+
+== Usage ==
+
+ # first register the control and the message your wanna monitor to the event center.
+  # vEventInfo := GMeWindowMessageFeature.RegisterEvent(yourControl, WM_CHAR);
+ # then add the listeners to the event info:
+  # vEventInfo.AddListener(aControl1);
+  # vEventInfo.AddListener(aControl2);
+
+that's all, now the aControl1 and aControl2 will be triggered the WM_CHAR message if the WM_Char message occur on yourControl.
+
+== Example ==
+{{{
+  TTestListener = class
+  protected
+    procedure WMChar(var Message: TWMChar); message WM_CHAR;
+  public
+  end;
+
+var
+  aControl1, aControl2: TTestListener;
+begin
+  vEventInfo := GMeWindowMessageFeature.RegisterEvent(yourControl, WM_CHAR);
+  vEventInfo.AddListener(aControl1);
+  vEventInfo.AddListener(aControl2);
+end;
+
+}}}
