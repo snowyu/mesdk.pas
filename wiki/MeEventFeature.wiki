@@ -3,7 +3,9 @@
 = Introduction =
 An event system consists of 3 main entities: dispatchers, listeners, and event objects. Event dispatchers are objects that dispatch events to objects that are registered as listeners. An example UML of the distribution of event objects between dispatchers and listeners can be seen below.
 
-event_uml.jpg
+http://meaop.googlecode.com/svn/wiki/event_uml.jpg
+
+Sample Event Object UML - The black diamond indicates that the Event Dispatcher creates event objects, which are then used (as indicated by the white diamonds) by three Listeners.
 
  * TMeCustomEventFeature: the abstract multicast event feature class. 
  * TMeWindowMessageFeature: the windows message multi-cast event feature class. 
