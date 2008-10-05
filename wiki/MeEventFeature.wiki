@@ -1,9 +1,12 @@
 #summary Multi-Cast Event Feature
 
 = Introduction =
+An event system consists of 3 main entities: dispatchers, listeners, and event objects. Event dispatchers are objects that dispatch events to objects that are registered as listeners. An example UML of the distribution of event objects between dispatchers and listeners can be seen below.
 
-;TMeCustomEventFeature: the abstract multicast event feature class. 
-;TMeWindowMessageFeature: the windows message multi-cast event feature class. 
+event_uml.jpg
+
+ * TMeCustomEventFeature: the abstract multicast event feature class. 
+ * TMeWindowMessageFeature: the windows message multi-cast event feature class. 
 
 
 = TMeWindowMessageFeature =
