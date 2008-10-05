@@ -1,5 +1,5 @@
 
-{ Summary Various character and string routines (searching, testing and transforming).}
+{ Summary Various character and AnsiString routines (searching, testing and transforming).}
 {
    @author  Riceball LEE(riceballl@hotmail.com)
    @version $Revision$
@@ -64,14 +64,14 @@ uses
 type
   EStringError = Exception;
   //only result = true to continue.
-  TOnDoFileEvent = function (const aFileName: string): Boolean;
+  TOnDoFileEvent = function (const aFileName: AnsiString): Boolean;
 
 resourcestring
-  RsBlankSearchString       = 'Search string cannot be blank';
-  RsInvalidEmptyStringItem  = 'String list passed to StringsToMultiSz cannot contain empty strings.';
+  RsBlankSearchString       = 'Search AnsiString cannot be blank';
+  RsInvalidEmptyStringItem  = 'AnsiString list passed to StringsToMultiSz cannot contain empty strings.';
   RsNumericConstantTooLarge = 'Numeric constant too large.';
   RsFormatException         = 'Format exception';
-  RsDotNetFormatNullFormat  = 'Format string is null';
+  RsDotNetFormatNullFormat  = 'Format AnsiString is null';
   RsArgumentIsNull          = 'Argument %d is null';
   RsDotNetFormatArgumentNotSupported = 'Argument type of %d is not supported';
   RsArgumentOutOfRange      = 'Argument out of range';
@@ -87,43 +87,43 @@ const
 
 const
   // Misc. often used character definitions
-  AnsiNull           = Char(#0);
-  AnsiSoh            = Char(#1);
-  AnsiStx            = Char(#2);
-  AnsiEtx            = Char(#3);
-  AnsiEot            = Char(#4);
-  AnsiEnq            = Char(#5);
-  AnsiAck            = Char(#6);
-  AnsiBell           = Char(#7);
-  AnsiBackspace      = Char(#8);
-  AnsiTab            = Char(#9);
-  AnsiVerticalTab    = Char(#11);
-  AnsiFormFeed       = Char(#12);
-  AnsiSo             = Char(#14);
-  AnsiSi             = Char(#15);
-  AnsiDle            = Char(#16);
-  AnsiDc1            = Char(#17);
-  AnsiDc2            = Char(#18);
-  AnsiDc3            = Char(#19);
-  AnsiDc4            = Char(#20);
-  AnsiNak            = Char(#21);
-  AnsiSyn            = Char(#22);
-  AnsiEtb            = Char(#23);
-  AnsiCan            = Char(#24);
-  AnsiEm             = Char(#25);
-  AnsiEndOfFile      = Char(#26);
-  AnsiEscape         = Char(#27);
-  AnsiFs             = Char(#28);
-  AnsiGs             = Char(#29);
-  AnsiRs             = Char(#30);
-  AnsiUs             = Char(#31);
-  AnsiSpace          = Char(' ');
-  AnsiComma          = Char(',');
-  AnsiBackslash      = Char('\');
-  AnsiForwardSlash   = Char('/');
+  AnsiNull           = AnsiChar(#0);
+  AnsiSoh            = AnsiChar(#1);
+  AnsiStx            = AnsiChar(#2);
+  AnsiEtx            = AnsiChar(#3);
+  AnsiEot            = AnsiChar(#4);
+  AnsiEnq            = AnsiChar(#5);
+  AnsiAck            = AnsiChar(#6);
+  AnsiBell           = AnsiChar(#7);
+  AnsiBackspace      = AnsiChar(#8);
+  AnsiTab            = AnsiChar(#9);
+  AnsiVerticalTab    = AnsiChar(#11);
+  AnsiFormFeed       = AnsiChar(#12);
+  AnsiSo             = AnsiChar(#14);
+  AnsiSi             = AnsiChar(#15);
+  AnsiDle            = AnsiChar(#16);
+  AnsiDc1            = AnsiChar(#17);
+  AnsiDc2            = AnsiChar(#18);
+  AnsiDc3            = AnsiChar(#19);
+  AnsiDc4            = AnsiChar(#20);
+  AnsiNak            = AnsiChar(#21);
+  AnsiSyn            = AnsiChar(#22);
+  AnsiEtb            = AnsiChar(#23);
+  AnsiCan            = AnsiChar(#24);
+  AnsiEm             = AnsiChar(#25);
+  AnsiEndOfFile      = AnsiChar(#26);
+  AnsiEscape         = AnsiChar(#27);
+  AnsiFs             = AnsiChar(#28);
+  AnsiGs             = AnsiChar(#29);
+  AnsiRs             = AnsiChar(#30);
+  AnsiUs             = AnsiChar(#31);
+  AnsiSpace          = AnsiChar(' ');
+  AnsiComma          = AnsiChar(',');
+  AnsiBackslash      = AnsiChar('\');
+  AnsiForwardSlash   = AnsiChar('/');
 
-  AnsiDoubleQuote = Char('"');
-  AnsiSingleQuote = Char('''');
+  AnsiDoubleQuote = AnsiChar('"');
+  AnsiSingleQuote = AnsiChar('''');
   AnsiLineFeed       = AnsiChar(#10);
   AnsiCarriageReturn = AnsiChar(#13);
   AnsiCrLf           = AnsiString(#13#10);
@@ -182,39 +182,39 @@ const
 
 
 {可以递归调用处理子目录以及旗下的文件}
-function ProcessFolder(const aFolder, aPatterns: string; const OnFile: TOnDoFileEvent): Boolean;
+function ProcessFolder(const aFolder, aPatterns: AnsiString; const OnFile: TOnDoFileEvent): Boolean;
 {
 only process the files in the aPath
   @param aPatterns  the search patterns: *.dpr;*.dfm
 }
-function ProcessFiles(const aPath:string; aPatterns: string; const OnFile: TOnDoFileEvent): Boolean;
+function ProcessFiles(const aPath:AnsiString; aPatterns: AnsiString; const OnFile: TOnDoFileEvent): Boolean;
 
-function ExtractFileBaseName(const aFileName: string): string;
+function ExtractFileBaseName(const aFileName: AnsiString): AnsiString;
 
 //come from JCL
-function PathIsDiskDevice(const Path: string): Boolean;
-function PathIsUNC(const Path: string): Boolean;
-function PathIsAbsolute(const Path: string): Boolean;
+function PathIsDiskDevice(const Path: AnsiString): Boolean;
+function PathIsUNC(const Path: AnsiString): Boolean;
+function PathIsAbsolute(const Path: AnsiString): Boolean;
 
-{ Summary Trim and lowercase the string.}
+{ Summary Trim and lowercase the AnsiString.}
 { Description
-  @Param aText the string to trim
-  @Param IgnoreCase  Ignore this string Case states. the default is False.
-  @Param IgnoreBlanks  Ignore the blanks in this string. the default is False.
-  Return the result string.
+  @Param aText the AnsiString to trim
+  @Param IgnoreCase  Ignore this AnsiString Case states. the default is False.
+  @Param IgnoreBlanks  Ignore the blanks in this AnsiString. the default is False.
+  Return the result AnsiString.
 }
-function StrTrim(const aText: string; const IgnoreCase: boolean = False; const IgnoreBlanks: boolean = False): string;
+function StrTrim(const aText: AnsiString; const IgnoreCase: boolean = False; const IgnoreBlanks: boolean = False): AnsiString;
 
-//Fetch the left string until aDelim found.
-function StrFetch(var S: string; const aDelim: string; const aDelete: Boolean = True): string;
-//Fetch the right string until aDelim found.
-function StrRFetch(var S: string; const aDelim: string; const aDelete: Boolean = True): string;
+//Fetch the left AnsiString until aDelim found.
+function StrFetch(var S: AnsiString; const aDelim: AnsiString; const aDelete: Boolean = True): AnsiString;
+//Fetch the right AnsiString until aDelim found.
+function StrRFetch(var S: AnsiString; const aDelim: AnsiString; const aDelete: Boolean = True): AnsiString;
 
-function StrToHex(const Source: string): string;
-procedure StrToStrings(S, Sep: string; const List: PMeStrings; const AllowEmptyString: Boolean = True);
+function StrToHex(const Source: AnsiString): AnsiString;
+procedure StrToStrings(S, Sep: AnsiString; const List: PMeStrings; const AllowEmptyString: Boolean = True);
 
-function StrFind(const Substr, S: string; const Index: Integer = 1): Integer;
-function StrSearch(const Substr, S: string; const Index: Integer = 1): Integer;
+function StrFind(const Substr, S: AnsiString; const Index: Integer = 1): Integer;
+function StrSearch(const Substr, S: AnsiString; const Index: Integer = 1): Integer;
 //StrMatches: *, ? matches
 function StrMatches(const Substr, S: AnsiString; const Index: Integer = 1): Boolean;
 function StrMatchWildA(const Source, Mask: AnsiString; 
@@ -227,55 +227,55 @@ function StrMatchWildIW(const Source, Mask: WideString;
   const WildChar: WideChar{$IFDEF SUPPORTS_DEFAULTPARAMS} = WideAsterisk{$ENDIF}; 
   const MaskChar: WideChar{$IFDEF SUPPORTS_DEFAULTPARAMS} = WideQuestionMark{$ENDIF}): Boolean;
 //Pos from right
-function RPos(const SubStr, S: string): Integer;
-{This searches an array of string for an occurance of SearchStr}
-function PosInStrArray(const SearchStr: string; const Contents: array of string; const CaseSensitive: Boolean = True): Integer;
+function RPos(const SubStr, S: AnsiString): Integer;
+{This searches an array of AnsiString for an occurance of SearchStr}
+function PosInStrArray(const SearchStr: AnsiString; const Contents: array of AnsiString; const CaseSensitive: Boolean = True): Integer;
 
 //convert the '#10' or '#$FF' to Chr(10) or Chr($FF);
-function StrDelphiUnEscape(const S: string): string;
+function StrDelphiUnEscape(const S: AnsiString): AnsiString;
 
-// String Extraction
-function StrAfter(const SubStr, S: string): string;
-function StrBefore(const SubStr, S: string): string;
-function StrBetween(const S: string; const Start, Stop: Char): string;
-function StrChopRight(const S: string; N: Integer): string;
-function StrLeft(const S: string; Count: Integer): string;
-function StrMid(const S: string; Start, Count: Integer): string;
-function StrRestOf(const S: string; N: Integer): string;
-function StrRight(const S: string; Count: Integer): string;
+// AnsiString Extraction
+function StrAfter(const SubStr, S: AnsiString): AnsiString;
+function StrBefore(const SubStr, S: AnsiString): AnsiString;
+function StrBetween(const S: AnsiString; const Start, Stop: AnsiChar): AnsiString;
+function StrChopRight(const S: AnsiString; N: Integer): AnsiString;
+function StrLeft(const S: AnsiString; Count: Integer): AnsiString;
+function StrMid(const S: AnsiString; Start, Count: Integer): AnsiString;
+function StrRestOf(const S: AnsiString; N: Integer): AnsiString;
+function StrRight(const S: AnsiString; Count: Integer): AnsiString;
 
-function TextIsSame(const A1, A2: string): Boolean;
+function TextIsSame(const A1, A2: AnsiString): Boolean;
 
 // Character Transformation Routines
-function CharHex(const C: Char): Byte;
-function CharLower(const C: Char): Char; {$IFDEF CLR} inline; {$ENDIF}
-function CharUpper(const C: Char): Char; {$IFDEF CLR} inline; {$ENDIF}
+function CharHex(const C: AnsiChar): Byte;
+function CharLower(const C: AnsiChar): AnsiChar; {$IFDEF CLR} inline; {$ENDIF}
+function CharUpper(const C: AnsiChar): AnsiChar; {$IFDEF CLR} inline; {$ENDIF}
 
 // Character Test Routines
-function CharIsUpper(const C: Char): Boolean; {$IFDEF CLR} inline; {$ENDIF}
-function CharIsLower(const C: Char): Boolean; {$IFDEF CLR} inline; {$ENDIF}
-function CharIsDigit(const C: Char): Boolean; {$IFDEF CLR} inline; {$ENDIF}
-function CharIsNumberChar(const C: Char): Boolean; {$IFDEF CLR} inline; {$ENDIF}
-function CharPosInSet(const AString: string; const ACharPos: Integer; const ASet: String): Integer;{$IFDEF CLR} inline; {$ENDIF}
-function CharIsInSet(const AString: string; const ACharPos: Integer; const ASet:  String): Boolean;{$IFDEF CLR} inline; {$ENDIF}
-function CharIsInEOL(const AString: string; const ACharPos: Integer): Boolean;{$IFDEF CLR} inline; {$ENDIF}
-function IsLeadChar(ACh : Char):Boolean;
-function CharRange(const AMin, AMax : Char): String;
+function CharIsUpper(const C: AnsiChar): Boolean; {$IFDEF CLR} inline; {$ENDIF}
+function CharIsLower(const C: AnsiChar): Boolean; {$IFDEF CLR} inline; {$ENDIF}
+function CharIsDigit(const C: AnsiChar): Boolean; {$IFDEF CLR} inline; {$ENDIF}
+function CharIsNumberChar(const C: AnsiChar): Boolean; {$IFDEF CLR} inline; {$ENDIF}
+function CharPosInSet(const AString: AnsiString; const ACharPos: Integer; const ASet: AnsiString): Integer;{$IFDEF CLR} inline; {$ENDIF}
+function CharIsInSet(const AString: AnsiString; const ACharPos: Integer; const ASet:  AnsiString): Boolean;{$IFDEF CLR} inline; {$ENDIF}
+function CharIsInEOL(const AString: AnsiString; const ACharPos: Integer): Boolean;{$IFDEF CLR} inline; {$ENDIF}
+function IsLeadChar(ACh : AnsiChar):Boolean;
+function CharRange(const AMin, AMax : AnsiChar): AnsiString;
 
-// String Test Routines
-function StrIsInteger(const S: string): Boolean;
+// AnsiString Test Routines
+function StrIsInteger(const S: AnsiString): Boolean;
 
 {$IFDEF COMPILER5} // missing Delphi 5 functions
-function TryStrToInt(const S: string; out Value: Integer): Boolean;
-function TryStrToInt64(const S: string; out Value: Int64): Boolean;
-function TryStrToFloat(const S: string; out Value: Extended): Boolean; overload;
-function TryStrToFloat(const S: string; out Value: Double): Boolean; overload;
-function TryStrToFloat(const S: string; out Value: Single): Boolean; overload;
-function TryStrToCurr(const S: string; out Value: Currency): Boolean;
+function TryStrToInt(const S: AnsiString; out Value: Integer): Boolean;
+function TryStrToInt64(const S: AnsiString; out Value: Int64): Boolean;
+function TryStrToFloat(const S: AnsiString; out Value: Extended): Boolean; overload;
+function TryStrToFloat(const S: AnsiString; out Value: Double): Boolean; overload;
+function TryStrToFloat(const S: AnsiString; out Value: Single): Boolean; overload;
+function TryStrToCurr(const S: AnsiString; out Value: Currency): Boolean;
 {$ENDIF COMPILER5}
 
 Var
-  gAppPath: String;
+  gAppPath: AnsiString;
 
 implementation
 
@@ -288,8 +288,8 @@ type
   end;
 
 const
-  AnsiStrRecSize  = SizeOf(TAnsiStrRec);     // size of the string header rec
-  AnsiCharCount   = Ord(High(Char)) + 1; // # of chars in one set
+  AnsiStrRecSize  = SizeOf(TAnsiStrRec);     // size of the AnsiString header rec
+  AnsiCharCount   = Ord(High(AnsiChar)) + 1; // # of chars in one set
   AnsiLoOffset    = AnsiCharCount * 0;       // offset to lower case chars
   AnsiUpOffset    = AnsiCharCount * 1;       // offset to upper case chars
   AnsiReOffset    = AnsiCharCount * 2;       // offset to reverse case chars
@@ -318,22 +318,22 @@ const
 
 
 var
-  AnsiCaseMap: array [0..AnsiCaseMapSize - 1] of Char; // case mappings
+  AnsiCaseMap: array [0..AnsiCaseMapSize - 1] of AnsiChar; // case mappings
   AnsiCaseMapReady: Boolean = False;         // true if case map exists
-  AnsiCharTypes: array [Char] of Word;
+  AnsiCharTypes: array [AnsiChar] of Word;
 
 procedure LoadCharTypes;
 var
-  CurrChar: Char;
+  CurrChar: AnsiChar;
   CurrType: Word;
   {$IFDEF CLR}
   Category: System.Globalization.UnicodeCategory;
   {$ENDIF CLR}
 begin
-  for CurrChar := Low(Char) to High(Char) do
+  for CurrChar := Low(AnsiChar) to High(AnsiChar) do
   begin
     {$IFDEF MSWINDOWS}
-    GetStringTypeExA(LOCALE_USER_DEFAULT, CT_CTYPE1, @CurrChar, SizeOf(Char), CurrType);
+    GetStringTypeExA(LOCALE_USER_DEFAULT, CT_CTYPE1, @CurrChar, SizeOf(AnsiChar), CurrType);
     {$DEFINE CHAR_TYPES_INITIALIZED}
     {$ENDIF MSWINDOWS}
     {$IFDEF LINUX}
@@ -367,11 +367,11 @@ end;
 
 procedure LoadCaseMap;
 var
-  CurrChar, UpCaseChar, LoCaseChar, ReCaseChar: Char;
+  CurrChar, UpCaseChar, LoCaseChar, ReCaseChar: AnsiChar;
 begin
   if not AnsiCaseMapReady then
   begin
-    for CurrChar := Low(Char) to High(Char) do
+    for CurrChar := Low(AnsiChar) to High(AnsiChar) do
     begin
       {$IFDEF MSWINDOWS}
       LoCaseChar := CurrChar;
@@ -381,8 +381,8 @@ begin
       {$DEFINE CASE_MAP_INITIALIZED}
       {$ENDIF MSWINDOWS}
       {$IFDEF LINUX}
-      LoCaseChar := Char(tolower(Byte(CurrChar)));
-      UpCaseChar := Char(toupper(Byte(CurrChar)));
+      LoCaseChar := AnsiChar(tolower(Byte(CurrChar)));
+      UpCaseChar := AnsiChar(toupper(Byte(CurrChar)));
       {$DEFINE CASE_MAP_INITIALIZED}
       {$ENDIF LINUX}
       {$IFNDEF CASE_MAP_INITIALIZED}
@@ -404,7 +404,7 @@ begin
 end;
 {$ENDIF}
 
-function RPos(const SubStr, S: string): Integer;
+function RPos(const SubStr, S: AnsiString): Integer;
 begin
   Result := Length(S) - Length(SubStr)+1;
   while Result > 0 do
@@ -422,7 +422,7 @@ begin
   Result := -1;
 end;
 
-function StrDelphiUnEscape(const S: string): string;
+function StrDelphiUnEscape(const S: AnsiString): AnsiString;
 var
   i: Integer;
 begin
@@ -465,7 +465,7 @@ begin
   end;
 end;
 
-function StrFetch(var S: string; const aDelim: string; const aDelete: Boolean): string;
+function StrFetch(var S: AnsiString; const aDelim: AnsiString; const aDelete: Boolean): AnsiString;
 var
   I: Integer;
 begin
@@ -492,7 +492,7 @@ begin
   end;
 end;
 
-function StrRFetch(var S: string; const aDelim: string; const aDelete: Boolean): string;
+function StrRFetch(var S: AnsiString; const aDelim: AnsiString; const aDelete: Boolean): AnsiString;
 var
   I: Integer;
 begin
@@ -515,10 +515,10 @@ begin
   end;
 end;
 
-procedure StrToStrings(S, Sep: string; const List: PMeStrings; const AllowEmptyString: Boolean = True);
+procedure StrToStrings(S, Sep: AnsiString; const List: PMeStrings; const AllowEmptyString: Boolean = True);
 var
   I, L: Integer;
-  Left: string;
+  Left: AnsiString;
 begin
   Assert(List <> nil);
   //List.BeginUpdate;
@@ -542,12 +542,12 @@ begin
 end;
 
 
-function StrToHex(const Source: string): string;
+function StrToHex(const Source: AnsiString): AnsiString;
 var
   Index: Integer;
   C, L, N: Integer;
   BL, BH: Byte;
-  S: string;
+  S: AnsiString;
   {$IFDEF CLR}
   sb: StringBuilder;
   {$ENDIF CLR}
@@ -591,7 +591,7 @@ begin
       {$ELSE}
       Result[N] :=
       {$ENDIF CLR}
-        Char((BH shl 4) + BL);
+        AnsiChar((BH shl 4) + BL);
       Inc(N);
     end;
   end;
@@ -601,12 +601,12 @@ begin
 end;
 
 {$IFDEF CLR}
-function StrFind(const Substr, S: string; const Index: Integer): Integer;
+function StrFind(const Substr, S: AnsiString; const Index: Integer): Integer;
 begin
-  Result := System.String(S).ToLower().IndexOf(System.String(SubStr).ToLower(), Index - 1) + 1;
+  Result := System.AnsiString(S).ToLower().IndexOf(System.AnsiString(SubStr).ToLower(), Index - 1) + 1;
 end;
 {$ELSE}
-function StrFind(const Substr, S: string; const Index: Integer): Integer; assembler;
+function StrFind(const Substr, S: AnsiString; const Index: Integer): Integer; assembler;
 const
    SearchChar: Byte = 0;
    NumberOfChars: Integer = 0;
@@ -633,7 +633,7 @@ asm
         PUSH    ESI
         PUSH    EDI
 
-        // set the string pointers
+        // set the AnsiString pointers
 
         MOV     ESI, EDX
         MOV     EDI, EAX
@@ -651,7 +651,7 @@ asm
 
         PUSH    ESI
 
-        // dec the length of Substr because the first char is brought out of it
+        // dec the length of Substr because the first AnsiChar is brought out of it
 
         DEC     EBX
         JS      @@NotFound
@@ -668,7 +668,7 @@ asm
 
         MOV     NumberOfChars, EBX
 
-        // point Str to Index'th char
+        // point Str to Index'th AnsiChar
 
         ADD     ESI, EDX
 
@@ -678,7 +678,7 @@ asm
         XOR     EAX, EAX
         XOR     EDX, EDX
 
-        // bring the first char out of the Substr and point Substr to the next char
+        // bring the first AnsiChar out of the Substr and point Substr to the next AnsiChar
 
         MOV     DL, [EDI]
         INC     EDI
@@ -692,7 +692,7 @@ asm
 
 @@FindNext:
 
-        // update the loop counter and check the end of string.
+        // update the loop counter and check the end of AnsiString.
         // if we reached the end, Substr was not found.
 
         DEC     ECX
@@ -700,17 +700,17 @@ asm
 
 @@Find:
 
-        // get current char from the string, and point Str to the next one
+        // get current AnsiChar from the AnsiString, and point Str to the next one
 
         MOV     AL, [ESI]
         INC     ESI
 
 
-        // lower case current char
+        // lower case current AnsiChar
 
         MOV     AL, [EBX + EAX]
 
-        // does current char match primary search char? if not, go back to the main loop
+        // does current AnsiChar match primary search AnsiChar? if not, go back to the main loop
 
         CMP     AL, SearchChar
         JNE     @@FindNext
@@ -780,12 +780,12 @@ end;
 {$ENDIF CLR}
 
 {$IFDEF CLR}
-function StrSearch(const Substr, S: string; const Index: Integer): Integer;
+function StrSearch(const Substr, S: AnsiString; const Index: Integer): Integer;
 begin
-  Result := System.String(S).IndexOf(SubStr, Index - 1) + 1;
+  Result := System.AnsiString(S).IndexOf(SubStr, Index - 1) + 1;
 end;
 {$ELSE}
-function StrSearch(const Substr, S: string; const Index: Integer): Integer; assembler;
+function StrSearch(const Substr, S: AnsiString; const Index: Integer): Integer; assembler;
 asm
         // make sure that strings are not null
 
@@ -801,14 +801,14 @@ asm
         JL      @@IndexIsSmall
 
         // ebp will hold # of chars in Substr to compare, esi pointer to Str,
-        // edi pointer to Substr, ebx primary search char
+        // edi pointer to Substr, ebx primary search AnsiChar
 
         PUSH    EBX
         PUSH    ESI
         PUSH    EDI
         PUSH    EBP
 
-        // set the string pointers
+        // set the AnsiString pointers
 
         MOV     ESI, EDX
         MOV     EDI, EAX
@@ -826,7 +826,7 @@ asm
         MOV     EBX, [EDI-AnsiStrRecSize].TAnsiStrRec.Length
         MOV     ECX, [ESI-AnsiStrRecSize].TAnsiStrRec.Length
 
-        // dec the length of Substr because the first char is brought out of it
+        // dec the length of Substr because the first AnsiChar is brought out of it
 
         DEC     EBX
         JS      @@NotFound
@@ -839,7 +839,7 @@ asm
         SUB     ECX, EDX
         JLE     @@NotFound
 
-        // point Str to Index'th char
+        // point Str to Index'th AnsiChar
 
         ADD     ESI, EDX
 
@@ -852,8 +852,8 @@ asm
         XOR     EAX, EAX
         XOR     EBX, EBX
 
-        // bring the first char out of the Substr, and
-        // point Substr to the next char
+        // bring the first AnsiChar out of the Substr, and
+        // point Substr to the next AnsiChar
 
         MOV     BL, [EDI]
         INC     EDI
@@ -864,7 +864,7 @@ asm
 
 @@FindNext:
 
-        // update the loop counter and check the end of string.
+        // update the loop counter and check the end of AnsiString.
         // if we reached the end, Substr was not found.
 
         DEC     ECX
@@ -872,11 +872,11 @@ asm
 
 @@Find:
 
-        // get current char from the string, and /point Str to the next one.
+        // get current AnsiChar from the AnsiString, and /point Str to the next one.
         MOV     AL, [ESI]
         INC     ESI
 
-        // does current char match primary search char? if not, go back to the main loop
+        // does current AnsiChar match primary search AnsiChar? if not, go back to the main loop
 
         CMP     AL, BL
         JNE     @@FindNext
@@ -885,7 +885,7 @@ asm
 
 @@Compare:
 
-        // move # of char to compare into edx, edx will be our compare loop counter.
+        // move # of AnsiChar to compare into edx, edx will be our compare loop counter.
 
         MOV     EDX, EBP
 
@@ -942,9 +942,9 @@ asm
 end;
 {$ENDIF CLR}
 
-//=== String Extraction ======================================================
+//=== AnsiString Extraction ======================================================
 
-function StrAfter(const SubStr, S: string): string;
+function StrAfter(const SubStr, S: AnsiString): AnsiString;
 var
   P: Integer;
 begin
@@ -955,7 +955,7 @@ begin
     Result := StrRestOf(S, P + Length(SubStr));
 end;
 
-function StrBefore(const SubStr, S: string): string;
+function StrBefore(const SubStr, S: AnsiString): AnsiString;
 var
   P: Integer;
 begin
@@ -967,7 +967,7 @@ begin
 end;
 
 
-function StrBetween(const S: string; const Start, Stop: Char): string;
+function StrBetween(const S: AnsiString; const Start, Stop: AnsiChar): AnsiString;
 var
   PosStart, PosEnd: Integer;
   L: Integer;
@@ -984,32 +984,32 @@ begin
     Result := '';
 end;
 
-function StrChopRight(const S: string; N: Integer): string;
+function StrChopRight(const S: AnsiString; N: Integer): AnsiString;
 begin
   Result := Copy(S, 1, Length(S) - N);
 end;
 
-function StrLeft(const S: string; Count: Integer): string;
+function StrLeft(const S: AnsiString; Count: Integer): AnsiString;
 begin
   Result := Copy(S, 1, Count);
 end;
 
-function StrMid(const S: string; Start, Count: Integer): string;
+function StrMid(const S: AnsiString; Start, Count: Integer): AnsiString;
 begin
   Result := Copy(S, Start, Count);
 end;
 
-function StrRestOf(const S: string; N: Integer ): string;
+function StrRestOf(const S: AnsiString; N: Integer ): AnsiString;
 begin
   Result := Copy(S, N, (Length(S) - N + 1));
 end;
 
-function StrRight(const S: string; Count: Integer): string;
+function StrRight(const S: AnsiString; Count: Integer): AnsiString;
 begin
   Result := Copy(S, Length(S) - Count + 1, Count);
 end;
 
-function StrIsInteger(const S: string): Boolean;
+function StrIsInteger(const S: AnsiString): Boolean;
 var
   i: Integer;
 begin
@@ -1041,7 +1041,7 @@ end;
 
 //=== Character Transformation Routines ======================================
 
-function CharHex(const C: Char): Byte;
+function CharHex(const C: AnsiChar): Byte;
 begin
   Result := $FF;
   if C in AnsiDecDigits then
@@ -1053,62 +1053,62 @@ begin
   end;
 end;
 
-function CharIsLower(const C: Char): Boolean;
+function CharIsLower(const C: AnsiChar): Boolean;
 begin
   {$IFDEF CLR}
-  Result := System.Char.IsLower(C);
+  Result := System.AnsiChar.IsLower(C);
   {$ELSE}
   Result := (AnsiCharTypes[C] and C1_LOWER) <> 0;
   {$ENDIF CLR}
 end;
 
-function CharIsUpper(const C: Char): Boolean;
+function CharIsUpper(const C: AnsiChar): Boolean;
 begin
   {$IFDEF CLR}
-  Result := System.Char.IsUpper(C);
+  Result := System.AnsiChar.IsUpper(C);
   {$ELSE}
   Result := (AnsiCharTypes[C] and C1_UPPER) <> 0;
   {$ENDIF CLR}
 end;
 
-function CharIsDigit(const C: Char): Boolean;
+function CharIsDigit(const C: AnsiChar): Boolean;
 begin
   {$IFDEF CLR}
-  Result := System.Char.IsDigit(C);
+  Result := System.AnsiChar.IsDigit(C);
   {$ELSE}
   Result := (AnsiCharTypes[C] and C1_DIGIT) <> 0;
   {$ENDIF CLR}
 end;
 
-function CharIsNumberChar(const C: Char): Boolean;
+function CharIsNumberChar(const C: AnsiChar): Boolean;
 begin
   {$IFDEF CLR}
-  Result := System.Char.IsDigit(C) or
+  Result := System.AnsiChar.IsDigit(C) or
   {$ELSE}
   Result := ((AnsiCharTypes[C] and C1_DIGIT) <> 0) or
   {$ENDIF CLR}
     (C in AnsiSigns) or (C = DecimalSeparator);
 end;
 
-function CharUpper(const C: Char): Char;
+function CharUpper(const C: AnsiChar): AnsiChar;
 begin
   {$IFDEF CLR}
-  Result := System.Char.ToUpper(C);
+  Result := System.AnsiChar.ToUpper(C);
   {$ELSE}
   Result := AnsiCaseMap[Ord(C) + AnsiUpOffset];
   {$ENDIF CLR}
 end;
 
-function CharLower(const C: Char): Char;
+function CharLower(const C: AnsiChar): AnsiChar;
 begin
   {$IFDEF CLR}
-  Result := System.Char.ToLower(C);
+  Result := System.AnsiChar.ToLower(C);
   {$ELSE}
   Result := AnsiCaseMap[Ord(C) + AnsiLoOffset];
   {$ENDIF CLR}
 end;
 
-function CharToCaseFoldW(const Char: WideChar): WideChar;
+function CharToCaseFoldW(const AnsiChar: WideChar): WideChar;
 const
   CHAR_TO_CASE_FOLD_1: array[$0000..$03FF] of Byte = (
     $00, $01, $02, $03, $04, $05, $06, $07,
@@ -1529,7 +1529,7 @@ const
 var
   i: Integer;
 begin
-  Result := Char;
+  Result := AnsiChar;
   i := CHAR_TO_CASE_FOLD_1[Ord(Result) div CHAR_TO_CASE_FOLD_SIZE];
   if i <> 0 then
     begin
@@ -2000,7 +2000,7 @@ begin
   until False;
 end;
 
-function ExtractFileBaseName(const aFileName: string): string;
+function ExtractFileBaseName(const aFileName: AnsiString): AnsiString;
 var
   i: integer;
 begin
@@ -2009,19 +2009,19 @@ begin
   Result := Copy(aFileName, 1, i-1);
 end;
 
-function PathIsDiskDevice(const Path: string): Boolean;
+function PathIsDiskDevice(const Path: AnsiString): Boolean;
 {$IFDEF UNIX}
 var
-  FullPath: string;
+  FullPath: AnsiString;
   F: PIOFile;
-  Buffer: array [0..255] of Char;
+  Buffer: array [0..255] of AnsiChar;
   MountEntry: TMountEntry;
   FsTypes: PMeStrings;
 
   procedure GetAvailableFileSystems(const List: PMeStrings);
   var
     F: TextFile;
-    S: string;
+    S: AnsiString;
   begin
     AssignFile(F, '/proc/filesystems');
     Reset(F);
@@ -2067,7 +2067,7 @@ begin
 end;
 {$ENDIF MSWINDOWS}
 
-function PathIsUNC(const Path: string): Boolean;
+function PathIsUNC(const Path: AnsiString): Boolean;
 
 {$IFDEF MSWINDOWS}
 
@@ -2098,7 +2098,7 @@ var
   var
     NonDigitFound: Boolean;
   begin
-    // a valid machine name is a string composed of the set [a-z, A-Z, 0-9, -, _] but it may not
+    // a valid machine name is a AnsiString composed of the set [a-z, A-Z, 0-9, -, _] but it may not
     // consist entirely out of numbers
     Result := True;
     NonDigitFound := False;
@@ -2145,7 +2145,7 @@ var
     InvalidCharacters =
       ['<', '>', '?', '/', ',', '*', '+', '=', '[', ']', '|', ':', ';', '"', '''']; //'
   begin
-    // a valid share name is a string composed of a set the set !InvalidCharacters note that a
+    // a valid share name is a AnsiString composed of a set the set !InvalidCharacters note that a
     // leading '$' is valid (indicates a hidden share)
     Result := True;
     {$IFDEF CLR}
@@ -2209,7 +2209,7 @@ end;
 
 {$ENDIF UNIX}
 
-function PathIsAbsolute(const Path: string): Boolean;
+function PathIsAbsolute(const Path: AnsiString): Boolean;
 {$IFDEF CLR}
 begin
   Result := System.IO.Path.IsPathRooted(Path);
@@ -2242,11 +2242,11 @@ begin
 end;
 {$ENDIF ~CLR}
 
-function ProcessFiles(const aPath:string; aPatterns: string; const OnFile: TOnDoFileEvent): Boolean;
+function ProcessFiles(const aPath:AnsiString; aPatterns: AnsiString; const OnFile: TOnDoFileEvent): Boolean;
 var 
   p: integer;
   SrchRec: TSearchRec;
-  Pattern: string;
+  Pattern: AnsiString;
 begin
   //WriteLn('ProcessFiles ' + aPath);
   Result := True;
@@ -2279,7 +2279,7 @@ begin
 end;
 
 //the aFolder must IncludeTrailingPathDelimiter!!
-function ProcessFolder(const aFolder, aPatterns: string; const OnFile: TOnDoFileEvent): Boolean;
+function ProcessFolder(const aFolder, aPatterns: AnsiString; const OnFile: TOnDoFileEvent): Boolean;
 var
   DirSrchRec: TSearchRec;
 begin
@@ -2306,7 +2306,7 @@ begin
     Result := ProcessFiles(aFolder, aPatterns, OnFile);
 end;
 
-function StrTrim(const aText: string; const IgnoreCase: boolean; const IgnoreBlanks: boolean): string;
+function StrTrim(const aText: AnsiString; const IgnoreCase: boolean; const IgnoreBlanks: boolean): AnsiString;
 var
   i, j, len: integer;
 begin
@@ -2348,7 +2348,7 @@ begin
 end;
 
 {$IFDEF COMPILER5} // missing Delphi 5 functions
-function TryStrToInt(const S: string; out Value: Integer): Boolean;
+function TryStrToInt(const S: AnsiString; out Value: Integer): Boolean;
 var
   Err: Integer;
 begin
@@ -2356,7 +2356,7 @@ begin
   Result := Err = 0;
 end;
 
-function TryStrToInt64(const S: string; out Value: Int64): Boolean;
+function TryStrToInt64(const S: AnsiString; out Value: Int64): Boolean;
 var
   Err: Integer;
 begin
@@ -2364,12 +2364,12 @@ begin
   Result := Err = 0;
 end;
 
-function TryStrToFloat(const S: string; out Value: Extended): Boolean;
+function TryStrToFloat(const S: AnsiString; out Value: Extended): Boolean;
 begin
   Result := TextToFloat(PChar(S), Value, fvExtended);
 end;
 
-function TryStrToFloat(const S: string; out Value: Double): Boolean;
+function TryStrToFloat(const S: AnsiString; out Value: Double): Boolean;
 var
   F: Extended;
 begin
@@ -2378,7 +2378,7 @@ begin
     Value := F;
 end;
 
-function TryStrToFloat(const S: string; out Value: Single): Boolean;
+function TryStrToFloat(const S: AnsiString; out Value: Single): Boolean;
 var
   F: Extended;
 begin
@@ -2387,23 +2387,23 @@ begin
     Value := F;
 end;
 
-function TryStrToCurr(const S: string; out Value: Currency): Boolean;
+function TryStrToCurr(const S: AnsiString; out Value: Currency): Boolean;
 begin
   Result := TextToFloat(PChar(S), Value, fvCurrency);
 end;
 {$ENDIF COMPILER5}
 
-function TextIsSame(const A1, A2: string): Boolean;
+function TextIsSame(const A1, A2: AnsiString): Boolean;
 begin
   {$IFDEF DOTNET}
-  Result := System.String.Compare(A1, A2, True) = 0;
+  Result := System.AnsiString.Compare(A1, A2, True) = 0;
   {$ELSE}
   Result := AnsiCompareText(A1, A2) = 0;
   {$ENDIF}
 end;
 
-{This searches an array of string for an occurance of SearchStr}
-function PosInStrArray(const SearchStr: string; const Contents: array of string; const CaseSensitive: Boolean = True): Integer;
+{This searches an array of AnsiString for an occurance of SearchStr}
+function PosInStrArray(const SearchStr: AnsiString; const Contents: array of AnsiString; const CaseSensitive: Boolean = True): Integer;
 begin
   for Result := Low(Contents) to High(Contents) do begin
     if CaseSensitive then begin
@@ -2419,7 +2419,7 @@ begin
   Result := -1;
 end;
 
-function CharPosInSet(const AString: string; const ACharPos: Integer; const ASet: String): Integer;
+function CharPosInSet(const AString: AnsiString; const ACharPos: Integer; const ASet: AnsiString): Integer;
 begin
   if ACharPos <= Length(AString) then begin
     Result := AnsiPos(AString[ACharPos], ASet);
@@ -2428,17 +2428,17 @@ begin
   end;
 end;
 
-function CharIsInSet(const AString: string; const ACharPos: Integer; const ASet:  String): Boolean;
+function CharIsInSet(const AString: AnsiString; const ACharPos: Integer; const ASet:  AnsiString): Boolean;
 begin
   Result := CharPosInSet(AString, ACharPos, ASet) > 0;
 end;
 
-function CharIsInEOL(const AString: string; const ACharPos: Integer): Boolean;
+function CharIsInEOL(const AString: AnsiString; const ACharPos: Integer): Boolean;
 begin
   Result := CharIsInSet(AString, ACharPos, AnsiCrLf);
 end;
 
-function IsLeadChar(ACh : Char):Boolean;
+function IsLeadChar(ACh : AnsiChar):Boolean;
 begin
   {$IFDEF DOTNET}
   Result := False;
@@ -2447,9 +2447,9 @@ begin
   {$ENDIF}
 end;
 
-function CharRange(const AMin, AMax : Char): String;
+function CharRange(const AMin, AMax : AnsiChar): AnsiString;
 var
-  i : Char;
+  i : AnsiChar;
 {$IFDEF DOTNET}
   LSB : System.Text.StringBuilder;
 begin
