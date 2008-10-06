@@ -122,6 +122,31 @@ var Request = new Class({
     ErrorCanNotSetRequestHeader : 'Error Can not Set RequestHeader'
 	},
 
+  _IsCrossSite: function(aUrl){
+  	//XSS hack----------------------------------
+    var vResult = false;
+    //this.FIsCrossSite = false;
+    if (aUrl != undefined && aUrl != "") {
+    	var vUrlParts = aUrl.match(/^(\w+:)\/\/([^\/:]+?)(?::(\d+))?(?:$|\/)/);
+    	if(vUrlParts){
+    		vResult = (
+    			location.protocol !=  vUrlParts[1] ||
+    			document.domain   !=  vUrlParts[2] ||
+    			location.port     != (vUrlParts[3] || "")
+    		);
+    	}
+    }
+    //console.log('FIsCrossSite='+this.FIsCrossSite);
+		if (!this.options.async && this.FIsCrossSite)
+			throw Error({code: cErrorNeedAsyncForCrossSite, message: this.rs.ErrorNeedAsyncForCrossSite});
+    return vResult;
+    //XSS hack -------------------------------
+  },
+  setUrl: function(aUrl){
+    this.setOptions({url: aUrl});
+    this.FIsCrossSite = this._IsCrossSite(aUrl); //XSS hack
+  },
+
 	/** 
      @construct 
 	@memberOf Request
@@ -131,20 +156,7 @@ var Request = new Class({
 		this.options.isSuccess = this.options.isSuccess || this.isSuccess;
 		this.headers = new Hash(this.options.headers);
 
-  	//XSS hack----------------------------------
-    this.FIsCrossSite = false;
-  	var vUrlParts = this.options.url.match(/^(\w+:)\/\/([^\/:]+?)(?::(\d+))?(?:$|\/)/);
-  	if(vUrlParts){
-  		this.FIsCrossSite = (
-  			location.protocol !=  vUrlParts[1] ||
-  			document.domain   !=  vUrlParts[2] ||
-  			location.port     != (vUrlParts[3] || "")
-  		);
-  	};
-    //console.log(this.FIsCrossSite);
-		if (!this.options.async && this.FIsCrossSite)
-			throw Error({code: cErrorNeedAsyncForCrossSite, message: this.rs.ErrorNeedAsyncForCrossSite});
-    //XSS hack -------------------------------
+    this.FIsCrossSite = this._IsCrossSite(this.options.url); //XSS hack
 
 		this.xhr = new Browser.Request();
 	}
@@ -286,20 +298,34 @@ Request.implement({
 
 		if (!this.check(arguments.callee, options)) return this;
 
+		var vIsCrossSite = this.FIsCrossSite;
+
+    var type = $type(options);
+    //var url = "";
+
+		if (type == 'string' || type == 'element') {
+      options = {data: options}
+    }
+    else if (type == "object" && options["url"] != this.options.url){
+      //url = options["url"];
+      vIsCrossSite = this._IsCrossSite(options["url"]);
+    }
+    //alert(JSON.encode(options));
+    
+		var old = this.options;
+		options = $extend({data: old.data, url: old.url, method: old.method}, options);
+		var data = options.data, url = options.url, method = options.method;
+    //if (url == "") url = options.url;
+    //alert(options.url);
+
     //XSS hack -------------------------------
-		if (this.FIsCrossSite && options.method != 'get')
+		if (vIsCrossSite && options.method != 'get')
 			throw Error({code: cErrorCrossSiteSupportGetMethodOnly, message: this.rs.ErrorCrossSiteSupportGetMethodOnly});
     //XSS hack -------------------------------
 
 		this.running = true;
     Request.Count++;
 
-		var type = $type(options);
-		if (type == 'string' || type == 'element') options = {data: options};
-
-		var old = this.options;
-		options = $extend({data: old.data, url: old.url, method: old.method}, options);
-		var data = options.data, url = options.url, method = options.method;
     if (data.params) {
       if (data.params.CallbackParamName) delete data.params.CallbackParamName;
       if (!data.params.id) data.params.id = Request.Count;
@@ -317,7 +343,7 @@ Request.implement({
 		}
 
 		//XSS hack ----------------------------------
-    if (this.FIsCrossSite) {
+    if (vIsCrossSite) {
   		this.fireEvent('request');
       //Create an ad hoc function specifically for this cross-site request
       Request.callbacks['r' + String(Request.Count)] = (function(instance, id){
@@ -439,6 +465,9 @@ Request.implement({
 
 });
 
+/*
+  get(aUrl,  aData)
+*/
 (function(){
   var methods = {};
   ['get', 'post', 'put', 'delete', 'GET', 'POST', 'PUT', 'DELETE'].each(function(method){
