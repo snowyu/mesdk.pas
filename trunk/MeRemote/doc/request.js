@@ -48,7 +48,7 @@ var cErrorCanNotSetRequestHeader = 14;
   }
   vRequest.addEvent('complete', onComplete);
 	@events
-	  onException, onComplete, onFailure
+	  onComplete, onFailure
 */
 var Request = new Class({
 
@@ -219,11 +219,13 @@ Request.implement({
 	},
 
 	failure: function(aError){
+    //alert('OnFail: '+ arguments);
+    //console.log('OnFail: %s',arguments);
 		this.onFailure(aError);
 	},
 
 	onFailure: function(){
-		this.fireEvent('complete', arguments).fireEvent('failure', arguments);
+		this.fireEvent('complete', arguments).fireEvent('failure', arguments).callChain();
 	},
 
 	setHeader: function(name, value){
@@ -394,13 +396,13 @@ Request.implement({
     this.status = 0;
 
   	if(typeof response != 'object')
-  		throw Error({code: cErrorResponseObject, message: rsErrorResponseObject});
+  		throw Error({code: cErrorResponseObject, message: rs.ErrorResponseObject});
   	if(!response.id)
-  		throw Error({code: cErrorResponseIdMissed,message: rsErrorResponseIdMissed});
+  		throw Error({code: cErrorResponseIdMissed,message: rs.ErrorResponseIdMissed});
 
   	if(!Request.pendingRequests[response.id])
   	  //'Fatal error with RpcClient code: no such ID "' + response.id + '" found in pendingRequests.'
-  		throw Error({code: cErrorResponseIdUnkonwn, message: rsErrorResponseIdUnkonwn});
+  		throw Error({code: cErrorResponseIdUnkonwn, message: rs.ErrorResponseIdUnkonwn});
 
   	//Remove the SCRIPT element from the DOM tree for cross-site (JSON-in-Script) requests
   	if(Request.pendingRequests[response.id]){
@@ -415,8 +417,12 @@ Request.implement({
 
   	//Handle errors returned by the server
   	if(response.error !== undefined){
-  		var err = new Error(response.error.message);
-  		err.code = response.error.code;
+		  this.response = {text: null, xml: null};
+      this.failure(response);
+/*
+    var err = new Error(response.error.message);
+      if (response.error["code"])
+  		  err.code = response.error.code;
   		//err.locationCode = SERVER
   		if(Request.pendingRequests[response.id].onException){
   			try{
@@ -429,7 +435,8 @@ Request.implement({
   			}
   		}
   		else uncaughtExceptions.push(err);
-  	}
+//*/
+      }
   	else {
     	//Process the valid result
       //console.log("success!");
@@ -440,10 +447,12 @@ Request.implement({
 
   	delete Request.pendingRequests[response.id];
 
+
+/*
   	//Merge any exception raised by onComplete into the previous one(s) and throw it
+    //  console.log("The 1err response(%d)", uncaughtExceptions.length);
   	if(uncaughtExceptions.length){
 			this.response = {text: null, xml: null};
-			this.failure();
 
   		var code;
   		var message = 'There ' + (uncaughtExceptions.length == 1 ?
@@ -456,11 +465,14 @@ Request.implement({
   			if(uncaughtExceptions[i].code)
   				code = uncaughtExceptions[i].code;
   		}
-  		var err = new Error(message);
-  		err.code = code;
+  		var err = {error: {"code": code, "message": message}};
+  		//err.code = code;
+      //console.log("The 1err response(%d)", uncaughtExceptions.length);
       //console.log("The err response(%d): %s", requestId, message);
-  		throw err;
+      this.failure(err);
+  		//throw err;
   	}
+//*/
   }
 
 });
