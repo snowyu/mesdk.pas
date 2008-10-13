@@ -13,6 +13,8 @@
     * Portions created by Riceball LEEis Copyright (C) 2008
     * All rights reserved.
     * Contributor(s):
+
+
 }
 unit uMeEventFeature;
 
@@ -29,6 +31,7 @@ uses
   Windows,
   {$ENDIF}
   SysUtils, Classes
+  , uMeSystem
   , uMeObject
   , uMeSysUtils
   {$IFDEF MeRTTI_SUPPORT}
@@ -40,40 +43,71 @@ uses
   ;
 
 type
+  {: this exception prevents the event object from moving on to the next node, but only after any other event listeners on the current node are allowed to execute. }
+  EMeEventStopPropagation = class(EMeError);
+  {: this exception prevents prevents the event object from moving on to the next node, but does not allow any other event listeners on the current node to execute. }
+  EMeEventStopImmediatePropagation = class(EMeError);
+
   TEventId = Cardinal;
-  PMeEventInfo = ^ TMeEventInfo;
-  PMePublisherInfo = ^ TMePublisherInfo;
+  PMeCustomEventInfo = ^ TMeCustomEventInfo;
+  PMeCustomPublisherInfo = ^ TMeCustomPublisherInfo;
   TMeCustomEventFeature = class;
 
-  TMeEventInfo = object(TMeDynamicObject)
+  TMeEventPhase = (epUnknown, epCapturing, epTarget, epBubbling);
+
+  PMeMessage = ^TMeMessage;
+  TMeMessage = packed record
+    Msg: Cardinal;
+    WParam: Longint;
+    LParam: Longint;
+    Result: Longint;
+
+    //the extend:
+    Target: TObject;
+    CurrentTarget: TObject;
+  end;
+
+  TMeCustomEventInfo = object(TMeDynamicObject)
   protected
     procedure Init; virtual; //override
     procedure ListenerFreeNotify(Instance : Pointer);
-
   public
     destructor Destroy; virtual; //override;
+    {: dispatch the event to Subscribers(listeners)} 
     procedure Dispatch(const Sender: TObject; var aEvent);
     procedure AddListener(const aListener: TObject);
   public
+    //Read-only property
     EventId: TEventId;
+    //Read-only property
     Subscribers: PMeThreadSafeList;
+    //this event is cancelable or not
+    Cancelable: Boolean;
   end;
 
-  {: the abstract Publisher Info object.}
-  TMePublisherInfo = object(TMeDynamicObject)
+  TMeEventInfo = object(TMeCustomEventInfo)
+  public
+    EventPhase: TMeEventPhase;
+  end;
+
+  {: the Publisher Info object.}
+  TMeCustomPublisherInfo = object(TMeDynamicObject)
   protected
     FOwner: TMeCustomEventFeature;
     procedure Init; virtual; //override
+    function GetEventInfoClass: TMeClass; virtual; 
   public
     destructor Destroy; virtual; //override;
     {: Is the event exists }
-    function IsExists(aEventId: TEventId): Boolean; virtual;
+    function IsEventExists(aEventId: TEventId): Boolean;
     function IndexOfEvent(aEventId: TEventId): Integer;
-    function FindEvent(const aEvent): PMeEventInfo; virtual;
-    function RegisterEvent(const aEventId: TEventId): Integer;
+    function FindEvent(const aEvent): PMeCustomEventInfo;
+    function FindEventById(const aEventId: TEventId): PMeCustomEventInfo;
+    function RegisterEventById(const aEventId: TEventId): Integer;
+    function RegisterEvent(const aEvent: PMeCustomEventInfo): Integer;
   public
     Publisher: TObject;
-    Events: PMeList; //List of PMeEventInfo
+    Events: PMeThreadSafeList; //List of PMeCustomEventInfo
     //Subscribers: PMeThreadSafeList;
   end;
   
@@ -84,7 +118,7 @@ type
   protected
     procedure PublisherFreeNotify(Instance : Pointer);
     function IndexOfPublisher(const Instance : TObject): Integer;
-    function FindPublisher(const Instance : TObject): PMePublisherInfo;
+    function FindPublisher(const Instance : TObject): PMeCustomPublisherInfo;
     procedure ClearPublishers;
     procedure DeletePublisher(const Instance : TObject);
     {: must override }
@@ -99,11 +133,16 @@ type
     constructor Create; override;
     destructor Destroy; override;
 
-    function RegisterEvent(const aPublisher: TObject; const aEventId: TEventId): PMeEventInfo;
+    function GetEvent(const aPublisher: TObject; const aEventId: TEventId): PMeCustomEventInfo;
+    function RegisterEvent(const aPublisher: TObject; const aEventId: TEventId): PMeCustomEventInfo;
     procedure UnRegisterEvent(const aPublisher: TObject; const aEventId: TEventId);
   end;
 
-  { Summary: 基于Window 消息的多投事件的功能。 }
+  { Summary: the multicast event feaure for windows message  }
+  {
+    the return value of the TMessage should be 0 if someone processes this message.
+    
+  }
   TMeWindowMessageFeature = class(TMeCustomEventFeature)
   protected
     function GetPublisherInfoClass: TMeClass; override;
@@ -129,14 +168,14 @@ begin
   Result := FMeWindowMessageFeature;
 end;
 
-{ TMeEventInfo }
-procedure TMeEventInfo.Init;
+{ TMeCustomEventInfo }
+procedure TMeCustomEventInfo.Init;
 begin
   inherited;
   New(Subscribers, Create);
 end;
 
-destructor TMeEventInfo.Destroy; 
+destructor TMeCustomEventInfo.Destroy; 
 var
   i: Integer;
 begin
@@ -154,7 +193,7 @@ begin
   inherited;
 end;
 
-procedure TMeEventInfo.AddListener(const aListener: TObject);
+procedure TMeCustomEventInfo.AddListener(const aListener: TObject);
 begin
   if Assigned(aListener) then
     with Subscribers.LockList^ do
@@ -169,7 +208,7 @@ begin
     end;
 end;
 
-procedure TMeEventInfo.Dispatch(const Sender: TObject; var aEvent);
+procedure TMeCustomEventInfo.Dispatch(const Sender: TObject; var aEvent);
 var
   i: Integer;
 begin
@@ -178,74 +217,113 @@ begin
     //writeln('Subscribers.conunt:',Count);
     //writeln('EventId:',PDispatchMessage(aEvent).MsgId);
     for i := 0 to Count - 1 do
-    begin
+    try
       TObject(Items[i]).Dispatch(PDispatchMessage(aEvent)^);
+    except
+      On EMeEventStopImmediatePropagation do break;
+      else
+        Raise;
     end;
   finally
     Subscribers.UnLockList;
   end;
 end;
 
-procedure TMeEventInfo.ListenerFreeNotify(Instance : Pointer);
+procedure TMeCustomEventInfo.ListenerFreeNotify(Instance : Pointer);
 begin
   Subscribers.Remove(Instance);
 end;
 
-{ TMePublisherInfo }
-procedure TMePublisherInfo.Init;
+{ TMeCustomPublisherInfo }
+procedure TMeCustomPublisherInfo.Init;
 begin
   inherited;
   New(Events, Create);
 end;
 
-destructor TMePublisherInfo.Destroy; 
+destructor TMeCustomPublisherInfo.Destroy; 
 begin
-  Events.FreeMeObjects;
+  with Events.LockList^ do 
+  try 
+    FreeMeObjects;
+  finally
+    Events.UnLockList;
+  end;
   MeFreeAndNil(Events);
   inherited;
 end;
 
-function TMePublisherInfo.FindEvent(const aEvent): PMeEventInfo;
+function TMeCustomPublisherInfo.FindEvent(const aEvent): PMeCustomEventInfo;
+begin
+  Result := FindEventById(FOwner.RetrieveEventId(aEvent));
+end;
+
+function TMeCustomPublisherInfo.FindEventById(const aEventId: TEventId): PMeCustomEventInfo;
 var
   i: Integer;
 begin
-  with Events^ do
+  with Events.LockList^ do
+  try
     for i := 0 to Count - 1 do
     begin
-      Result := PMeEventInfo(Items[i]);
-      if Assigned(Result) and (Result.EventId = FOwner.RetrieveEventId(aEvent)) then
+      Result := PMeCustomEventInfo(Items[i]);
+      if Assigned(Result) and (Result.EventId = aEventId) then
         exit;
     end;
+  finally
+    Events.UnLockList;
+  end;
   Result := nil;
 end;
 
-function TMePublisherInfo.IndexOfEvent(aEventId: TEventId): Integer;
-var
-  vItem: PMeEventInfo;
+
+function TMeCustomPublisherInfo.GetEventInfoClass: TMeClass;
 begin
-  with Events^ do
+  Result := TypeOf(TMeCustomEventInfo);
+end;
+
+function TMeCustomPublisherInfo.IndexOfEvent(aEventId: TEventId): Integer;
+var
+  vItem: PMeCustomEventInfo;
+begin
+  with Events.LockList^ do
+  try
     for Result := 0 to Count - 1 do
     begin
-      vItem := PMeEventInfo(Items[Result]);
+      vItem := PMeCustomEventInfo(Items[Result]);
       if Assigned(vItem) and (vItem.EventId = aEventId) then
         exit;
     end;
+  finally
+    Events.UnLockList;
+  end;
   Result := -1;
 end;
 
-function TMePublisherInfo.IsExists(aEventId: TEventId): Boolean; 
+function TMeCustomPublisherInfo.IsEventExists(aEventId: TEventId): Boolean; 
 begin
   Result := IndexOfEvent(aEventId) >= 0;
 end;
 
-function TMePublisherInfo.RegisterEvent(const aEventId: TEventId): Integer;
+function TMeCustomPublisherInfo.RegisterEvent(const aEvent: PMeCustomEventInfo): Integer;
+begin
+  if Assigned(aEvent) and (IndexOfEvent(aEvent.EventId) < 0) then
+  begin
+    Result := Events.Add(aEvent);
+  end
+  else 
+    Result := -1;
+end;
+
+function TMeCustomPublisherInfo.RegisterEventById(const aEventId: TEventId): Integer;
 var
-  vItem: PMeEventInfo;
+  vItem: PMeCustomEventInfo;
 begin
   Result := IndexOfEvent(aEventId);
   if Result < 0 then
   begin
-    New(vItem, Create);
+    vItem := PMeCustomEventInfo(NewMeObject(GetEventInfoClass));
+    //New(vItem, Create);
     vItem.EventId := aEventId;
     Result := Events.Add(vItem);
   end
@@ -254,7 +332,7 @@ begin
 end;
 
 {
-function TMePublisherInfo.RetrieveEventId(var aEvent): TEventId;
+function TMeCustomPublisherInfo.RetrieveEventId(var aEvent): TEventId;
 begin
 end;
 }
@@ -274,31 +352,12 @@ begin
   inherited;
 end;
 
-Type
-  PMessage = ^TMessage;
-  TMessage = packed record
-
-    Msg: Cardinal;
-    case Integer of
-      0: (
-        WParam: Longint;
-        LParam: Longint;
-        Result: Longint);
-      1: (
-        WParamLo: Word;
-        WParamHi: Word;
-        LParamLo: Word;
-        LParamHi: Word;
-        ResultLo: Word;
-        ResultHi: Word);
-
-  end;
 procedure TMeCustomEventFeature.BeforeExecute(Sender: TObject; MethodItem:
   TMeInterceptedMethodItem; const Params: PMeProcParams);
 var
-  vItem: PMePublisherInfo;
+  vItem: PMeCustomPublisherInfo;
   v: PDispatchMessage;
-  vEventInfo: PMeEventInfo;
+  vEventInfo: PMeCustomEventInfo;
 begin
   //if Assigned(Sender) and (Sender.ClassName= 'TTestPublisher') then write('Dispatch.BeforeExecute:'+Sender.ClassName);
   vItem := FindPublisher(Sender);
@@ -315,13 +374,13 @@ end;
 procedure TMeCustomEventFeature.ClearPublishers;
 var
   i: Integer;
-  vItem: PMePublisherInfo;
+  vItem: PMeCustomPublisherInfo;
 begin
   with FPublisherInfoList.LockList^ do
   try
     for i := Count -1 downto 0 do
     begin
-      vItem := PMePublisherInfo(Items[i]);
+      vItem := PMeCustomPublisherInfo(Items[i]);
       if Assigned(vItem) then
       begin
         RemoveFreeNotification(vItem, PublisherFreeNotify);
@@ -337,13 +396,13 @@ end;
 procedure TMeCustomEventFeature.DeletePublisher(const Instance : TObject);
 var
   i: Integer;
-  vItem: PMePublisherInfo;
+  vItem: PMeCustomPublisherInfo;
 begin
   with FPublisherInfoList.LockList^ do
   try
     for i := Count -1 downto 0 do
     begin
-      vItem := PMePublisherInfo(Items[i]);
+      vItem := PMeCustomPublisherInfo(Items[i]);
       if Assigned(vItem) and (vItem.Publisher  = Instance) then
       begin
         RemoveFreeNotification(vItem, PublisherFreeNotify);
@@ -357,7 +416,7 @@ begin
   end;
 end;
 
-function TMeCustomEventFeature.FindPublisher(const Instance : TObject): PMePublisherInfo;
+function TMeCustomEventFeature.FindPublisher(const Instance : TObject): PMeCustomPublisherInfo;
 var
   i: Integer;
 begin
@@ -365,7 +424,7 @@ begin
   try
     for i := 0 to Count -1 do
     begin
-      Result := PMePublisherInfo(Items[i]);
+      Result := PMeCustomPublisherInfo(Items[i]);
       if Assigned(Result) and (Result.Publisher  = Instance) then
         exit;
     end;
@@ -375,15 +434,27 @@ begin
   Result := nil;
 end;
 
+function TMeCustomEventFeature.GetEvent(const aPublisher: TObject; const aEventId: TEventId): PMeCustomEventInfo;
+var
+  vPublisherInfo: PMeCustomPublisherInfo;
+begin
+  Result := nil;
+  vPublisherInfo := FindPublisher(aPublisher);
+  if Assigned(vPublisherInfo) then
+  begin
+    Result := vPublisherInfo.FindEventById(aEventId);
+  end;
+end;
+
 function TMeCustomEventFeature.IndexOfPublisher(const Instance : TObject): Integer;
 var
-  vItem: PMePublisherInfo;
+  vItem: PMeCustomPublisherInfo;
 begin
   with FPublisherInfoList.LockList^ do
   try
     for Result := 0 to Count -1 do
     begin
-      vItem := PMePublisherInfo(Items[Result]);
+      vItem := PMeCustomPublisherInfo(Items[Result]);
       if Assigned(vItem) and (vItem.Publisher  = Instance) then
         exit;
     end;
@@ -403,16 +474,16 @@ begin
   //DeletePublisher(Instance);
 end;
 
-function TMeCustomEventFeature.RegisterEvent(const aPublisher: TObject; const aEventId: TEventId): PMeEventInfo;
+function TMeCustomEventFeature.RegisterEvent(const aPublisher: TObject; const aEventId: TEventId): PMeCustomEventInfo;
 var
   i: Integer;
-  vPublisherInfo: PMePublisherInfo;
+  vPublisherInfo: PMeCustomPublisherInfo;
 begin
   Result := nil;
   i := IndexOfPublisher(aPublisher);
   if i < 0 then
   begin
-    vPublisherInfo := PMePublisherInfo(NewMeObject(GetPublisherInfoClass));
+    vPublisherInfo := PMeCustomPublisherInfo(NewMeObject(GetPublisherInfoClass));
     vPublisherInfo.FOwner := Self;
     vPublisherInfo.Publisher := aPublisher;
     i := FPublisherInfoList.Add(vPublisherInfo);
@@ -422,19 +493,19 @@ begin
     end;
   end
   else
-    vPublisherInfo := PMePublisherInfo(FPublisherInfoList.Get(i));
+    vPublisherInfo := PMeCustomPublisherInfo(FPublisherInfoList.Get(i));
   if Assigned(vPublisherInfo) then
   begin
-    i := vPublisherInfo.RegisterEvent(aEventId);
+    i := vPublisherInfo.RegisterEventById(aEventId);
     if i >= 0 then
-      Result := PMeEventInfo(vPublisherInfo.Events.Items[i]);
+      Result := PMeCustomEventInfo(vPublisherInfo.Events.Get(i));
   end;
 end;
 
 procedure TMeCustomEventFeature.UnRegisterEvent(const aPublisher: TObject; const aEventId: TEventId);
 var
   i: Integer;
-  vPublisherInfo: PMePublisherInfo;
+  vPublisherInfo: PMeCustomPublisherInfo;
 begin
   i := IndexOfPublisher(aPublisher);
   if i >= 0 then
@@ -443,7 +514,7 @@ begin
     i := vPublisherInfo.IndexOfEvent(aEventId);
     if i >= 0 then
     begin
-      PMeEventInfo(vPublisherInfo.Events.Items[i]).Free;
+      PMeCustomEventInfo(vPublisherInfo.Events.Get(i)).Free;
       vPublisherInfo.Events.Delete(i);
     end;
   end;
@@ -452,7 +523,7 @@ end;
 { TMeWindowMessageFeature }
 function TMeWindowMessageFeature.GetPublisherInfoClass: TMeClass;
 begin
-  Result := TypeOf(TMePublisherInfo);
+  Result := TypeOf(TMeCustomPublisherInfo);
 end;
 
 { TObject.Dispatch accepts any data type as its Message parameter.  The
