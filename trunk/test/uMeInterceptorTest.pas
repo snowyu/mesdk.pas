@@ -91,6 +91,7 @@ type
     procedure Test_AddToMethodExceptionBefore;
     procedure Test_AddToProc;
     procedure Test_AddToDLLProc;
+    procedure Test_AddToProperty;
 
     {procedure Test_AddToFunctionInt;
     procedure Test_AddToFunctionFloat;
@@ -301,6 +302,29 @@ begin
   Status(' Check '+ vS +' Test_AddToProc');
   {$ENDIF}
   FInterceptor := FInterceptorClass.AddTo(@TestProc, 'TestProc');
+  InitInterceptor(FInterceptor);
+  try
+    RunResult := '';
+    FillChar(FResults, SizeOf(FResults), 0);
+    TestProc;
+    CheckResults(nil, @TestProc);
+    CheckEquals(cResultStr, RunResult, 'the Run Result mismatch!');
+  finally
+    FInterceptorClass.RemoveFrom(@TestProc);
+  end;
+end;
+
+procedure TTest_MeCustomInterceptor.Test_AddToProperty;
+var
+  i: Integer;
+  vS: string;
+begin
+  i :=Pos('_', ClassName);
+  vS := Copy(ClassName, i+1, MaxInt);
+  {$IFDEF Debug_WriteToConsole_Support}
+  Status(' Check '+ vS +' Test_AddToProperty');
+  {$ENDIF}
+  FInterceptor := FInterceptorClass.AddToProperty(TTestPropObj, 'Name', [mpsGet]);
   InitInterceptor(FInterceptor);
   try
     RunResult := '';

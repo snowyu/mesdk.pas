@@ -344,6 +344,7 @@ type
             PTypeInfo = nil): TMeAbstractInterceptor; overload;
     { Summary Add the Interceptor to a published Property. }
     { Description
+             TODO:  need DUnit test.
     Note: the property method Must be named by: Get/Set/IsStored + property
     name
     }

@@ -55,7 +55,7 @@ type
             aMethodParams: PTypeData = nil): Boolean; overload;
   end;
 
-  { Summary  the abstract AOP instance feature class. the additional properties of the object can be added.}
+  { Summary  the abstract AOP instance feature class. add the additional properties to the class.}
   { Description
   there are two ways to do:
   * It can add new properties for object instance to modify the VMT, append the object size.

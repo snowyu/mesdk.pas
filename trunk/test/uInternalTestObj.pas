@@ -18,6 +18,14 @@ type
   end;
   TTestMethods = array of TTestMethodRec;
 
+  TTestPropObj = class
+  protected
+    FName: AnsiString;
+    function GetName: AnsiString;
+  published
+    property Name: string read GetName;
+  end;
+
   {$M+}
   TTestBaseObj = Class
   private
@@ -96,6 +104,11 @@ asm
   {$IFDEF FPC}
     MOV EAX, offset AbstractError
   {$ENDIF}
+end;
+
+function TTestPropObj.GetName: AnsiString;
+begin
+  Result := FName;
 end;
 
 procedure TTestBaseObj.VirtualMethod3;
