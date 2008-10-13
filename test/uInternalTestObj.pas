@@ -21,6 +21,7 @@ type
   TTestPropObj = class
   protected
     FName: AnsiString;
+  public
     function GetName: AnsiString;
   published
     property Name: string read GetName;
@@ -108,7 +109,8 @@ end;
 
 function TTestPropObj.GetName: AnsiString;
 begin
-  Result := FName;
+  RunResult := 'TTestPropObj.GetName Run!';
+  Result := RunResult;
 end;
 
 procedure TTestBaseObj.VirtualMethod3;
