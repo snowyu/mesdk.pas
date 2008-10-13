@@ -113,7 +113,7 @@ var
   vPublisher: TTestPublisher;
   vListeners: array[0..2] of TTestListener;
   i, j: Integer;
-  vEventInfo: PMeEventInfo;
+  vEventInfo: PMeCustomEventInfo;
   vMsg: TMessage;
 begin
   vPublisher := TTestPublisher.Create;
