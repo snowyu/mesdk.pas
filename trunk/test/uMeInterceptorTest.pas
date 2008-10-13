@@ -329,11 +329,16 @@ begin
   try
     RunResult := '';
     FillChar(FResults, SizeOf(FResults), 0);
-    TestProc;
-    CheckResults(nil, @TestProc);
-    CheckEquals(cResultStr, RunResult, 'the Run Result mismatch!');
+    with TTestPropObj.Create do
+    try
+      vS := Name;
+    finally
+      Free;
+    end;
+    CheckResults(nil, @TTestPropObj.GetName);
+    CheckEquals(vS, RunResult, 'the Run Result mismatch!');
   finally
-    FInterceptorClass.RemoveFrom(@TestProc);
+    FInterceptorClass.RemoveFrom(@TTestPropObj.GetName);
   end;
 end;
 
