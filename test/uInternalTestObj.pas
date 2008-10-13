@@ -18,16 +18,16 @@ type
   end;
   TTestMethods = array of TTestMethodRec;
 
+  {$M+}
   TTestPropObj = class
   protected
     FName: AnsiString;
   public
     function GetName: AnsiString;
   published
-    property Name: string read GetName;
+    property Name: AnsiString read GetName write FName;
   end;
 
-  {$M+}
   TTestBaseObj = Class
   private
     procedure VirtualMethod1; virtual;abstract;

@@ -50,6 +50,8 @@ type
     Tick: integer; //the time to execute.
     Method: Pointer;
     ResultState: TMeExecuteStates;
+    Params: array of AnsiString;
+    Result: AnsiString;
   end;
   {
   0: AllowExecute
@@ -69,10 +71,10 @@ type
     FRaiseException: Boolean;
     FResults: TTestInterceptResults;
     procedure InitInterceptor(aInterceptor: TMeAbstractInterceptor);virtual;
-    function DoOnAllowExecute(Sender: TObject; MethodItem: TMeInterceptedMethodItem; const Params: PMeProcParams = nil): Boolean;virtual;
-    procedure DoOnBeforeExecute(Sender: TObject; MethodItem: TMeInterceptedMethodItem; const Params: PMeProcParams = nil);virtual;
-    procedure DoOnAfterExecute(Sender: TObject; MethodItem: TMeInterceptedMethodItem; const thisState: TMeExecuteStates; const Params: PMeProcParams = nil);virtual;
-    function DoOnAfterException(Sender: TObject; MethodItem: TMeInterceptedMethodItem; const E: Exception; const Params: PMeProcParams = nil): Boolean;virtual;
+    function DoOnAllowExecute(Sender: TObject; MethodItem: TMeInterceptedMethodItem; const aParams: PMeProcParams): Boolean;virtual;
+    procedure DoOnBeforeExecute(Sender: TObject; MethodItem: TMeInterceptedMethodItem; const aParams: PMeProcParams = nil);virtual;
+    procedure DoOnAfterExecute(Sender: TObject; MethodItem: TMeInterceptedMethodItem; const thisState: TMeExecuteStates; const aParams: PMeProcParams = nil);virtual;
+    function DoOnAfterException(Sender: TObject; MethodItem: TMeInterceptedMethodItem; const E: Exception; const aParams: PMeProcParams = nil): Boolean;virtual;
     procedure CheckResults(Sender: TObject; aMethod: Pointer; E: ExceptionClass = nil; thisState: TMeExecuteStates = [esAllowed, esBefore, esAfter]);
   protected
     procedure SetUp;override;
@@ -162,7 +164,9 @@ begin
   FreeAndNil(FInterceptor);
 end;
 
-function TTestMeCustomInterceptor.DoOnAllowExecute(Sender: TObject; MethodItem: TMeInterceptedMethodItem; const Params: PMeProcParams): Boolean;
+function TTestMeCustomInterceptor.DoOnAllowExecute(Sender: TObject; MethodItem: TMeInterceptedMethodItem; const aParams: PMeProcParams): Boolean;
+var
+  i: Integer;
 begin
   QueryPerformanceCounter(FStartCount);
   FResults[0].Sender := Sender;
@@ -170,18 +174,39 @@ begin
   FResults[0].Method := MethodItem.Injector.MethodOriginalLocation;
   QueryPerformanceCounter(FStopCount);
   FResults[0].Tick := FStopCount - FStartCount;
+  if Assigned(aParams) then
+  begin
+    SetLength(FResults[0].Params, aParams.Count);
+    for i := 0 to aParams.Count - 1 do
+    begin
+      FResults[0].Params[i] := aParams.Items[i].AsString;
+    end;
+    FResults[0].Result := aParams.ResultParam.AsString;
+  end;
   {$IFDEF Debug_WriteToConsole_Support}
   if Assigned(Sender) then write(Sender.ClassName+'.');
   writeln(MethodItem.Name, ' OnAllowExecute ', FResults[0].Tick);
   {$ENDIF}
+  
 end;
 
-procedure TTestMeCustomInterceptor.DoOnBeforeExecute(Sender: TObject; MethodItem: TMeInterceptedMethodItem; const Params: PMeProcParams);
+procedure TTestMeCustomInterceptor.DoOnBeforeExecute(Sender: TObject; MethodItem: TMeInterceptedMethodItem; const aParams: PMeProcParams);
+var
+  i: Integer;
 begin
   FResults[1].Sender := Sender;
   FResults[1].Method := MethodItem.Injector.MethodOriginalLocation;
   QueryPerformanceCounter(FStopCount);
   FResults[1].Tick := FStopCount - FStartCount;
+  if Assigned(aParams) then
+  begin
+    SetLength(FResults[1].Params, aParams.Count);
+    for i := 0 to aParams.Count - 1 do
+    begin
+      FResults[1].Params[i] := aParams.Items[i].AsString;
+    end;
+    FResults[1].Result := aParams.ResultParam.AsString;
+  end;
   {$IFDEF Debug_WriteToConsole_Support}
   if Assigned(Sender) then write(Sender.ClassName+'.');
   writeln(MethodItem.Name, ' OnBeforeExecute ', FResults[1].Tick);
@@ -190,15 +215,25 @@ end;
 
 procedure TTestMeCustomInterceptor.DoOnAfterExecute(Sender: TObject; MethodItem: TMeInterceptedMethodItem
   ; const thisState: TMeExecuteStates
-  ; const Params: PMeProcParams);
+  ; const aParams: PMeProcParams);
 var
   s: string;
+  i: Integer;
 begin
   FResults[2].Sender := Sender;
   FResults[2].Method := MethodItem.Injector.MethodOriginalLocation;
   QueryPerformanceCounter(FStopCount);
   FResults[2].Tick := FStopCount - FStartCount;
   FResults[2].ResultState := thisState;
+  if Assigned(aParams) then
+  begin
+    SetLength(FResults[2].Params, aParams.Count);
+    for i := 0 to aParams.Count - 1 do
+    begin
+      FResults[2].Params[i] := aParams.Items[i].AsString;
+    end;
+    FResults[2].Result := aParams.ResultParam.AsString;
+  end;
   {$IFDEF Debug_WriteToConsole_Support}
   if Assigned(Sender) then write(Sender.ClassName+'.');
   writeln(MethodItem.Name, ' OnAfterExecute ', FResults[2].Tick);
@@ -211,7 +246,7 @@ begin
   {$ENDIF}
 end;
 
-function TTestMeCustomInterceptor.DoOnAfterException(Sender: TObject; MethodItem: TMeInterceptedMethodItem; const E: Exception; const Params: PMeProcParams): Boolean;
+function TTestMeCustomInterceptor.DoOnAfterException(Sender: TObject; MethodItem: TMeInterceptedMethodItem; const E: Exception; const aParams: PMeProcParams): Boolean;
 begin
   FResults[3].Sender := Sender;
   FResults[3].Method := MethodItem.Injector.MethodOriginalLocation;
@@ -318,6 +353,7 @@ procedure TTest_MeCustomInterceptor.Test_AddToProperty;
 var
   i: Integer;
   vS: string;
+  vObj: TTestPropObj;
 begin
   i :=Pos('_', ClassName);
   vS := Copy(ClassName, i+1, MaxInt);
@@ -329,13 +365,16 @@ begin
   try
     RunResult := '';
     FillChar(FResults, SizeOf(FResults), 0);
-    with TTestPropObj.Create do
+    vObj := TTestPropObj.Create;
+    with vObj do
     try
       vS := Name;
+      CheckEquals(0, length(FResults[2].Params), 'length(FResults[2].Params) mismatch!');
+      CheckEquals(vS, FResults[2].Result, 'Result.Params mismatch!');
+      CheckResults(vObj, @TTestPropObj.GetName);
     finally
       Free;
     end;
-    CheckResults(nil, @TTestPropObj.GetName);
     CheckEquals(vS, RunResult, 'the Run Result mismatch!');
   finally
     FInterceptorClass.RemoveFrom(@TTestPropObj.GetName);

@@ -1304,7 +1304,7 @@ var
     s: string;
     vMethodParams: PMeProcType;
     vProc: Pointer;
-    procedure SetProcTypeForPropInfo(aMethodParams: PMeProcType;
+    procedure SetProcTypeForPropInfo(var aMethodParams: PMeProcType;
       aSpecifier: TMePropertySpecifier
       ; aCallingConvention: TCallingConvention
       ; const aPropInfo: PPropInfo
@@ -1317,6 +1317,20 @@ var
       begin
         FParamList.FreeMeObjects;
         FParamList.Clear;
+        (*
+        vParamType := New(PMeParamType);
+        FParamList.Add(vParamType);
+        with TMeParamTypeAccess(vParamType^) do
+        begin
+          FProcType := aMethodParams;
+          FParamType := GetRegisteredTypeByName('Integer'); //RegisterClassType(TypeInfo(TObject));
+          if FParamType = nil then
+            raise EMeTypeError.CreateResFmt(@rsTypeNotSupportError, ['TObject']);
+          {$IFDEF MeRTTI_EXT_SUPPORT}
+          FParamName := 'Self';
+          {$ENDIF}
+        end; //with *)
+
         FCallingConvention := aCallingConvention;
         case aSpecifier of
           mpsGet:
@@ -1325,8 +1339,8 @@ var
             if LongWord(aPropInfo.Index) <> $80000000 then
             begin
              //has index.
-              vParamType := New(PMeParamType);
-              FParamList.Add(vParamType);
+              vParamType := NewParam();
+              //FParamList.Add(vParamType);
               with TMeParamTypeAccess(vParamType^) do
               begin
                 FProcType := aMethodParams;
@@ -1343,8 +1357,8 @@ var
               Raise EMeTypeError.CreateResFmt(@rsTypeNotSupportError, [aPropInfo.PropType^.Name]);
             if RetOnStack then
             begin
-              vParamType := New(PMeParamType);
-              FParamList.Add(vParamType);
+              vParamType := NewParam();
+              //FParamList.Add(vParamType);
               with TMeParamTypeAccess(vParamType^) do
               begin
                 FProcType := aMethodParams;
@@ -1414,9 +1428,10 @@ var
       vProcType := RegisterProcType(aMethodParams);
       if vProcType <> aMethodParams then
       begin
-        Dispose(aMethodParams);
-        aMethodParams := nil;
-      end;
+        //Dispose(aMethodParams);
+        aMethodParams.Free;
+        aMethodParams := vProcType;//nil;
+      end; //}
     end;
   begin
       Case aSpecifier of
@@ -1453,8 +1468,11 @@ var
           try
             aInterceptMethod.Name := s;
             New(vMethodParams, Create);
+            vMethodParams.SelfType := RegisterClassType(aClass);
+            
             SetProcTypeForPropInfo(vMethodParams, aSpecifier
               , aCallingConvention, vPropInfo);
+
             if Assigned(vMethodParams) then
               aInterceptMethod.MethodParams := vMethodParams
             else
@@ -1503,8 +1521,6 @@ begin
     if aPropSpecifiers <> [] then
     begin
       vClass := FInterceptedClasses.GetItem(aClass);
-      if vClass.FOwner = nil then
-        vClass.FOwner := aClass;
 
       Result := GetInterceptor(Self);
 
@@ -1520,6 +1536,10 @@ begin
       begin
         DoInject(vInterceptedMethod, mpsStored);
       end;
+
+      if Assigned(vClass) and (vClass.FOwner = nil) then
+        vClass.FOwner := aClass;
+
     end;
   end;
 end;
@@ -1625,7 +1645,7 @@ function TMeAbstractInterceptor.AfterException(Sender: TObject; MethodItem:
         nil): Boolean;
 begin
   if Assigned(FOnAfterException) then
-    Result := FOnAfterException(Sender, MethodItem, E)
+    Result := FOnAfterException(Sender, MethodItem, E, Params)
   else
     Result := True;
 end;
@@ -1635,7 +1655,7 @@ procedure TMeAbstractInterceptor.AfterExecute(Sender: TObject; MethodItem:
         Params: PMeProcParams = nil);
 begin
   if Assigned(FOnAfterExecute) then
-   FOnAfterExecute(Sender, MethodItem, thisState);
+   FOnAfterExecute(Sender, MethodItem, thisState, Params);
 end;
 
 function TMeAbstractInterceptor.AllowExecute(Sender: TObject; MethodItem:
@@ -1643,7 +1663,7 @@ function TMeAbstractInterceptor.AllowExecute(Sender: TObject; MethodItem:
 begin
   Result := True;
   if Assigned(FOnAllowExecute) then
-   Result := FOnAllowExecute(Sender, MethodItem);
+   Result := FOnAllowExecute(Sender, MethodItem, Params);
 end;
 
 class procedure TMeAbstractInterceptor.ApplyMethodParams(aMethodItem:
@@ -1667,7 +1687,7 @@ procedure TMeAbstractInterceptor.BeforeExecute(Sender: TObject; MethodItem:
         TMeInterceptedMethodItem; const Params: PMeProcParams = nil);
 begin
   if Assigned(FOnBeforeExecute) then
-   FOnBeforeExecute(Sender, MethodItem);
+   FOnBeforeExecute(Sender, MethodItem, Params);
 end;
 
 class function TMeAbstractInterceptor.CheckIntercept(aMethod: Pointer;
