@@ -374,7 +374,7 @@ end;
 procedure TTest_MeCustomInterceptor.Test_AddToProperty;
 var
   i: Integer;
-  vS: string;
+  vS, vS1: string;
   vObj: TTestPropObj;
 begin
   i :=Pos('_', ClassName);
@@ -407,7 +407,9 @@ begin
       CheckEquals(vS, FResults[1].Params[0], 'FResults[1].SetName param mismatch!');
       CheckEquals(vS, FResults[2].Params[0], 'FResults[2].SetName param mismatch!');
       //CheckEquals(vS, Name, 'SetName param mismatch!');
-      writeln(vS, '=FResults[2].Params[i]=', FResults[2].Params[0]);
+      //writeln(vS, '=FResults[2].Params[i]=', FResults[2].Params[0]);
+      vS1 := Name;
+      CheckEquals(vS, vS1, 'SetName  failed!');
     finally
       Free;
       FDisableModifyResult := False;
