@@ -24,8 +24,9 @@ type
     FName: AnsiString;
   public
     function GetName: AnsiString;
+    procedure SetName(const value: string);
   published
-    property Name: AnsiString read GetName write FName;
+    property Name: AnsiString read GetName write SetName;
   end;
 
   TTestBaseObj = Class
@@ -109,8 +110,13 @@ end;
 
 function TTestPropObj.GetName: AnsiString;
 begin
-  RunResult := 'TTestPropObj.GetName Run!';
-  Result := RunResult;
+  //RunResult := 'TTestPropObj.GetName Run!';
+  Result := FName;
+end;
+
+procedure TTestPropObj.SetName(const value: string);
+begin
+  FName := Value;
 end;
 
 procedure TTestBaseObj.VirtualMethod3;

@@ -1373,8 +1373,7 @@ var
             if LongWord(aPropInfo.Index) <> $80000000 then
             begin
              //has index.
-              vParamType := New(PMeParamType);
-              FParamList.Add(vParamType);
+              vParamType := NewParam();
               with TMeParamTypeAccess(vParamType^) do
               begin
                 FProcType := aMethodParams;
@@ -1386,8 +1385,8 @@ var
                 {$ENDIF}
               end; //with
             end;
-            vParamType := New(PMeParamType);
-            FParamList.Add(vParamType);
+            vParamType := NewParam();
+            //FParamList.Add(vParamType);
             with TMeParamTypeAccess(vParamType^) do
             begin
               FProcType := aMethodParams;

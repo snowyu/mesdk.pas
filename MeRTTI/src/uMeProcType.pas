@@ -181,8 +181,8 @@ type
     procedure SetAsInteger(const aValue: Integer);
     function GetAsInt64: Int64;
     procedure SetAsInt64(const aValue: Int64);
-    function GetAsString: String;
-    procedure SetAsString(const aValue: String);
+    function GetAsString: AnsiString;
+    procedure SetAsString(const aValue: AnsiString);
 
     {$IFDEF MeRTTI_EXT_SUPPORT}
     function GetName: ShortString;
@@ -210,7 +210,7 @@ type
     Property AsPointer: Pointer read GetAsPointer write SetAsPointer;
     Property AsInteger: Integer read GetAsInteger write SetAsInteger;
     Property AsInt64: Int64 read GetAsInt64 write SetAsInt64;
-    Property AsString: String read GetAsString write SetAsString;
+    Property AsString: AnsiString read GetAsString write SetAsString;
     //Property AsXXX: AsString, AsInteger, AsBoolean, AsDateTime....
     //Indicates the type of parameter.
     Property DataType: TMeParamType read FDataType;
@@ -1508,8 +1508,8 @@ begin
     else
       case FDataType.ParamType.Kind of
         mtkPointer, mtkObject, mtkClass, mtkInterface: Result := IntToStr(Integer(FParamValue.VPointer));
-        mtkLString: Result := PAnsiString(FParamValue.VAnsiString)^;
-        mtkWString: Result := PWideString(FParamValue.VWideString)^;
+        mtkLString: Result := AnsiString(FParamValue.VAnsiString);
+        mtkWString: Result := WideString(FParamValue.VWideString);
         mtkString:  Result := FParamValue.VString^;
         mtkInteger:
         begin

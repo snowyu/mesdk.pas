@@ -63,6 +63,7 @@ type
   {abstract tester }
   TTestMeCustomInterceptor = class (TCustomTest_Method)
   protected
+    FDisableModifyResult: Boolean;
     FStartCount: Int64;
     FStopCount: Int64;
     FInterceptor: TMeAbstractInterceptor;
@@ -179,9 +180,15 @@ begin
     SetLength(FResults[0].Params, aParams.Count);
     for i := 0 to aParams.Count - 1 do
     begin
+      //writeln(aParams.Items[i].AsInteger);
       FResults[0].Params[i] := aParams.Items[i].AsString;
     end;
-    FResults[0].Result := aParams.ResultParam.AsString;
+    {if Assigned(aParams.ResultParam) then
+    begin
+      FResults[0].Result := aParams.ResultParam.AsString
+    end
+    else //}
+      FResults[0].Result :='';
   end;
   {$IFDEF Debug_WriteToConsole_Support}
   if Assigned(Sender) then write(Sender.ClassName+'.');
@@ -205,7 +212,10 @@ begin
     begin
       FResults[1].Params[i] := aParams.Items[i].AsString;
     end;
-    FResults[1].Result := aParams.ResultParam.AsString;
+    {if Assigned(aParams.ResultParam) then
+      FResults[1].Result := aParams.ResultParam.AsString
+    else}
+      FResults[1].Result :='';
   end;
   {$IFDEF Debug_WriteToConsole_Support}
   if Assigned(Sender) then write(Sender.ClassName+'.');
@@ -217,7 +227,7 @@ procedure TTestMeCustomInterceptor.DoOnAfterExecute(Sender: TObject; MethodItem:
   ; const thisState: TMeExecuteStates
   ; const aParams: PMeProcParams);
 var
-  s: string;
+  s: AnsiString;
   i: Integer;
 begin
   FResults[2].Sender := Sender;
@@ -232,7 +242,19 @@ begin
     begin
       FResults[2].Params[i] := aParams.Items[i].AsString;
     end;
-    FResults[2].Result := aParams.ResultParam.AsString;
+    if Assigned(aParams.ResultParam) then
+    begin
+      if not FDisableModifyResult and (aParams.ResultParam.DataType.Kind = mtkLString) then
+      begin
+        //s := aParams.ResultParam.AsString + '_TeSt!';
+        //aParams.ResultParam.AsPointer := Pointer(@ss);
+        aParams.ResultParam.AsString := aParams.ResultParam.AsString + '_TeSt!';
+      end;
+      FResults[2].Result := aParams.ResultParam.AsString;
+      //writeln('FResults[2].Result="', FResults[2].Result, '"');
+    end
+    else
+      FResults[2].Result :='';
   end;
   {$IFDEF Debug_WriteToConsole_Support}
   if Assigned(Sender) then write(Sender.ClassName+'.');
@@ -360,7 +382,7 @@ begin
   {$IFDEF Debug_WriteToConsole_Support}
   Status(' Check '+ vS +' Test_AddToProperty');
   {$ENDIF}
-  FInterceptor := FInterceptorClass.AddToProperty(TTestPropObj, 'Name', [mpsGet]);
+  FInterceptor := FInterceptorClass.AddToProperty(TTestPropObj, 'Name', [mpsGet, mpsSet]);
   InitInterceptor(FInterceptor);
   try
     RunResult := '';
@@ -369,13 +391,28 @@ begin
     with vObj do
     try
       vS := Name;
+      CheckEquals(0, length(FResults[0].Params), 'length(FResults[0].Params) mismatch!');
+      CheckEquals(0, length(FResults[1].Params), 'length(FResults[1].Params) mismatch!');
       CheckEquals(0, length(FResults[2].Params), 'length(FResults[2].Params) mismatch!');
-      CheckEquals(vS, FResults[2].Result, 'Result.Params mismatch!');
+      CheckEquals(FResults[2].Result, vS, 'Result[2] mismatch!');
+      //writeln(vS);
       CheckResults(vObj, @TTestPropObj.GetName);
+      FDisableModifyResult := true;
+      vS := vS + '_ApPly!!';
+      Name := vS;
+      CheckEquals(1, length(FResults[0].Params), 'length(FResults[0].Params) mismatch!');
+      CheckEquals(1, length(FResults[1].Params), 'length(FResults[1].Params) mismatch!');
+      CheckEquals(1, length(FResults[2].Params), 'length(FResults[2].Params) mismatch!');
+      CheckEquals(vS, FResults[0].Params[0], 'FResults[0].SetName param mismatch!');
+      CheckEquals(vS, FResults[1].Params[0], 'FResults[1].SetName param mismatch!');
+      CheckEquals(vS, FResults[2].Params[0], 'FResults[2].SetName param mismatch!');
+      //CheckEquals(vS, Name, 'SetName param mismatch!');
+      writeln(vS, '=FResults[2].Params[i]=', FResults[2].Params[0]);
     finally
       Free;
+      FDisableModifyResult := False;
     end;
-    CheckEquals(vS, RunResult, 'the Run Result mismatch!');
+    //CheckEquals(vS, RunResult, 'the Run Result mismatch!');
   finally
     FInterceptorClass.RemoveFrom(@TTestPropObj.GetName);
   end;
