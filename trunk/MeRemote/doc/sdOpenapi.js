@@ -35,12 +35,14 @@
 
       //get the friends of the ptId by async
       get: function(aPtId, aOnComplete){
-          if ($type(aOnComplete) != 'function') 
-            throw Error({code: cErrorFunctionTypeNeed, message: rs.ErrorFunctionTypeNeed});
           if (gCacheFriends.has(aPtId)){
-            aOnComplete(gCacheFriends.get(aPtId));
+            var vResult = gCacheFriends.get(aPtId);
+            if (aOnComplete) aOnComplete(vResult);
+            return vResult;
           }
-          else {
+          if (aOnComplete) {
+            if ($type(aOnComplete) != 'function')
+              throw Error({code: cErrorFunctionTypeNeed, message: rs.ErrorFunctionTypeNeed});
             var vFriends = false;
             var vUrl = window.SNDA.serviceUrl + '/sdo/users/' + aPtId + '/friends?key=' + SNDA.appKey;
             var vJsonRequest = new Request.JSON({
@@ -60,31 +62,7 @@
             });
             vJsonRequest.get();
           }
-      }, 
-      //get the friends of the ptId by synchronization.
-      getSync: function(aPtId){
-        if (gCacheFriends.has(aPtId)){
-          return gCacheFriends.get(aPtId)
-        }
-        else {
-          var vFriends = false;
-          var vUrl = window.SNDA.serviceUrl + '/sdo/users/' + aPtId + 'friends';
-          var vJsonRequest = new Request.JSON({
-            url: vUrl, 
-            async: false,
-            onComplete: function(aResult){
-              vFriends = aResult["result"];
-            }
-          });
-          vJsonRequest.get();
-          if (vFriends) { 
-            if (this.options.cacheable) gCacheFriends.include(vFriends.PtId, vFriends);
-            vDone = vFriends;
-          }
-          if (aResult["error"]) throw Error(aResult["error"]);
-        }
       }
-      
     }),
   }
 
