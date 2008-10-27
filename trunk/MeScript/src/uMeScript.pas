@@ -834,11 +834,13 @@ begin
         if Result then
         begin
           Body.AddOpCode(opPush, vParamCount);
+          //check whether the vFuncName is lcoal varaible?
           //reuse vParamCount as stackIndex
           vParamCount := 0;
           i := FindVariable(vFuncName, vParamCount);
           if i >= 0 then
           begin
+            //load the function address from the variable.
           	//vParamCount is stackIndex
             if vParamCount = 0 then
               Body.AddOpCode(opLoadVar, i)
