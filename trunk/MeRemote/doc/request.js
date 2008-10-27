@@ -302,13 +302,13 @@ Request.implement({
 
 		var vIsCrossSite = this.FIsCrossSite;
 
-    var type = $type(options);
+    var vType = $type(options);
     //var url = "";
 
-		if (type == 'string' || type == 'element') {
+		if (vType == 'string' || vType == 'element') {
       options = {data: options}
     }
-    else if (type == "object" && options["url"] != this.options.url){
+    else if (vType == "object" && options["url"] && options["url"] != this.options.url){
       //url = options["url"];
       vIsCrossSite = this._IsCrossSite(options["url"]);
     }
