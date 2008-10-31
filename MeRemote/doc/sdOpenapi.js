@@ -1,8 +1,7 @@
-(function() {
+(function sdInit() {
   var gCacheFriends = new Hash();
   //var vJsonRequest = new Request.JSON(CallbackParamName:'callback');
   var cErrorFunctionTypeNeed = 1;
-  
 
   window.SNDA =
   {
@@ -10,6 +9,7 @@
     //var vDemoService;
     //var vPtId = Browser.getQueryStringValue("ptid");
 
+    isDebugged: false,
     serviceUrl: 'http://dev.api.sdo.com',
     appKey: '55D2CAD969DD019D993F4471132A4B64',
   	/*
@@ -17,8 +17,11 @@
              @constant
           */
     rs: {
-      ErrorFunctionTypeNeed : "the type should be function type.",
+      ErrorFunctionTypeNeed : "the type should be function type."
   	},
+    getIsDebugged: function() {
+      return (Browser.Engine=='gecko' && SNDA.isDebugged);
+    },
 
     Friends: new Class({
       Implements: [Chain, Events, Options],
@@ -37,6 +40,9 @@
       get: function(aPtId, aOnComplete){
           if (gCacheFriends.has(aPtId)){
             var vResult = gCacheFriends.get(aPtId);
+
+            //if (getIsDebugged) console.log('getFriends:'+'('+aPtId+')'+' hit cache');
+
             if (aOnComplete) aOnComplete(vResult);
             return vResult;
           }
@@ -63,7 +69,7 @@
             vJsonRequest.get();
           }
       }
-    }),
+    })
   }
 
 })();
