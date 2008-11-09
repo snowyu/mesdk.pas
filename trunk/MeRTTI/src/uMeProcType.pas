@@ -921,7 +921,7 @@ begin
         mtkInt64:   Result := PInt64(FParamValue.VPointer)^;
         //mtkDynArray:   (VDynBound: Integer; VDynArray: Pointer);
         //mtkMethod:     (VCode: Pointer; VData: Pointer);
-        mtkFloat: if FDataType.ParamType.ClassType = TypeOf(TMeFloatType) then
+        mtkFloat: if FDataType.ParamType.InheritsFrom(TypeOf(TMeFloatType)) then
         begin
          case PMeFloatType(FDataType.ParamType).FloatType of
             ftSingle: Result := PSingle(FParamValue.VPointer)^;
@@ -940,7 +940,8 @@ begin
         mtkInteger: 
         begin
           //Result := FParamValue.VInteger;
-          if FDataType.ParamType.ClassType = TypeOf(TMeCustomOrdinalType) then
+          if FDataType.ParamType.InheritsFrom(TypeOf(TMeCustomOrdinalType)) then
+          begin
             case PMeCustomOrdinalType(FDataType.ParamType).OrdType of
               otSByte: Result := ShortInt(FParamValue.VInteger);
               otUByte: Result := Byte(FParamValue.VInteger);
@@ -949,6 +950,7 @@ begin
               otSLong: Result := FParamValue.VInteger;
               otULong: Result := LongWord(FParamValue.VInteger);
             end;//case
+          end;
         end;
         mtkSet:
         begin
@@ -969,7 +971,7 @@ begin
         mtkInt64:   Result := FParamValue.VInt64;
         //mtkDynArray:   (VDynBound: Integer; VDynArray: Pointer);
         //mtkMethod:     (VCode: Pointer; VData: Pointer);
-        mtkFloat: if FDataType.ParamType.ClassType = TypeOf(TMeFloatType) then
+        mtkFloat: if FDataType.ParamType.InheritsFrom(TypeOf(TMeFloatType)) then
         begin
          case PMeFloatType(FDataType.ParamType).FloatType of
            ftSingle: Result := FParamValue.VSingle;
@@ -1021,7 +1023,7 @@ begin
         mtkInt64:   PInt64(FParamValue.VPointer)^ := aValue;
         //mtkDynArray:   aValue := FParamValue.VDynArray;
         //mtkMethod:     aValue := FParamValue.VCode;
-        mtkFloat: if FDataType.ParamType.ClassType = TypeOf(TMeFloatType) then
+        mtkFloat: if FDataType.ParamType.InheritsFrom(TypeOf(TMeFloatType)) then
         begin
          case PMeFloatType(FDataType.ParamType).FloatType of
             ftSingle: PSingle(FParamValue.VPointer)^ := aValue;
@@ -1067,7 +1069,7 @@ begin
         mtkInt64:   FParamValue.VInt64 := aValue;
         //mtkDynArray:   aValue := FParamValue.VDynArray;
         //mtkMethod:     aValue := FParamValue.VCode;
-        mtkFloat: if FDataType.ParamType.ClassType = TypeOf(TMeFloatType) then
+        mtkFloat: if FDataType.ParamType.InheritsFrom(TypeOf(TMeFloatType)) then
         begin
          case PMeFloatType(FDataType.ParamType).FloatType of
            ftSingle: FParamValue.VSingle := aValue;
@@ -1112,7 +1114,7 @@ begin
         mtkDynArray:   Result := FParamValue.VDynArray;
         //mtkMethod:     Result := FParamValue.VCode;
         mtkProcedure:    Result := FParamValue.VCode;
-        mtkFloat: if FDataType.ParamType.ClassType = TypeOf(TMeFloatType) then
+        mtkFloat: if FDataType.ParamType.InheritsFrom(TypeOf(TMeFloatType)) then
         begin
          case PMeFloatType(FDataType.ParamType).FloatType of
            ftSingle: Result := @FParamValue.VSingle;
@@ -1156,7 +1158,7 @@ begin
         mtkInt64:   FParamValue.VInt64 := PInt64(aValue)^;
         //mtkDynArray:   aValue := FParamValue.VDynArray;
         //mtkMethod:     aValue := FParamValue.VCode;
-        mtkFloat: if FDataType.ParamType.ClassType = TypeOf(TMeFloatType) then
+        mtkFloat: if FDataType.ParamType.InheritsFrom(TypeOf(TMeFloatType)) then
         begin
          case PMeFloatType(FDataType.ParamType).FloatType of
            ftSingle: FParamValue.VSingle := PSingle(aValue)^;
@@ -1202,7 +1204,7 @@ begin
         mtkInt64:   Result := PInt64(FParamValue.VPointer)^;
         //mtkDynArray:   aValue := FParamValue.VDynArray;
         //mtkMethod:     aValue := FParamValue.VCode;
-        mtkFloat: if FDataType.ParamType.ClassType = TypeOf(TMeFloatType) then
+        mtkFloat: if FDataType.ParamType.InheritsFrom(TypeOf(TMeFloatType)) then
           case PMeFloatType(FDataType.ParamType).FloatType of
             ftSingle: Result := Trunc(PSingle(FParamValue.VPointer)^);
             ftDouble: Result := Trunc(PDouble(FParamValue.VPointer)^);
@@ -1243,7 +1245,7 @@ begin
         mtkInt64:   Result := FParamValue.VInt64;
         //mtkDynArray:   aValue := FParamValue.VDynArray;
         //mtkMethod:     aValue := FParamValue.VCode;
-        mtkFloat: if FDataType.ParamType.ClassType = TypeOf(TMeFloatType) then
+        mtkFloat: if FDataType.ParamType.InheritsFrom(TypeOf(TMeFloatType)) then
           case PMeFloatType(FDataType.ParamType).FloatType of
             ftSingle: Result := Trunc(FParamValue.VSingle);
             ftDouble: Result := Trunc(FParamValue.VDouble);
@@ -1271,7 +1273,7 @@ begin
         mtkInt64:   PInt64(FParamValue.VPointer)^ := aValue;
         //mtkDynArray:   aValue := FParamValue.VDynArray;
         mtkProcedure:     PPointer(FParamValue.VPointer)^ := Pointer(aValue);
-        mtkFloat: if FDataType.ParamType.ClassType = TypeOf(TMeFloatType) then
+        mtkFloat: if FDataType.ParamType.InheritsFrom(TypeOf(TMeFloatType)) then
           case PMeFloatType(FDataType.ParamType).FloatType of
             ftSingle: PSingle(FParamValue.VPointer)^ := aValue;
             ftDouble: PDouble(FParamValue.VPointer)^ := aValue;
@@ -1298,7 +1300,7 @@ begin
         mtkInt64:   FParamValue.VInt64 := aValue;
         //mtkDynArray:   aValue := FParamValue.VDynArray;
         mtkProcedure:     FParamValue.VCode := Pointer(aValue);
-        mtkFloat: if FDataType.ParamType.ClassType = TypeOf(TMeFloatType) then
+        mtkFloat: if FDataType.ParamType.InheritsFrom(TypeOf(TMeFloatType)) then
           case PMeFloatType(FDataType.ParamType).FloatType of
             ftSingle: FParamValue.VSingle := aValue;
             ftDouble: FParamValue.VDouble := aValue;
@@ -1322,7 +1324,7 @@ begin
   if Assigned(FDataType.ParamType) then
     if FDataType.IsByRef then
       case FDataType.ParamType.Kind of
-        mtkSet, mtkEnumeration, mtkInteger: if FDataType.ParamType.ClassType = TypeOf(TMeCustomOrdinalType) then
+        mtkSet, mtkEnumeration, mtkInteger: if FDataType.ParamType.InheritsFrom(TypeOf(TMeCustomOrdinalType)) then
           case PMeCustomOrdinalType(FDataType.ParamType).OrdType of
             otSByte:
                 Result := PShortInt(FParamValue.VPointer)^;
@@ -1349,7 +1351,7 @@ begin
         mtkInt64:   Result := PInt64(FParamValue.VPointer)^;
         //mtkDynArray:   aValue := FParamValue.VDynArray;
         //mtkMethod:     aValue := FParamValue.VCode;
-        mtkFloat: if FDataType.ParamType.ClassType = TypeOf(TMeFloatType) then
+        mtkFloat: if FDataType.ParamType.InheritsFrom(TypeOf(TMeFloatType)) then
           case PMeFloatType(FDataType.ParamType).FloatType of
             ftSingle: Result := Trunc(PSingle(FParamValue.VPointer)^);
             ftDouble: Result := Trunc(PDouble(FParamValue.VPointer)^);
@@ -1363,7 +1365,7 @@ begin
       end// case
     else
       case FDataType.ParamType.Kind of
-        mtkSet, mtkEnumeration, mtkInteger: if FDataType.ParamType.ClassType = TypeOf(TMeCustomOrdinalType) then
+        mtkSet, mtkEnumeration, mtkInteger: if FDataType.ParamType.InheritsFrom(TypeOf(TMeCustomOrdinalType)) then
           case PMeCustomOrdinalType(FDataType.ParamType).OrdType of
             otSByte:
                 Result := ShortInt(FParamValue.VByte);
@@ -1390,7 +1392,7 @@ begin
         mtkInt64:   Result := FParamValue.VInt64;
         //mtkDynArray:   aValue := FParamValue.VDynArray;
         //mtkMethod:     aValue := FParamValue.VCode;
-        mtkFloat: if FDataType.ParamType.ClassType = TypeOf(TMeFloatType) then
+        mtkFloat: if FDataType.ParamType.InheritsFrom(TypeOf(TMeFloatType)) then
           case PMeFloatType(FDataType.ParamType).FloatType of
             ftSingle: Result := Trunc(FParamValue.VSingle);
             ftDouble: Result := Trunc(FParamValue.VDouble);
@@ -1415,7 +1417,7 @@ begin
           PVariant(FParamValue.VPointer)^ := aValue;
         end;
         mtkInt64:   PInt64(FParamValue.VPointer)^ := aValue;
-        mtkFloat: if FDataType.ParamType.ClassType = TypeOf(TMeFloatType) then
+        mtkFloat: if FDataType.ParamType.InheritsFrom(TypeOf(TMeFloatType)) then
           case PMeFloatType(FDataType.ParamType).FloatType of
             ftSingle: PSingle(FParamValue.VPointer)^ := aValue;
             ftDouble: PDouble(FParamValue.VPointer)^ := aValue;
@@ -1439,7 +1441,7 @@ begin
           Variant(FParamValue.VVariant) := aValue;
         end;
         mtkInt64:   FParamValue.VInt64 := aValue;
-        mtkFloat: if FDataType.ParamType.ClassType = TypeOf(TMeFloatType) then
+        mtkFloat: if FDataType.ParamType.InheritsFrom(TypeOf(TMeFloatType)) then
           case PMeFloatType(FDataType.ParamType).FloatType of
             ftSingle: FParamValue.VSingle := aValue;
             ftDouble: FParamValue.VDouble := aValue;
@@ -1464,7 +1466,7 @@ begin
   if Assigned(FDataType.FParamType) then
     if FDataType.IsByRef then
       case FDataType.ParamType.Kind of
-        mtkSet, mtkEnumeration, mtkInteger: if FDataType.ParamType.ClassType = TypeOf(TMeCustomOrdinalType) then
+        mtkSet, mtkEnumeration, mtkInteger: if FDataType.ParamType.InheritsFrom(TypeOf(TMeCustomOrdinalType)) then
           case PMeCustomOrdinalType(FDataType.ParamType).OrdType of
             otSByte:
                 Result := IntToStr(PShortInt(FParamValue.VPointer)^);
@@ -1493,7 +1495,7 @@ begin
         mtkInt64:   Result := IntToStr(PInt64(FParamValue.VPointer)^);
         //mtkDynArray:   aValue := FParamValue.VDynArray;
         //mtkMethod:     aValue := FParamValue.VCode;
-        mtkFloat: if FDataType.ParamType.ClassType = TypeOf(TMeFloatType) then
+        mtkFloat: if FDataType.ParamType.InheritsFrom(TypeOf(TMeFloatType)) then
           case PMeFloatType(FDataType.ParamType).FloatType of
             ftSingle: Result := FloatToStr(PSingle(FParamValue.VPointer)^);
             ftDouble: Result := FloatToStr(PDouble(FParamValue.VPointer)^);
@@ -1531,7 +1533,7 @@ begin
         //mtkDynArray:   Result := FParamValue.VDynArray;
         //mtkMethod:     Result := FParamValue.VCode;
         mtkProcedure:    Result := IntToStr(Integer(FParamValue.VCode));
-        mtkFloat: if FDataType.ParamType.ClassType = TypeOf(TMeFloatType) then
+        mtkFloat: if FDataType.ParamType.InheritsFrom(TypeOf(TMeFloatType)) then
         begin
          case PMeFloatType(FDataType.ParamType).FloatType of
            ftSingle: Result := FloatToStr(FParamValue.VSingle);
@@ -1551,7 +1553,7 @@ begin
     if FDataType.IsByRef then
     begin
       case FDataType.ParamType.Kind of
-        mtkSet, mtkEnumeration, mtkInteger: if FDataType.ParamType.ClassType = TypeOf(TMeCustomOrdinalType) then
+        mtkSet, mtkEnumeration, mtkInteger: if FDataType.ParamType.InheritsFrom(TypeOf(TMeCustomOrdinalType)) then
           case PMeCustomOrdinalType(FDataType.ParamType).OrdType of
             otSByte:
                 PShortInt(FParamValue.VPointer)^ := StrToInt(aValue);
@@ -1571,7 +1573,7 @@ begin
           PVariant(FParamValue.VPointer)^ := aValue;
         end;
         mtkInt64:   PInt64(FParamValue.VPointer)^ := StrToInt(aValue);
-        mtkFloat: if FDataType.ParamType.ClassType = TypeOf(TMeFloatType) then
+        mtkFloat: if FDataType.ParamType.InheritsFrom(TypeOf(TMeFloatType)) then
           case PMeFloatType(FDataType.ParamType).FloatType of
             ftSingle: PSingle(FParamValue.VPointer)^ := StrToFloat(aValue);
             ftDouble: PDouble(FParamValue.VPointer)^ := StrToFloat(aValue);
@@ -1597,7 +1599,7 @@ begin
         end;
         mtkInt64:   FParamValue.VInt64 := StrToInt(aValue);
         mtkInteger:   FParamValue.VInteger := StrToInt(aValue);
-        mtkFloat: if FDataType.ParamType.ClassType = TypeOf(TMeFloatType) then
+        mtkFloat: if FDataType.ParamType.InheritsFrom(TypeOf(TMeFloatType))  then
           case PMeFloatType(FDataType.ParamType).FloatType of
             ftSingle: FParamValue.VSingle := StrToFloat(aValue);
             ftDouble: FParamValue.VDouble := StrToFloat(aValue);

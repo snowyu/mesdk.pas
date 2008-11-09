@@ -23,7 +23,7 @@
         Andrey V. Sorokin(RegExpr)
                                 http://RegExpStudio.com
                                 mailto:anso@mail.ru
-        Riceball LEE
+        Riceball LEE(riceballl@hotmail.com)
 
  v. 0.948+ 2003-12-17 by riceball
   + SubExprName define and parse: "():SubExprName:"
@@ -62,6 +62,9 @@
   / ( a )  (?| x ( y ) z | (p (q) r) | (t) u (v) ) ( z ) /x
   # 1            2         2  3        2     3     4
 
+ v. 0.981 2008-11-02 by riceball
+ + ExecutionTimeOut: Cardinal; ms
+   0 means no timeout.
 
 the Compile Options:
 ModifierX: the extended syntax. To extend your pattern's legibility by permitting whitespace and comments
@@ -149,9 +152,9 @@ type
  RegExprString = WideString;
  REChar = WideChar;
  {$ELSE}
- PRegExprChar = PChar;
+ PRegExprChar = PAnsiChar;
  RegExprString = AnsiString; //###0.952 was string
- REChar = Char;
+ REChar = AnsiChar;
  {$ENDIF}
  TREOp = REChar; // internal p-code type //###0.933
  PREOp = ^TREOp;
@@ -229,6 +232,9 @@ type
  TRegExpr = class
    //private
    protected
+     FExecutionTimeOut: Cardinal;
+     //FStartTime, 
+     FEndTime: Cardinal;
      FInputString: RegExprString;  //##1.000
      FInputStringLen: Integer;     //##1.000
     //Store the found SubExpr String position
@@ -469,8 +475,8 @@ type
     property ModifierR : boolean index 2 read GetModifier write SetModifier;
     // Modifier /r - use r.e.syntax extended for russian,
     // (was property ExtSyntaxEnabled in previous versions)
-    // If true, then à-ÿ  additional include russian letter '¸',
-    // À-ß  additional include '¨', and à-ß include all russian symbols.
+    // If true, then -  additional include russian letter '',
+    // -  additional include '', and - include all russian symbols.
     // You have to turn it off if it may interfere with you national alphabet.
     // , initialized from RegExprModifierR
 
@@ -660,6 +666,7 @@ type
     // Set this property if you want to override case-insensitive functionality.
     // Create set it to RegExprInvertCaseFunction (InvertCaseFunction by default)
 
+    property ExecutionTimeOut: Cardinal read FExecutionTimeOut write FExecutionTimeOut;
   end;
 
  ERegExpr = class (Exception)
@@ -1168,6 +1175,7 @@ const
  reeComplexBracesNotImplemented = 126;
  reeUrecognizedModifier = 127;
  reeBadLinePairedSeparator = 128;
+ reeSubExprNameMisMatch = 129;
  reeRegRepeatCalledInappropriately = 1000;
  reeMatchPrimMemoryCorruption = 1001;
  reeMatchPrimCorruptedPointers = 1002;
@@ -1181,7 +1189,7 @@ const
  reeModifierUnsupported = 1013;
  reeLoopStackExceeded = 1014;
  reeLoopWithoutEntry = 1015;
- reeSubExprNameMisMatch = 1016;
+ reeExecTimeout = 1016;
  reeBadPCodeImported = 2000;
 
 function TRegExpr.ErrorMsg (AErrorID : integer) : RegExprString;
@@ -1212,6 +1220,7 @@ function TRegExpr.ErrorMsg (AErrorID : integer) : RegExprString;
     reeComplexBracesNotImplemented: Result := 'TRegExpr(comp): If you want take part in beta-testing BRACES ''{min,max}'' and non-greedy ops ''*?'', ''+?'', ''??'' for complex cases - remove ''.'' from {.$DEFINE ComplexBraces_RegExpr}';
     reeUrecognizedModifier: Result := 'TRegExpr(comp): Urecognized Modifier';
     reeBadLinePairedSeparator: Result := 'TRegExpr(comp): LinePairedSeparator must countain two different chars or no chars at all';
+    reeSubExprNameMisMatch: Result := 'TRegExpr(comp): The defined SubExpr Name is no "End" sign (:) !';
 
     reeRegRepeatCalledInappropriately: Result := 'TRegExpr(exec): RegRepeat Called Inappropriately';
     reeMatchPrimMemoryCorruption: Result := 'TRegExpr(exec): MatchPrim Memory Corruption';
@@ -1225,7 +1234,7 @@ function TRegExpr.ErrorMsg (AErrorID : integer) : RegExprString;
     reeDumpCorruptedOpcode: Result := 'TRegExpr(dump): Corrupted Opcode';
     reeLoopStackExceeded: Result := 'TRegExpr(exec): Loop Stack Exceeded';
     reeLoopWithoutEntry: Result := 'TRegExpr(exec): Loop Without LoopEntry !';
-    reeSubExprNameMisMatch: Result := 'TRegExpr(comp): The defined SubExpr Name is no "End" sign (:) !';
+    reeExecTimeout: Result := 'TRegExpr(exec): execution timeout.';
     reeBadPCodeImported: Result := 'TRegExpr(misc): Bad p-code imported';
     else Result := 'Unknown error';
    end;
@@ -1640,7 +1649,7 @@ procedure TRegExpr.Tail (p : PRegExprChar; val : PRegExprChar);
    // shr after subtraction to calculate widechar distance %-( )
    // so, if difference is negative we have .. the "feature" :(
    // I could wrap it in $IFDEF UniCode_RegExpr, but I didn't because
-   // "P – Q computes the difference between the address given
+   // "P  Q computes the difference between the address given
    // by P (the higher address) and the address given by Q (the
    // lower address)" - Delphi help quotation.
    else PRENextOff (scan + REOpSz)^ := val - scan; //###0.933
@@ -1752,17 +1761,17 @@ const
    #$418,#$419,#$41A,#$41B,#$41C,#$41D,#$41E,#$41F,
    #$420,#$421,#$422,#$423,#$424,#$425,#$426,#$427,
    #$428,#$429,#$42A,#$42B,#$42C,#$42D,#$42E,#$42F,#0);
- RusRangeLoLow = #$430{'à'};
- RusRangeLoHigh = #$44F{'ÿ'};
- RusRangeHiLow = #$410{'À'};
- RusRangeHiHigh = #$42F{'ß'};
+ RusRangeLoLow = #$430{''};
+ RusRangeLoHigh = #$44F{''};
+ RusRangeHiLow = #$410{''};
+ RusRangeHiHigh = #$42F{''};
 {$ELSE}
- RusRangeLo = 'àáâãäå¸æçèéêëìíîïðñòóôõö÷øùúûüýþÿ';
- RusRangeHi = 'ÀÁÂÃÄÅ¨ÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß';
- RusRangeLoLow = 'à';
- RusRangeLoHigh = 'ÿ';
- RusRangeHiLow = 'À';
- RusRangeHiHigh = 'ß';
+ RusRangeLo = '';
+ RusRangeHi = 'Å¨';
+ RusRangeLoLow = '';
+ RusRangeLoHigh = '';
+ RusRangeHiLow = '';
+ RusRangeHiHigh = '';
 {$ENDIF}
 
 function TRegExpr.CompileRegExpr (exp : PRegExprChar) : boolean;
@@ -3105,6 +3114,8 @@ function TRegExpr.MatchPrim (prog : PRegExprChar) : boolean;
   scan := prog;
 
   while scan <> nil do begin
+     if (FExecutionTimeOut <> 0) and (GetTickCount >= FEndTime) then
+       Error(reeExecTimeout);
      len := PRENextOff (scan + 1)^; //###0.932 inlined regnext
      if len = 0
       then next := nil
@@ -3788,6 +3799,8 @@ function TRegExpr.ExecPrim (AOffset: integer) : boolean;
    then EXIT;
 
   StartPtr := FInputStringPtr + AOffset - 1;
+  //FStartTime := GetTickCount;
+  FEndTime := GetTickCount + FExecutionTimeOut;
 
   // If there is a "must appear" string, look for it.
   if regMustStr <> nil then begin
@@ -3962,7 +3975,7 @@ procedure TRegExpr.SetInputString (const AInputString : RegExprString);
   fInputStart := PChar (FInputStringPtr);
   Len := length (FInputStringPtr);
   fInputEnd := PRegExprChar (integer (fInputStart) + Len); ??
-  !! startp/endp âñå ðàâíî áóäåò îïàñíî èñïîëüçîâàòü ?
+  !! startp/endp      ?
   }
  end; { of procedure TRegExpr.SetInputString
 --------------------------------------------------------------}

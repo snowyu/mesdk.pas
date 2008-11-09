@@ -266,26 +266,26 @@ type
   { Summary: add the name property and assign virtual method. }
   TMeNamedObject = object(TMeDynamicObject)
   protected //private
-    FName: String;
+    FName: AnsiString;
   public
     destructor Destroy; virtual;
     procedure Assign(const aObject: PMeNamedObject); virtual;
   public
-    property Name: String read FName write FName;
+    property Name: AnsiString read FName write FName;
   end;
 
   PMeComponent = ^TMeComponent;
   { Summary: set the name property will be added to GComponentNameList. }
   TMeComponent = object(TMeDynamicObject)
   protected //##private
-    FName: String;
-    procedure SetName(const NewName: String);
+    FName: AnsiString;
+    procedure SetName(const NewName: AnsiString);
   public
     destructor Destroy; virtual;
     procedure Assign(const aObject: PMeNamedObject); virtual; {override}
   public
     {Summary Specifies the name of the component}
-    property Name: String read FName write SetName;
+    property Name: AnsiString read FName write SetName;
   end;
 
   PMeInterfacedObject = ^TMeInterfacedObject;
@@ -1288,7 +1288,7 @@ asm
 end;
 {$ENDIF}
 
-procedure TMeComponent.SetName(const NewName: String);
+procedure TMeComponent.SetName(const NewName: AnsiString);
 begin
   if FName <> '' then
   begin

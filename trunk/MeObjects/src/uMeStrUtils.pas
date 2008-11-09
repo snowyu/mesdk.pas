@@ -67,11 +67,11 @@ type
   TOnDoFileEvent = function (const aFileName: AnsiString): Boolean;
 
 resourcestring
-  RsBlankSearchString       = 'Search AnsiString cannot be blank';
+  RsBlankSearchString       = 'Search string cannot be blank';
   RsInvalidEmptyStringItem  = 'AnsiString list passed to StringsToMultiSz cannot contain empty strings.';
   RsNumericConstantTooLarge = 'Numeric constant too large.';
   RsFormatException         = 'Format exception';
-  RsDotNetFormatNullFormat  = 'Format AnsiString is null';
+  RsDotNetFormatNullFormat  = 'Format string is null';
   RsArgumentIsNull          = 'Argument %d is null';
   RsDotNetFormatArgumentNotSupported = 'Argument type of %d is not supported';
   RsArgumentOutOfRange      = 'Argument out of range';
@@ -206,8 +206,11 @@ function PathIsAbsolute(const Path: AnsiString): Boolean;
 function StrTrim(const aText: AnsiString; const IgnoreCase: boolean = False; const IgnoreBlanks: boolean = False): AnsiString;
 
 //Fetch the left AnsiString until aDelim found.
+{
+  return is the AnsiString on the left of the aDelim .
+}
 function StrFetch(var S: AnsiString; const aDelim: AnsiString; const aDelete: Boolean = True): AnsiString;
-//Fetch the right AnsiString until aDelim found.
+//Fetch the left AnsiString from the right pos until aDelim found.
 function StrRFetch(var S: AnsiString; const aDelim: AnsiString; const aDelete: Boolean = True): AnsiString;
 
 function StrToHex(const Source: AnsiString): AnsiString;
