@@ -41,11 +41,13 @@ type
     FList: PMeList;
     FLock: PMeCriticalSection;
     FDuplicates: TDuplicates;
+    //FFreeList: Boolean;
     //FMaxCount: Integer;
 
     procedure Init; virtual; //override
   public
-    destructor Destroy; virtual;
+    constructor Create(const aList: PMeList = nil);
+    destructor Destroy; virtual; //override
     function Add(const Item: Pointer): Integer;
     procedure Clear;
     procedure Delete(const Index: Integer);
@@ -553,9 +555,19 @@ end;
 procedure TMeThreadSafeList.Init;
 begin
   inherited;
-  New(FList, Create);
   New(FLock, Create);
   FDuplicates := dupIgnore;
+end;
+
+constructor TMeThreadSafeList.Create(const aList: PMeList);
+begin
+  inherited Create;
+  if assigned(aList) then
+  begin
+    FList := aList;
+  end
+  else
+    New(FList, Create);
 end;
 
 destructor TMeThreadSafeList.Destroy;

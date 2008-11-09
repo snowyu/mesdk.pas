@@ -73,11 +73,11 @@ SearchListBegin, SearchList 为子表达式，当前禁止在子表达式中嵌套子表达式！
 
 Content=/[[ListTitle]] [[ListDetail]]/
 ListTitle=/<tr><th>(.*):Sex</th><th>(.*):Age</th><th>(.*):Name</th></tr>/:1
-ListDetail=/<tr><td>(.*):$[ListBegin.Sex]:</td><td>(.*):$[ListBegin.Age]:</td><td>(.*):$[ListBegin.Name]:</td></tr>/:n
+ListDetail=/<tr><td>(.*):$[ListTitle.Sex]:</td><td>(.*):$[ListTitle.Age]:</td><td>(.*):$[ListTitle.Name]:</td></tr>/:n
 
-if not found "$[ListBegin.Sex]" then use ListBegin.Sex as FiledName.
+if not found "$[ListTitle.Sex]" then use ListTitle.Sex as FiledName.
 
-[[ListBegin]] 为子表达式
+[[ListTitle]] 为子表达式
 
 
     property MatchStrPos [const aSubExprName : RegExprString] : integer read GetMatchStrPos;
@@ -103,7 +103,7 @@ Defines:
   Macro(inline): $[:Macro{Param1=XX1,Param2=XX2}:]
     the macro is pure Regular expression! the "{Param1=XX1, Param2=XX2}" is optional.
     eg: 
-    Macro: ATag= <a href=(['|"])(?<URI>.*?)(\1).*>(?<Name>.*?)</a>
+    Macro: ATag= <a href=(['|"])(?<URI>.*?)(\-2).*>(?<Name>.*?)</a>
       List=/$[:ATag{URI=MyURI,Name=MName}:]/:n
 
 *)

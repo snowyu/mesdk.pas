@@ -223,6 +223,8 @@ begin
       vClass := TObject(aMethod.Data).ClassType;
     vFunc.InitFromType(RegisterProcTypeInfo(aProcParams, vClass));
     vFunc.FInstance := aMethod.Data;
+    if Assigned(vFunc.SelfParam) then
+      vFunc.SelfParam.AsPointer := aMethod.Data;
     vFunc.FProc := aMethod.Code;
     vFunc.FName := aName;
     Add(vFunc);
