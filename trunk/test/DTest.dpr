@@ -92,6 +92,8 @@ uses
   , uMeSysUtilsTest
   , uMeThreadTest
   , uRegExprTest
+  , uMeServiceTest
+  , uMeServiceMgrTest
   ;
 
 
