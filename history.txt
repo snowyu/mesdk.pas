@@ -1,3 +1,576 @@
+MeSDK v.1.2 Release 2008-11-10
+
+Revision: 345
+Author: riceball.lee
+Date: 20:34:19, 2008年11月10日
+Message:
++ [DUnit] UnitTest for MeService
+----
+Added : /trunk/test/uMeServiceMgrTest.pas
+Added : /trunk/test/uMeServiceTest.pas
+
+Revision: 344
+Author: riceball.lee
+Date: 20:33:19, 2008年11月10日
+Message:
+* [Bug][DUnit] the ClassName is removed for the error optimal by Delphi7 
+----
+Modified : /trunk/test/uMeInjectorTest.pas
+Modified : /trunk/test/uMeInterceptorTest.pas
+Modified : /trunk/test/uMeTypInfoTest.pas
+
+Revision: 343
+Author: riceball.lee
+Date: 21:09:04, 2008年11月9日
+Message:
++ Init MeService
+----
+Added : /trunk/MeService
+Added : /trunk/MeService/src
+Added : /trunk/MeService/src/MeService.inc
+Added : /trunk/MeService/src/uMePlugin.pas
+Added : /trunk/MeService/src/uMePluginMgr.pas
+Added : /trunk/MeService/src/uMeService.pas
+Added : /trunk/MeService/src/uMeServiceFunction.pas
+Added : /trunk/MeService/src/uMeServiceMgr.pas
+Added : /trunk/MeService/src/uMeServiceTypes.pas
+Modified : /trunk/test/DTest.dpr
+
+Revision: 342
+Author: riceball.lee
+Date: 20:58:58, 2008年11月9日
+Message:
+* [uMeObject] AnsiString type instead of String type.
+* [uMeStrUtils] AnsiString type instead of String type.
+* [uMeSysUtils] TMeThreadSafeList can use an external list object.
+* [uRegExpr] 
+  * AnsiChar type instead of Char type.
+  + TRegExpr.ExecutionTimeOut (ms)
+* [uMeRemoteServerFunc] [Bug] Register remote method.
+* [uMeProcType] [Bug] TMeParam.AsXXX Float value error.
+
+----
+Modified : /trunk/MeObjects/src/uMeObject.pas
+Modified : /trunk/MeObjects/src/uMeRegExpr.pas
+Modified : /trunk/MeObjects/src/uMeStrUtils.pas
+Modified : /trunk/MeObjects/src/uMeSysUtils.pas
+Modified : /trunk/MeObjects/src/uRegExpr.pas
+Modified : /trunk/MeRTTI/src/uMeProcType.pas
+Modified : /trunk/MeRemote/src/uMeRemoteServerFunc.pas
+Modified : /trunk/test/dcc32.cfg
+
+Revision: 341
+Author: riceball.lee@gmail.com
+Date: 11:09:21, 2008年10月31日
+Message:
+* [Bug] can not work on IE
++ IsDebugged for console.log on firefox.
+----
+Modified : /trunk/MeRemote/doc/sdOpenapi.js
+
+Revision: 338
+Author: riceball.lee@gmail.com
+Date: 17:02:54, 2008年10月27日
+Message:
+* [Bug] fixed CrossSite URL error
+----
+Modified : /trunk/MeRemote/doc/request.js
+
+Revision: 335
+Author: riceball.lee@gmail.com
+Date: 17:39:51, 2008年10月15日
+Message:
+* TMeParam
+  * AsString use AnsiString instead of String.
+  * [Bug] GetAsString can not get proper value when paramType is not ByRef.
+----
+Modified : /trunk/test/uMeInterceptorTest.pas
+Modified : /trunk/MeRTTI/src/uMeProcType.pas
+Modified : /trunk/MeAOP/src/uMeInterceptor.pas
+Modified : /trunk/test/uInternalTestObj.pas
+
+Revision: 334
+Author: riceball.lee
+Date: 23:28:53, 2008年10月13日
+Message:
+* [Bug][MeAOP] the OnXXXExecute event forget to pass the params.
+* [Bug][MeAOP] AddToProperty
+----
+Modified : /trunk/test/uMeInterceptorTest.pas
+Modified : /trunk/MeAOP/src/uMeInterceptor.pas
+Modified : /trunk/test/uInternalTestObj.pas
+Modified : /trunk/test/uMeEventFeatureTest.pas
+
+Revision: 332
+Author: riceball.lee@gmail.com
+Date: 18:18:51, 2008年10月13日
+Message:
++ [DUnit] AddToProperty for mpsGet
+----
+Modified : /trunk/test/uMeInterceptorTest.pas
+Modified : /trunk/test/uInternalTestObj.pas
+
+Revision: 330
+Author: riceball.lee@gmail.com
+Date: 13:45:34, 2008年10月10日
+Message:
+* [Bug] Request.js
+  the error will not be triggered onComplete event.
+----
+Modified : /trunk/MeRemote/doc/request.js
+
+Revision: 329
+Author: riceball.lee@gmail.com
+Date: 18:10:25, 2008年10月6日
+Message:
+* Request.js
+  + setUrl method
+  + send(aUrl, aData) XSS supports
+----
+Modified : /trunk/MeRemote/doc/request.js
+
+Revision: 328
+Author: riceball.lee
+Date: 15:47:17, 2008年10月5日
+Message:
+* replace the String and Char type to AnsiString and AnsiChar
+----
+Modified : /trunk/MeObjects/src/uMeStrUtils.pas
+
+Revision: 322
+Author: riceball.lee
+Date: 21:40:16, 2008年9月29日
+Message:
+* Minor Changed.
+----
+Modified : /trunk/test/uMeEventFeatureTest.pas
+Modified : /trunk/test/uMeThreadTest.pas
+
+Revision: 321
+Author: riceball.lee
+Date: 14:16:14, 2008年9月29日
+Message:
+* [TMeWindowMessageFeature] can work now.
++ [DUnit] test for WindowMessageFeature.
+----
+Modified : /trunk/test/uMeEventFeatureTest.pas
+Modified : /trunk/MeAOP/src/features/uMeEventFeature.pas
+
+Revision: 318
+Author: riceball.lee
+Date: 20:41:26, 2008年9月23日
+Message:
+* TMeThreadSafeList
+  + Delete method
+  * Add Method return the index of the list.
+----
+Modified : /trunk/MeObjects/src/uMeSysUtils.pas
+
+Revision: 315
+Author: riceball.lee
+Date: 8:11:37, 2008年9月23日
+Message:
+* uMeEventFeature has almost done.
+----
+Modified : /trunk/MeAOP/src/features/uMeEventFeature.pas
+
+Revision: 313
+Author: riceball.lee
+Date: 8:04:38, 2008年9月22日
+Message:
++ MultiCast Event Feature
+----
+Added : /trunk/MeAOP/src/features/uMeEventFeature.pas
+
+Revision: 309
+Author: riceball.lee
+Date: 10:28:51, 2008年9月14日
+Message:
+* redesign the MeScript Interpreter
+----
+Modified : /trunk/MeScript/src/uMeScript.pas
+Modified : /trunk/test/uMeScriptTest.pas
+Added : /trunk/MeRemote/src/uMeService.pas
+Modified : /trunk/MeScript/src/uMeScriptInterpreter.pas
+
+Revision: 305
+Author: riceball.lee@gmail.com
+Date: 16:17:49, 2008年9月8日
+Message:
+* ready to re-construct
+----
+Modified : /trunk/MeRemote/doc/rpc_client.js
+
+Revision: 303
+Author: riceball.lee@gmail.com
+Date: 16:13:07, 2008年9月8日
+Message:
+* [Bug] fixed the regular expression error for google Chrome browser.
+----
+Modified : /trunk/MeRemote/doc/request.js
+
+Revision: 301
+Author: riceball.lee
+Date: 14:12:14, 2008年8月23日
+Message:
+* [Bug] TMeThreadMgrTask force to terminate the threads error. 
+* Minor changes.
+----
+Modified : /trunk/test/DTest.dpr
+Modified : /trunk/test/dcc32.cfg
+Modified : /trunk/MeScript/src/uMeScript.pas
+Modified : /trunk/test/uMeThreadTest.pas
+Modified : /trunk/MeObjects/src/uMeThread.pas
+
+Revision: 296
+Author: riceball.lee
+Date: 21:42:53, 2008年8月17日
+Message:
++ example document for SetMeIdleProc
+----
+Modified : /trunk/MeObjects/src/uMeThread.pas
+
+Revision: 295
+Author: riceball.lee
+Date: 21:07:24, 2008年8月17日
+Message:
+* [Bug] the VCL controls will freeze the GLogger
+  + use the SetMeIdleProc to process message loop.
+* [Bug] [TMeThreadMgrTask.Run]the AutoStopped will make the Thread Manager quit immediately.
++ [uMeThread] MeSleep procedure.
+----
+Modified : /trunk/MeObjects/src/uMeThread.pas
+Modified : /trunk/MeAOP/src/features/uStringsLogger.pas
+
+Revision: 293
+Author: riceball.lee@gmail.com
+Date: 17:35:06, 2008年8月17日
+Message:
++ VM Instruction Execution Core(not work yet) 
+----
+Modified : /trunk/MeScript/src/uMeScript.pas
+Added : /trunk/MeScript/src/uMeScriptInterpreter.pas
+
+Revision: 291
+Author: riceball.lee@gmail.com
+Date: 13:27:46, 2008年8月17日
+Message:
++ English Document 
+* Seperate the VM Execution and script.
+  you can set by SetVMExecutorProc() procedure.
+----
+Modified : /trunk/MeScript/src/uMeScript.pas
+Modified : /trunk/MeScript/src/uMeScript_Interpreter_inc.pas
+Modified : /trunk/MeScript/doc/MeScript.cn.txt
+
+Revision: 289
+Author: riceball.lee
+Date: 20:52:25, 2008年8月13日
+Message:
++ TMeThreadTimer and DUnit Test for TMeThreadTimer
+----
+Modified : /trunk/test/uMeThreadTest.pas
+Modified : /trunk/MeObjects/src/uMeThread.pas
+
+Revision: 288
+Author: riceball.lee
+Date: 21:29:43, 2008年8月4日
+Message:
+* [Bug] Can not compile on the Delphi7.
+----
+Modified : /trunk/MeObjects/src/uMeRegExpr.pas
+Modified : /trunk/MeObjects/src/uMeThread.pas
+Modified : /trunk/MeObjects/examples/dcc32.cfg
+Modified : /trunk/MeObjects/examples/wget.dpr
+
+Revision: 287
+Author: riceball.lee
+Date: 17:23:46, 2008年7月31日
+Message:
++ [MeRemote]execution error report in the simple binary protocol.
+----
+Modified : /trunk/MeRemote/src/uMeIndyClientTransport.pas
+Modified : /trunk/MeRemote/src/uMeIndyServerTransport.pas
+
+Revision: 285
+Author: riceball.lee
+Date: 8:01:51, 2008年7月30日
+Message:
+* TMeTask
+  + property ActiveThreads
+  + property ThreadPool
+----
+Modified : /trunk/MeObjects/src/uMeThread.pas
+
+Revision: 284
+Author: riceball.lee
+Date: 7:36:04, 2008年7月29日
+Message:
++ TMeTask.Execute the task can be executed without thread.
+* TMeThreadMgrTask
+  + AutoStopped: Boolean //it will be stopped when no Active threads running
+----
+Modified : /trunk/MeObjects/src/uMeThread.pas
+
+Revision: 283
+Author: riceball.lee
+Date: 10:08:42, 2008年7月26日
+Message:
+* Add test to AddFreeNotification, RemoveFreeNotification for PMeDynamicObject
+----
+Modified : /trunk/test/uMeSysUtilsTest.pas
+
+Revision: 282
+Author: riceball.lee
+Date: 10:07:36, 2008年7月26日
+Message:
+* AddFreeNotification, RemoveFreeNotification support the TObject and PMeDynamicObject now.
+----
+Modified : /trunk/MeObjects/src/uMeObject.pas
+Modified : /trunk/MeObjects/src/uMeSysUtils.pas
+Modified : /trunk/MeObjects/examples/TestFreeNotify.dpr
+
+Revision: 280
+Author: riceball.lee
+Date: 19:54:29, 2008年7月20日
+Message:
+- property OnTaskDone(remove to TMeTask.OnTaskDone
+----
+Modified : /trunk/MeObjects/src/uMeIndyTask.pas
+
+Revision: 279
+Author: riceball.lee
+Date: 19:52:43, 2008年7月20日
+Message:
+* [Bug] can not get SubExpression with matchStr after ExecNext
+----
+Modified : /trunk/MeObjects/src/uRegExpr.pas
+
+Revision: 278
+Author: riceball.lee
+Date: 19:51:42, 2008年7月20日
+Message:
++ TMeCustomThread.OnAfterRun
+----
+Modified : /trunk/MeObjects/src/uMeThread.pas
+
+Revision: 277
+Author: riceball.lee
+Date: 16:44:52, 2008年7月20日
+Message:
+*. Minor changed.
+----
+Modified : /trunk/MeRemote/examples/IndyBin/client.dpr
+
+Revision: 276
+Author: riceball.lee
+Date: 16:44:08, 2008年7月20日
+Message:
+* Minor changed.
+----
+Modified : /trunk/MeObjects/src/uMeMakeHole.inc
+Modified : /trunk/MeObjects/src/uMeTypinfo.pas
+
+Revision: 275
+Author: riceball.lee
+Date: 16:43:29, 2008年7月20日
+Message:
++ property TMeTask.OnTaskDone
++ property TMeThreadMgrTask.OnThreadDone
+----
+Modified : /trunk/MeObjects/src/uMeThread.pas
+
+Revision: 273
+Author: riceball.lee
+Date: 22:27:48, 2008年7月14日
+Message:
+* [Bug] raise Error when Strings is nil
+----
+Modified : /trunk/MeAOP/src/features/uStringsLogger.pas
+
+Revision: 272
+Author: riceball.lee
+Date: 7:06:11, 2008年7月12日
+Message:
++ IndyBinServer is KeepAlive now.
+----
+Modified : /trunk/MeRemote/src/uMeIndyServerTransport.pas
+Modified : /trunk/MeRemote/examples/IndyBin/client.dpr
+
+Revision: 263
+Author: riceball.lee
+Date: 22:33:05, 2008年6月30日
+Message:
+* RegExprSubExpressions supports the: (?<name>...),
+  (?'name'..), (?P<name>...)
+----
+Modified : /trunk/MeObjects/src/uRegExpr.pas
+
+Revision: 262
+Author: riceball.lee
+Date: 19:25:00, 2008年6月29日
+Message:
+* Minor Changed.
+----
+Modified : /trunk/MeObjects/src/uRegExpr.pas
+
+Revision: 260
+Author: riceball.lee
+Date: 16:23:43, 2008年6月29日
+Message:
++ TMeConsoleLogger for console application.
+----
+Modified : /trunk/MeObjects/src/uMeLoggerEx.pas
+
+Revision: 259
+Author: riceball.lee
+Date: 16:22:41, 2008年6月29日
+Message:
+* [Bug] a memory leak found and fixed.
+----
+Modified : /trunk/MeObjects/src/uMeIndyTask.pas
+
+Revision: 256
+Author: riceball.lee
+Date: 9:45:40, 2008年6月27日
+Message:
+~ [Demo] Remote Add function console application:
+  client 12 3
+  return the result of the 12+3.
+----
+Modified : /trunk/MeRemote/examples/IndyBin/client.dpr
+
+Revision: 255
+Author: riceball.lee
+Date: 9:44:20, 2008年6月27日
+Message:
+* [Bug] Minor bug fixed.
+----
+Modified : /trunk/MeRemote/src/uMeIndyServerTransport.pas
+Modified : /trunk/MeRemote/src/uMeRemoteUtils.pas
+
+Revision: 254
+Author: riceball.lee
+Date: 22:51:45, 2008年6月26日
+Message:
+* [Bug] MeRemote can work now.
+----
+Modified : /trunk/MeObjects/src/uMeObject.pas
+Modified : /trunk/MeRemote/src/uMeRemoteServerFunc.pas
+Modified : /trunk/MeRemote/src/uMeIndyClientTransport.pas
+Modified : /trunk/MeRemote/src/uMeIndyServerTransport.pas
+Modified : /trunk/MeRemote/src/uMeRemoteUtils.pas
+Modified : /trunk/MeRemote/examples/IndyBin/dcc32.cfg
+Modified : /trunk/MeRemote/src/uMeRemoteFuncFeature.pas
+
+Revision: 253
+Author: riceball.lee
+Date: 22:02:34, 2008年6月26日
+Message:
+* Update TMeParam.AsString Property to support OrdinalType
+----
+Modified : /trunk/MeRTTI/src/uMeProcType.pas
+
+Revision: 252
+Author: riceball.lee
+Date: 18:13:49, 2008年6月26日
+Message:
++ [MeRemote] IndyBin protocol example[not done]
+----
+Modified : /trunk/MeRemote/src/uMeRemoteServerFunc.pas
+Modified : /trunk/MeRemote/src/uMeIndyClientTransport.pas
+Modified : /trunk/MeRemote/src/uMeIndyServerTransport.pas
+Added : /trunk/MeRemote/examples
+Added : /trunk/MeRemote/examples/IndyBin
+Added : /trunk/MeRemote/examples/IndyBin/client.dpr
+Modified : /trunk/test/uMeProcTypeTest.pas
+Added : /trunk/MeRemote/examples/IndyBin/dcc32.cfg
+Modified : /trunk/MeRemote/src/uMeRemoteFuncFeature.pas
+Added : /trunk/MeRemote/examples/IndyBin/server.dpr
+
+Revision: 251
+Author: riceball.lee
+Date: 16:31:43, 2008年6月23日
+Message:
+* under-construct
+----
+Modified : /trunk/MeRemote/src/uMeRemoteServerFunc.pas
+Modified : /trunk/test/dcc32.cfg
+Modified : /trunk/MeRemote/src/uMeIndyServerTransport.pas
+Modified : /trunk/MeRemote/src/uMeRemoteUtils.pas
+
+Revision: 250
+Author: riceball.lee
+Date: 2:31:47, 2008年6月22日
+Message:
++ [Test] TTest_MeStrings.Test_AddDelimitedText
+----
+Modified : /trunk/MeObjects/src/uMeObject.pas
+Modified : /trunk/test/uMeObjectTest.pas
+
+Revision: 249
+Author: riceball.lee
+Date: 17:48:41, 2008年6月20日
+Message:
+* still under-construct!
+----
+Modified : /trunk/MeRemote/src/uMeIndyServerTransport.pas
+
+Revision: 248
+Author: riceball.lee
+Date: 17:47:56, 2008年6月20日
+Message:
+* minor changed
+----
+Modified : /trunk/MeRemote/src/uMeIndyClientTransport.pas
+
+Revision: 247
+Author: riceball.lee
+Date: 17:45:32, 2008年6月20日
+Message:
+* TMeRemmoteFunction
+  + procedure Execute(const aIn, aOut: PMeStream);
+* TMeRemmoteFunctions
+  + procedure Execute(const aIndex: Integer; const aIn, aOut: PMeStream);
+* [Bug] the parent of TMeRemmoteFunctions should be TMeTreadSafeList.
+----
+Modified : /trunk/MeRemote/src/uMeRemoteServerFunc.pas
+
+Revision: 243
+Author: riceball.lee
+Date: 16:33:10, 2008年6月18日
+Message:
+* [Bug] Test passed on Delphi 7
+----
+Modified : /trunk/test/uMeInterceptorTest.pas
+
+Revision: 242
+Author: riceball.lee
+Date: 16:32:07, 2008年6月18日
+Message:
+* [Bug] Can not compile on Delphi7
+----
+Modified : /trunk/MeObjects/src/uMeThread.pas
+Modified : /trunk/MeObjects/src/uMeSyncObjs.pas
+
+Revision: 241
+Author: riceball.lee
+Date: 16:30:55, 2008年6月18日
+Message:
+* use const E: Exception parameter instead in TMeAfterExceptionEvent.
+----
+Modified : /trunk/MeAOP/src/uMeInterceptor.pas
+
+Revision: 240
+Author: riceball.lee
+Date: 6:54:07, 2008年6月18日
+Message:
+* [Bug] Can not Compile on Delphi7
+----
+Modified : /trunk/MeScript/src/uMeScript.pas
+Modified : /trunk/MeObjects/src/uMeThread.pas
+
+
 MeSDK v.1.1 Release 2008.6.16
 
 * [Bug] TMeTokenizer can not process this: {aaa();}
