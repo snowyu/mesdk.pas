@@ -47,12 +47,14 @@ implementation
 procedure TTest_MeInjector.TestInjectPublishedMethod(aClass: TClass; aTestMethods: TTestMethods);
 var
   i: Integer;
+  {$IFDEF Debug_WriteToConsole_Support}
   vS: string;
+  {$ENDIF}
   vProc: TNewMethodProc;
 begin
-  i :=Pos('_', ClassName);
-  vS := Copy(ClassName, i+1, MaxInt);
   {$IFDEF Debug_WriteToConsole_Support}
+  i :=Pos('_', Self.ClassName);
+  vS := Copy(ClassName, i+1, MaxInt);
   Status(aClass.ClassName + ': Check '+ vS +' Test_InjectPublishedMethod');
   {$ENDIF}
   CreateObject(aClass);
@@ -74,12 +76,14 @@ end;
 procedure TTest_MeInjector.TestInjectStaticMethod(aClass: TClass; aTestMethods: TTestMethods);
 var
   i: Integer;
+  {$IFDEF Debug_WriteToConsole_Support}
   vS: string;
+  {$ENDIF}
   vProc: TNewMethodProc;
 begin
+  {$IFDEF Debug_WriteToConsole_Support}
   i :=Pos('_', ClassName);
   vS := Copy(ClassName, i+1, MaxInt);
-  {$IFDEF Debug_WriteToConsole_Support}
   Status(aClass.ClassName + ': Check '+ vS +' Test_InjectStaticMethod');
   {$ENDIF}
   CreateObject(aClass);
@@ -102,12 +106,14 @@ procedure TTest_MeInjector.TestInjectVirtualMethod(aClass: TClass; aTestMethods:
   ; aGetProc: TGetMethodByIndexProc);
 var
   i: Integer;
+  {$IFDEF Debug_WriteToConsole_Support}
   vS: string;
+  {$ENDIF}
   vProc: TNewMethodProc;
 begin
+  {$IFDEF Debug_WriteToConsole_Support}
   i :=Pos('_', ClassName);
   vS := Copy(ClassName, i+1, MaxInt);
-  {$IFDEF Debug_WriteToConsole_Support}
   Status(aClass.ClassName + ': Check '+ vS +' Test_InjectVirtual/Dynamic Method');
   {$ENDIF}
   CreateObject(aClass);
