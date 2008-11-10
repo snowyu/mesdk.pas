@@ -113,8 +113,9 @@ var
   i: Integer;
   vS: string;
 begin
-  i :=Pos('_', ClassName);
-  vS := Copy(ClassName, i+1, MaxInt);
+  vS := ClassName;
+  i :=Pos('_', vS);
+  vS := Copy(vS, i+1, MaxInt);
   {$IFDEF Debug_WriteToConsole_Support}
   //Status('Check '+aClass.ClassName+' ' + vS + ' TestGetMethodCount');
   Status(aClass.ClassName + ': Check '+ vS +' method Count');
@@ -155,8 +156,9 @@ var
   s: string;
   vS: string;
 begin
-  i :=Pos('_', ClassName);
-  vS := Copy(ClassName, i+1, MaxInt);
+  vS := ClassName;
+  i :=Pos('_', vS);
+  vS := Copy(vS, i+1, MaxInt);
   {$IFDEF Debug_WriteToConsole_Support}
   Status(aClass.ClassName + ': Check '+ vS + ' TestGetMethodByIndex');
   {$ENDIF}
@@ -200,8 +202,9 @@ var
   vS: string;
   vMethodType: TMethodType;
 begin
-  i :=Pos('_', ClassName);
-  vS := Copy(ClassName, i+1, MaxInt);
+  vS := ClassName;
+  i :=Pos('_', vS);
+  vS := Copy(vS, i+1, MaxInt);
   {$IFDEF Debug_WriteToConsole_Support}
   Status(aClass.ClassName + ': Check '+ vS + ' TestGetIndexByMethod');
   {$ENDIF}
@@ -226,8 +229,9 @@ var
   s: ShortString;
   vS: string;
 begin
-  i :=Pos('_', ClassName);
-  vS := Copy(ClassName, i+1, MaxInt);
+  vS := ClassName;
+  i :=Pos('_', vS);
+  vS := Copy(vS, i+1, MaxInt);
   {$IFDEF Debug_WriteToConsole_Support}
   Status(aClass.ClassName +': Check '+ vS + ' TestGetMethodByName');
   {$ENDIF}
@@ -261,8 +265,9 @@ var
   vNewProc: Pointer;
   vS: string;
 begin
-  i :=Pos('_', ClassName);
-  vS := Copy(ClassName, i+1, MaxInt);
+  vS := ClassName;
+  i :=Pos('_', vS);
+  vS := Copy(vS, i+1, MaxInt);
   {$IFDEF Debug_WriteToConsole_Support}
   Status(aClass.ClassName +': Check '+ vS + ' TestSetMethodByIndex');
   {$ENDIF}
@@ -289,8 +294,9 @@ var
   vNewProc: Pointer;
   vS: string;
 begin
-  i :=Pos('_', ClassName);
-  vS := Copy(ClassName, i+1, MaxInt);
+  vS := ClassName;
+  i :=Pos('_', vS);
+  vS := Copy(vS, i+1, MaxInt);
   {$IFDEF Debug_WriteToConsole_Support}
   Status(aClass.ClassName +': Check '+ vS + ' TestSetMethodByName');
   {$ENDIF}
