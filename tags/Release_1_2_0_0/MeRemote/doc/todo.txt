@@ -1,0 +1,1008 @@
+﻿2008-9-9
+! Server Exception Process [need take out as common feature]
+! MeApp --> MeFactory(MeServices)
+  these services can be plugin the MeFactory(MeServices) automatically.
+    mdl(method define language  -- RTTI)
+    MeFactoryFeature -- > MeLocalFactory(DLLFactory), MeRemoteFactory(all remote services register here)
+  MeApp
+    Factories: FactoryFeatures
+    Services: ; Services[]
+
+2008-9-8
+! how to recognize the get, post, put, delete http method to rebuild?
+  keep the post, put, delete as the reserved keywords. (the get is default)
+  if the api is not post, put, delete means the service api.
+  no, the service api can be get or post!!
+  extent the listMethods(): aMethod/crud
+
+  ApiLists = []; //default is get.
+  ApiLists = [{name: 'xx', methods: ['get','post']},...]; 
+
+RpcClient
+  Service:
+
+
+2008-9-3
+* dynamic services discovering
+* remote error monitor
+* distributed services manager
+
+mootools(不包括Request).
+
+http://www.scalix.com/
+http://elgg.org/
+
+2008-8-20
+Request:
+  url
+    IsCrossSite
+  options
+    IsAsync
+  httpMethod
+  method
+  parameters
+
+My Error Obj: {code: number, message: ''}  
+
+Js Client SDK:
+the JS Client SDK
+  1. the Core Orient-Object Frame<done>
+  2. the Core functions
+    2.1 Core functions to operate the Object.<Partly Done>
+    2.2 Core functions to operate the Selector (like the JQuery).
+  3. the Core Objects
+    3.1 Array
+    3.2 Function
+    3.3 Number
+    3.4 String
+    3.5 Hash
+    3.6 Event
+    3.7 JSON<!>
+    3.8 Request<!>
+  4. the RpcClient Objects<!>
+    4.1 the RpcClient Object<!>
+    4.2 the Abstract RpcClient.Service Class<!>
+    4.3 the RpcClient.SDService class<!>
+      var myService = new RpcClient.SDService(['games', 'users', 'methods']);
+      var gameList  = myService.games.Get();
+      myService.games.Delete('SohuGame');
+
+      //the asynchronous call:
+      myService.games.Get({onSuccess: doGameListSuccess});
+      function doGameListSuccess(result){
+        gamesList = result;
+      };
+  5. the international languages
+  6. the template engine
+  7. UI
+
+2008-8-19
+http://jquerycomet.googlecode.com/svn/trunk/
+Use the MooTools Core(exclude Request and FX).
+I have to modify the Requst class to obey the new rules. (request.js)
+
+  var jsonRequest = new Request.JSON({url: vServiceURL, onComplete: function(result){
+  	$("result").set('text', JSON.encode(result));
+   }});
+
+  jsonRequest[vHttpMethod]({method: vMethodName, params: vParamList, id: requestId});
+
+
+.NET 2 SP1
+.NET 3.5 SP1
+Windows 集群服务
+VMare Workstation & VPC 2007
+
+    
+2008-8-18
+Service.Method();
+Service.Data.Get();
+Service.Data.Create(); //Post
+Service.Data.Update(); //put
+Service.Data.Delete();
+
+2008-7-21
+Patameter Type Limits:
+  Simple Types allowed
+  Pointer disallowed.
+  
+choose this as the bin protocol.
+
+Base 128 Varints -protocol buffer
+http://protorpc.likbilen.com/Protorpcdocprotobuf.html
+To understand your simple protocol buffer encoding, you first need to understand varints. Varints are a method of serializing integers using one or more bytes. Smaller numbers take a smaller number of bytes.
+
+Each byte in a varint, except the last byte, has the most significant bit (msb) set – this indicates that there are further bytes to come. The lower 7 bits of each byte are used to store the two's complement representation of the number in groups of 7 bits, least significant group first.
+
+So, for example, here is the number 1 – it's a single byte, so the msb is not set: 
+<code>
+0000 0001
+</code>
+
+And here is 130 – this is a bit more complicated:
+
+<code>
+1000 0010 0000 0001
+</code>
+
+How do you figure out that this is 130? First you drop the msb from each byte, as this is just there to tell us whether we've reached the end of the number (as you can see, it's set in the first byte as there is more than one byte in the varint):
+
+<code>
+1000 0010 0000 0001
+→ 000 0010  000 0001(get rid of the msb.)
+</code>
+
+You reverse the two groups of 7 bits because, as you remember, varints store numbers with the least significant group first. Then you concatenate them to get your final value:
+
+<code>
+000 0010(Low bits)  000 0001(High bits)
+→  000 0001 ++ 000 0010
+→  10000010
+→  128 + 2 = 130
+</code>
+
+可变长度的整数: 低位在前，高位在后。
+
+
+2008-7-8
+<div align="center"><font size="5">'''SNDA-RPC 协议规范'''</font> proposal<br/>Revision:0.8a({{REVISIONID}})
+-----
+</div>
+
+__TOC__
+
+<div align="right">
+Editor: [[User:Riceball|Riceball LEE]] 
+</div>
+= Overview =
+SNDA-RPC 是基于JSON-RPC<ref name="JSON-RPC">[[JSON-RPC/zh|JSON-RPC]]: http://json-rpc.org/</ref> 的扩展和修改，其目标是继续保持它的简单调用，修正其不足，以及扩展它对[[Representational_State_Transfer|RESTful]]<ref name="REST">REST(Representational State Transfer):是面向分布式超媒体系统（例如 World Wide Web）的一种软件架构风格。</ref>的支持。SNDA-RPC 是运行在 HTTP 协议<ref name="HTTP">HTTP 1.1 协议: http://www.w3.org/Protocols/rfc2616/rfc2616.html</ref>上无状态的，轻量级远程调用协议。
+
+SNDA-RPC描述了两类资源，Service API资源和Data API资源：
+
+* Service API资源，即通常所说的远程方法API资源，只能以HTTP GET或POST的方式被调用。其Service API的数据格式使用的是JSON<ref name="JSON">[[JSON/zh|JSON]]: http://www.json.org/json-zh.html</ref>
+* Data API资源，即数据资源，可以被CRUD(Create, Read, Update, Delete)操作的资源（注，可能许多数据资源都是只读性质），Data API的数据格式使用的JSON<ref name="JSON"/>, Atom<ref name="Atom">[http://bitworking.org/projects/atom/draft-ietf-atompub-protocol-04.html Atom]: http://bitworking.org/projects/atom/draft-ietf-atompub-protocol-04.html</ref>,RSS<ref name="RSS">[[RSS]]: http://en.wikipedia.org/wiki/RSS_(file_format)</ref>。
+
+它们的数据字符集编码都用的是UTF-8字符集<ref name="UTF8">UTF-8字符集: http://en.wikipedia.org/wiki/UTF-8</ref>.
+
+== Goals ==
+本规范的主要目标是在如下方面定义 SNDA-RPC 协议：
+* 描述Service API（远程过程）调用和返回结果
+* 描述Data API(RESTful Resource)调用和返回结果
+* 使用HTTP 1.1 协议传输请求和响应数据
+* 使用JSON<ref name="JSON" />作为消息数据的主要格式
+* 增强对[[Web Cache/zh|Web 高速缓存]]<ref name="WebCache">[[Web Cache/zh|Web 高速缓存]]服务是一种利用WEB高速缓存重定向技术，把用户所要访问的网络信息"抓"到本地，在最短的时间内将信息连续、完整、实时地传递给最终用户。高速缓存通过分布式地放置服务器及合理分配缓存Cache，从而降低广域网的带宽负荷，并提高网站内容的响应速度。</ref>（如：CDN 等）的兼容性，最大限度利用HTTP的现有资源
+* 尽量符合 W3C 存取控制标准（The W3C Access Control）：跨域安全检测请求规范<ref name="W3CAC">W3C 存取控制（The W3C Access Control）: http://www.w3.org/TR/access-control/ 是跨域的安全检测请求规范，让客户端文件对於谁可以、谁不可以向它们发出“以浏览器为基础的 request”（例如 XMLHttpRequest）有更好的控制。除此之外，这个 access control scheme 让网路应用程式拥有允许“跨站要求（cross-site request）”的能力。理论上，这让你在部署好存取控制点（Access Control Point）后，可以由 yoursite.com 的一个页面透过 XMLHttpRequest 向 google.com 要求一份文件。这个层级的控制，让管理网站内容的人员在决定是否“让他们的使用者建立混合不同网站内容的网页（mashup）或网站应用程式”时更有弹性。</ref>
+* SNDA-RPC协议的错误状态代码定义
+* 定义SNDA-RPC服务描述的简单规范
+
+== Non-Goals ==
+以下的方面将在其它专有规范中阐述，不在本规范约定范围之内，包括：
+* 安全策略
+** [[OAuth/zh|OAuth开放认证]]<ref name="OAuth">OAuth开放认证协议规范：是对用户透明的开发认证规范，涵盖了用户验证，用户授权和服务授权等和开放认证的方方面面: http://oauth.net/ 。</ref>
+* 服务的相互关联策略
+* 可靠性策略
+* 会话管理
+* 状态管理
+
+== 阅读对象 ==
+* 需要开发盛大Service and Data API 服务端SDK的资深开发人员
+* 需要开发盛大客户端调用 API SDK的资深开发人员
+
+== 阅读背景 ==
+首先您该对如下内容有所了解（必须）：
+* HTTP 1.1 协议标准规范<ref name="HTTP" />
+* JSON 协议标准规范 <ref name="JSON" />
+* JSON-RPC 1.1 协议标准规范 <ref name="JSON-RPC" />
+* 【服务端开发】[[Web Cache/zh|Web 高速缓存]]<ref name="WebCache"/>
+
+如果你希望支持RSS,Atom数据格式（可选）：
+* Atom 协议标准规范<ref name="Atom" />
+* RSS 协议标准规范<ref name="RSS" />
+
+= Terminology =
+;客户(Client): API的调用方
+;服务器(Server): 实现 API服务的一个服务器软件，内部可以宿主一个或多个 API服务或者是API服务的代理网关或传输者。
+;服务(Service): 提供一个或多个 API的提供者。
+;资源(Resource): 提供给用户使用的遵循全球统一资源标识规范的项，如数据(Data API)资源，远程方法(Service API)，服务(Service)资源等。
+;Service API: 已命名的在服务中的一个API远程调用，我们用一个英文动词来命名Service API，如，登录API我们命名为Login。本文中术语Proceudre，Method，Service API都是同一个意思。
+;Data API: 已命名的在服务中的一个数据资源，一般我们可以对数据资源进行CRUD(Create, Read, Update, Delete)操作。我们用一个英文名词来命名Data API，如，相片我们命名为Photo。
+;过程(Procedure): 参见 Service API.
+;方法(Method): 参见 Service API.
+;调用(Call): 在服务商的一次过程调用将导致在客户和服务器之间发生一次连续的请求-响应处理.
+;请求(Request): 客户端请求消息发送API的调用参数。
+;响应(Response): 服务器响应消息返回调用结果，无论成果或失败的结果。
+;错误(Error): 失败调用的应答。
+;通知(Notification): 一种单向(发完就不管)的调用，没有任何结果（结果为null），如果有错误会返回错误。
+;短连: 当客户需要调用服务的时候，方与服务相连，调用完毕后立即断开连接。每次连接只执行一个API。连接时间较短。短连又可分为强制短连和非强制短连。强制短连为服务器强制，在完成任务后服务器主动断开与客户的连接。非强制短连为客户端在完成任务后自觉的断开与服务器的连接，文中短连如无特殊说明均为非强制短连。
+;长连: 客户登录上服务后，一直与服务连接，直到客户注销。每次连接执行若干API，空闲也不会断开，直到客户自己注销，连接时间较长。
+;会话(Session): 在一段时间内客户服务器双方保持状态，完成一系列动作/消息的过程。
+;独立服务: 可以独立运行的服务。
+;子服务: 服务器上可以由若干服务组成，这些服务为该服务器上的子服务。
+;主服务(Main Service): 又称为默认服务(Default Service)，服务器上可以由若干服务组成，其中的默认服务为主服务。主服务在服务器中的名称为“default”，在该服务器上调用主服务可以省略前缀“default.”。同一服务器上有且只能有一个主服务。
+;依赖子服务: 必须依赖于某个独立服务，不能单独运行，不能作为默认服务。
+
+--------------
+HTTP 协议里的术语
+
+;HTTP 方法(HTTP Method): 客户端发出HTTP请求的方式，用来表示希望服务器如何处理请求的方式，有的地方又称为HTTP 动词（HTTP verb）或HTTP 动作(HTTP action)。本文涉及的HTTP 方法有HTTP GET，HTTP PUT，HTTP POST，HTTP DELETE.
+;路径(Path): 路径是URL中主机名(host name)后面的部分，如： "http://my.com/index.htm"，路径则是“/index.htm”.
+;请求报头(Request headers): 它们是一组关键字-值对（key-value pairs），起到metadata的作用，标识请求方要告诉服务器的一系列信息，HTTP标准请求报头大概有8个，应用程序也可以定义自己的报头。
+;实体正文(entity-body): 也称作文档(document)或表示(Representation)，一般来说，HTTP Get请求的实体正文(entity-body)为空，完成请求的信息全部在路径和请求报头中。
+;HTTP响应 (HTTP response): HTTP 响应可分为三个部分：响应代码；响应报头，和实体正文。
+* HTTP 响应代码(HTTP response code)：是用来告诉客户端应该如何处理响应的数字代码，以及 HTTP 请求是成功还是失败。如：“HTTP/1.1 200 OK”
+* 响应报头(Response headers): 大致与请求报头一样，不过这是服务器告诉客户端的关于实体正文的一系列信息。
+
+= 类型系统 =
+SNDA的类型系统为JSON<ref name="JSON"/>的类型系统，用于指明API调用中的值。JSON包括四种基本类型：数值(number)，字符串(string)，布尔型(boolean)，和空(null)；两种结构类型：对象(object)和数组(array)。
+
+;值(Value): 可以是字符串（string）、数值(number)、布尔值、 空值(null)、对象（object）或者数组（array）。这些结构可以嵌套。 
+;字符串（string）: 是由双引号包围的任意数量Unicode字符的集合，使用反斜线转义。一个字符（character）即一个单独的字符串（character string）。 字符串（string）与C或者Java的字符串非常相似。 
+;数值（number): 包括整数或小数，是由数字字符等构成。也与C或者Java的数值非常相似，不过未曾使用的八进制与十六进制格式。如：
+  1323
+  -34.45
+  +1.24E9
+;布尔类型（boolean）: 由 true, false 真假两个标识构成。
+;空（null）: 就是 null. 表示该值为空，什么都没有。
+;数组(Array): 是值（value）的有序列表。一个数组以“[”（左中括号）开始，“]”（右中括号）结束。值之间使用“,”（逗号）分隔。
+;对象(Object): 对象是一个无序的“'''名称/值'''对”集合。一个对象以“{”（左括号）开始，“}”（右括号）结束。每个“名称”后跟一个“:”（冒号）；“'''名称/值'''对”之间使用“,”（逗号）分隔。
+
+= Http 报头(Header) 的需求和扩展 =
+我们使用了如下的Http 报头(Header) 字段，并对报头(Header)字段做了扩展，满足我们的需要。对于我们扩展的非标准的HTTP 报头(Header)字段前面用“【扩展】”标识。如果字段仅当在某些方式才为必须，那么字段说明的最后我们会有“(仅当为XXX的时候)”类似的言语特此说明。
+
+== 请求方(Request)  ==
+请求方(Request)需要设置的Http Header 字段。请求方必须设置如下的Http Header 字段：
+
+* '''User-Agent''' 字段必须设置
+* '''Content-Type'''字段必须设置，内容为数据格式，数据字符集，以及版本号<ref name="Content-Type">Content-Type字段中的version参数为我们的扩展参数</ref>（如果需要指定版本号的话，在DataAPI为资源的版本号，在ServiceAPI中为服务的版本号，没有则总是对最新版本操作）如："Content-Type: application/json; charset=utf-8; version=1" .
+* '''Content-Length''' 必须参照HTTP规范([http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.4 Section 4.4, “Message Length”])正确设置.(仅当请求为HTTP POST的时候).
+* '''Accept''' 字段必须设置要，对于 ServiceAPI 必须设置为"application/json"，对于Data API则可以设置为："application/json", "application/atom","application/rss"，注意具体的某个Data API支持哪些格式，需要查阅相应的Data API 手册。
+* 【扩展】'''Protocol-Version''' 字段必须设置，用来告诉服务器客户端使用的是哪一个SNDA-RPC 协议规范版本。
+* 【扩展】'''API_Key''' 字段，对于需要限制访问权限的API需要客户提供一个授权API_Key（仅当访问受限API服务的时候必须）,对于公开开放的无权限要求的则不需要。
+* '''Date''' 字段，用于指明客户端访问时间，对于需要限制访问权限的API需要客户提供该信息,API服务端允许客户端请求时间误差为10分钟。（仅当访问受限API服务的时候必须）,对于公开开放的无权限要求的则不需要。该访问时间的日期格式为[[HTTP-Date]]<ref name="HTTP-Date">[[HTTP-Date]]：所有的[[HTTP-Date]]时间都是格林威治(GMT)标准时间， 可以使用三种时间格式：rfc1123-date, rfc850-date 和 asctime-date.
+</ref>格式，如："Fri, 22 May 2008 18:20:12 GMT",表示格林威治(GMT)时间为2008年5月22号礼拜5，18点20分12秒。
+
+
+可选的设置字段如下：
+* '''Content-MD5''' 字段<ref>Content-MD5头字段在HTTP协议标准中该字段用于计算EntityBody的MD5值，而HTTP Get方法Body为空，只有URI，这里将其改为计算URL参数的MD5检验和</ref>是对请求信息的MD5校验和，对于HTTP Get方式的URL参数生成方式如下：根据参数名称将你的所有请求参数按照字母先后顺序排序，如将param1=1,param2=2,param3=3 排序，参数名和参数值链接后，前面加上字符串snda。例如计算此字符串sndaparam11param22param33的md5()值，将此值以RFC 1864<ref>Content-MD5 Header Field: http://www.ietf.org/rfc/rfc1864.txt</ref>文中约定的Base64的字符串格式输出，对于POST方式只需要简单的对发送的正文(Body)进行散列即可。例如 Content-MD5: Q2hlY2sgSW50ZWdyaXR5IQ==
+* 【扩展】 '''Session''' 字段，会话Id字段，用于失去连接后，告诉服务器上次的会话Id，如果服务器依然保持有客户端上一次断线前的会话，那么该会话就会继续，否者服务器将返回一个完全不同的会话Id。
+
+== 响应方(Response)  ==
+响应方(Response)需要设置的Http Header 字段。服务器作为响应方必须要设置的 Http Header 字段如下：
+* '''Content-Type''' 字段必须设置为适当的返回数据类型，Service API总是为"application/json"，则可以为Data API则可以为："application/json", "application/atom","application/rss"，具体返回什么格式，需要视请求方发送的Accept Header 字段的内容类型来定；数据字符集（总是为utf-8），以及版本号<ref name="Content-Type" />（如果需要指定版本号的话，在DataAPI为资源的版本号，在ServiceAPI中为服务的版本号，没有则说明该服务不支持版本）。
+* '''ETag''' 字段<ref>HTTP 协议规格说明定义ETag为“被请求变量的实体值”，或者说是与某个Web资源关联的记号（token）。服务器单独负责判断记号是什么及其含义，并在HTTP响应头中将其传送到客户端，以下是服务器端返回的格式：
+　　ETag: "50b1c1d4f775c61:df3"
+　　客户端的查询更新格式是这样的：
+　　If-None-Match: W/"50b1c1d4f775c61:df3"
+　　如果ETag没改变，则返回状态304（Not Changed.）状态码，内容为空。（参见: HTTP 协议14.19节）</ref>用来指定返回资源版本的唯一标识（仅当请求为可缓存 API的时候）
+* '''Last-Modified''' 字段用来指示此资源在服务期端最后被修改的时间，其时间格式为[[HTTP-Date]]格式<ref name="HTTP-Date" />，所有的时间都是格林威治(GMT)标准时间，如："Last-Modified: Fri, 22 May 2008 18:20:12 GMT"（仅当请求为Data API的时候）
+* '''Content-Length''' 必须参照HTTP规范([http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.4 Section 4.4, “Message Length”])正确设置.
+* '''其它'''HTTP协议规定的必须返回的Http Header 字段.
+* 【扩展】'''Protocol-Version''' 字段必须设置，用来告诉客户端，服务器使用的是哪一个SNDA-RPC 协议规范版本。
+
+可选的设置字段如下：
+
+* 【扩展】 '''Session''' 字段，当前会话Id字段，如果服务器支持会话，才会设置。用于客户端失去连接后，服务器在一定时间内依然能保持客户端的会话信息。
+
+= URL参数扩展 =
+
+== callback参数  ==
+callback参数是为了对  Web Browser 提供跨域支持扩展而增加的。
+跨域支持的API调用必须是[http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.3 HTTP GET]。在API调用URL上增加一个callback参数，内容为一个回调js函数名称。
+
+当在服务器端发现URL中存在实现callback参数的时候，将返回的json对象塞入该回调函数，以如下形式返回javascript（假设我们存在如下的调用：http://ip/service/add?0=1&1=2&id=1&callback=mycallback ）：
+<code language="js">
+  mycallback({"result":3, "error":null, "id":1});
+</code>
+
+= HTTP 状态码 =
+== 成功结果的状态码 ==
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1 200 OK]: 当使用HTTP Get 方式调用成功后，可以返回HTTP 状态码 200。如果本次请求的是被 Cache(如，CDN)的成功验证，则返回响应可以是[http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3.5 304(未修改)]。
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.2 201 Created]: 当使用HTTP Post 方式调用成功后，对于Service API 必须返回HTTP 状态码 200；对于Data API，则应该返回 HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.2 201 Created]，同时在Location字段中返回新创建的资源的URL。
+ 201 Created
+ Location: /products/electronic/pc/10043
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.3 202 Accepted]: 请求被接受，但是不会被马上处理，请求稍后会被处理（可以在Location返回一个URI，以便客户能稍后查询其状态，若无法让客户查询状态，那么至少应该在实体正文(Entity-Body)中提供关于何时能处理请求的估计）。可以用于批处理（事务）请求中的过程，当请求事务执行过程中，每一步成功总是返回HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.3 202 Accepted]表示事务进行中。
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.5 204 No Content]: 表示实体正文(Entity-Body)内容为空。如果是HTTP POST方式返回该状态码表示接受投递的数据；如果是HTTP GET 方式则表示该资源存在，但是正文为空。
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.7 206 Partial Content]: 用于HTTP GET方式中获取部分数据的请求服务（使用Range请求报头的HTTP Get请求）。该部分GET方式常用于大型二进制文件的断点续传。报头需要提供Date。ETag和Content-Location的值应该和正常的Get请求相同。
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.8 207 Multi-Status]: 这是WebDAV对HTTP标准的一个扩展，它用于响应批量请求(Batch request)。当一个请求对多个资源进行操作的时候，可能会出现某些操作成功，某些操作失败的情况，这样单个响应代码不能表达该请求的状态。该响应代码告诉客户端，实体正文是多个HTTP响应代码的列表，批量请求中的每一个操作对应一个响应代码。
+
+== 服务重定向操作的状态码 ==
+
+; HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3.2 301 Moved Permanently]: 如果该服务器不支持客户所请求的API，允许服务器使用HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3.2 301 Moved Permanently]将客户重定向到支持该API服务器上。
+; HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3.3 302 Found]: 操作已经处理，但是正文必须到Location指定的URI中获得。
+; HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3.4 303 See Other]: 请求已经被处理，但是由于该资源URI不是全局规范的URI，所以用Location指明全局规范的URI。这样使得一个资源可以有多个URI。但是资源的全局规范URI只有一个。
+; HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3.5 304 Not Modified]: 用于客户端已经拥有数据，没必要重复发送的情况。返回的实体正文为空。
+; HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3.8 307 Temporary Redirect]: 当服务器当前正忙，允许服务器使用HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3.3 302 Found]将客户重定向到另一服务器.
+; 其它: 有关重定向操作的其它状态码请见HTTP协议规范中重定向状态码[http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3 10.3节]。
+
+== 错误失败的状态码 ==
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.1 400 Bad Request]: 表示客户端发送的请求有问题。
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.2 401 Unauthorized]: 未认证错误，WWW-Authenticate 将会告诉客户端接受哪些认证方式。
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.4 403 Forbidden]: 禁止访问，可能该资源只允许在特定时间段访问或者只允许特定IP地址的用户访问。这隐含该资源存在的意思。如果不想透露该信息，可以谎报一个404（not found）
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5 404 Not Found]: 调用的API没有在该服务器上发现
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.6 405 Method Not Allowed]: 该HTTP方法不支持，比如有的API可能不支持HTTP Get方法。Allow响应报头将列出该API支持的HTTP方法。如："Allow: GET, POST"
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.7 406 Not Acceptable]: 不接受，服务器无法满足客户端的要求。除Head方法外，服务器应该在响应的实体正文中返回能接受的资源列表。
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.9 408 Request Timeout]: 请求超时，客户端和服务器建立连接后，服务器在超时前没有收到请求数据，就会发送该响应代码并关闭连接。
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.11 410 Gone]: 用于服务器知道该资源曾经存在过，但是现在已经不存在了的情况。
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.16 415 Unsupported Media Type]: 服务器不能理解客户端发送的数据格式，比如服务器期望的是JSON格式的数据，但是客户端却发送的是XML的格式。如果数据格式正确，但是里面的内容却有问题，就应该返回 500（Internal Server Error）。
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.5.1 500 Internal Server Error]: 内部服务器错误，其中错误对象的具体错误代码参见《[[#错误号|错误对象中的错误号]]》一节
+;HTTP 状态码 [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.5.4 503 Service Unavailable]: 表示服务器太忙而不能接受服务，服务器可以发送Retry-After响应报头告知客户何时可以重试。
+
+= 资源命名 =
+为每一个暴露的Service资源和API资源命名一个在全局名称空间内唯一的URI，对API使用统一的URI命名规范,（naming scheme）<ref name="URI">Uniform Resource Identifier (URI): URI命名规范是已被标准化的，在全球范围完美运行，并且能被绝大多数人所理解的国际标准规范, URI包括了URL和URN两个规范。URI Generic Syntax: http://www.ietf.org/rfc/rfc3986.txt 。</ref>
+URI 实际上包括两个标准，一个是全球统一资源定位符(URL)<ref name="URL">Uniform Resource Locators (URL): http://www.ietf.org/rfc/rfc1738.txt</ref>，另一个则是全球统一资源名称(URN)<ref name="URN">全球统一资源名称(URN)，英文全称为“Uniform Resource Name”，URN 通过名称而不是位置对资源进行标识。下面是从RFC 1737摘录的部分内容，来说明URNs 的功能需求。
+* 全球普适性：URN是一个全球性的名字，而不是地区性的，其在世界任何地方都有同样的含意。
+* 全球唯一性：同一个URN永远不会指定给两个不同的资源。
+* 永久性：URN的生命周期是永久的。
+* 可伸缩性：URNs能被分配给网上现有的的任何资源，而且数百年仍会有效。
+* 对继承的支持性：设计的方案必须对现有的命名系统提供支持，能继承现有的命名系统。
+* 独立性：只有命名发布机构才有权决定在什么条件下发布一个名字。 
+* 解决方案：由于URNs有相应的URLs,因此必须有一种可行的机制将URN翻译成URL.
+* URN相关国际标准：
+** 统一资源名的功能需要: http://www.rfc-editor.org/rfc/rfc1737.txt 
+** URN语法：http://www.rfc-editor.org/rfc/rfc2611.txt 
+** URN命名空间的定义机制: http://www.rfc-editor.org/rfc/rfc2141.txt
+** A Uniform Resource Name (URN) for Services: http://www.rfc-editor.org/rfc/rfc5031.txt
+</ref>。
+* URL<ref name="URL"/> 定义的是资源的全球唯一访问位置
+* URN<ref name="URN"/> 定义的是资源的全球唯一名称
+
+== 命名约定 ==
+在SNDA-RPC中的服务、 API、参数的标识名称只能是由如下的字符组成：
+* 大写字符 A to Z (U+0041 to U+005A, ASCII 65 to 90)
+* 小写字符 a to z (U+0061 to U+007A, ASCII 97 to 122)
+* 十进制数字 0 to 9 (U+0030 to U+0039, ASCII 48 to 57)
+* 下划线 "_" (U+002D, ASCII 95)
+* 点 "." (U+002E, ASCII 46): 用于API或Service标识名称中，分隔下属的成员
+
+* Service API：每一个Service API都是远程服务上的一个函数，我们总是用动词或动宾结构来命名Service API，如，登录API我们命名为Login。
+* Data API：已命名的在服务中的一个数据资源，我们用名词来命名Data API，如，相片我们命名为Photo。
+
+== 命名原则 ==
+ 
+* 名称全局唯一
+* 只为值得被暴露的资源命名。
+* 数据资源(Data API)命名从大类到小类，从聚合到个体
+* 数据资源(Data API)和服务(Service)资源总是名词结构
+* 远程方法(Service API)资源总是动词结构
+* "default"和"system"服务名称被系统保留
+* 决定 API 是数据资源(Data API)还是远程方法(Service API)这是一个问题，是getXXX，还是XXX，如果需要很多参数，并且返回结果不能别修改，那么远程方法更适合，反之则是数据资源
+* 决定 API 资源(Data API and Sevice API)是否可被缓存，以及缓存的时限。缓存将使得API充分利用互联网上各种缓存机制(CDN)来降低本身服务的负荷。
+
+大量聚合类资源（有n多个资源组成）的获取是需要分页获取的，没有指定页号的总是返回第一页的数据。
+
+例子：
+<pre>
+<nowiki>
+## Data API
+http://example.com/customers
+http://example.com/customers/2-     ##返回第二页的顾客Id号列表
+http://example.com/customers/1234   ##返回Id号为1234号的顾客的信息
+http://example.com/orders/2007/10/776654
+http://example.com/products/electronic/computers/pc/4554
+
+## Service API
+http://example.com/customers/getCount ##返回顾客总数
+http://example.com/customers/search?vip=true&p=2 ##返回VIP的顾客Id号列表(第二页)
+</nowiki>
+</pre>
+
+= 调用约定 =
+要想调用某个API我们首先需要知道这个API的名称，以及参数，然后根据API不同的调用方式将其放入请求方(Request)的信息中。对于Service API而言，几乎所有的Service API都是同时支持HTTP Get方式和HTTP POST方式（只有极少数的只支持HTTP POST）;而对于Data API而言，访问方式则要视你的操作（获取，创建，更新，删除）而定。
+
+== 常规调用约定 ==
+常规调用约定描述的是在Service API 和 Data API 中都存在的调用约定。
+
+调用参数
+* '''id''' 参数供异步调用使用，服务器必须原样返回该值。(异步调用时候必须)
+* '''version''': 表示要调用方法的版本号，如果没有默认为最新版本。
+* '''method''': 调用API名称
+* '''params''': 调用参数列表，调用参数可以选择按位置或名称进行引用，但是禁止混合引用。
+** 按位置引用
+** 按名称引用
+
+=== 调用参数列表一致性约定 ===
+;参数的一致性: 仅当传递的参数和类型与API定义的参数和类型完全一致的时候，称为参数的完全一致：
+* 定义的所有的参数全部被提供，没有null值存在
+* 没有传递任何额外的参数
+* 每一个传递的参数值类型与定义的参数值类型完全匹配
+
+;参数的模糊性约定: 服务器应该能适应不完全匹配参数的调用，这被称为参数的模糊性约定：
+* 当传递的参数值数目少于定义的参数的时候，没有的参数被当作null值处理
+* 当传递的参数值数目多于定义的参数的时候，多余的参数将被忽略，或者服务器为该API原样传递多余的参数（如：当参数为可变参数列表的时候）
+* 当参数类型与定义的参数类型不一致的时候，需要合理的对参数类型进行转换，应该尽量避免转换后导致的数据或精度丢失。
+
+=== URL参数转义说明 ===
+当置参数于URL<ref name="URL"/>上的时候，为了满足URL参数的转义的要求，我们需要对参数的内容进行转义：
+* 所有的非US-ASCII字符必须使用“%”跟两位十六进制数字的形式进行转义。
+* 如下的US-ASCII字符是不安全的，也必须使用“%”跟两位十六进制数字的形式进行转义: 
+** URL的不安全字符: "<" , ">" , “"”, "%", "#" , "{", "}", "|", "\", "^", "~",  "[", "]", "`"
+** URL的保留字符：";",  "/", "?", ":", "@", "=" and "&"
+
+字符转义对照表：
+{| cellspacing="0" border="1"
+!字符 || 转义
+|-
+| < ||  %3C    
+|-
+| > ||  %3E    
+|-
+| " ||  %22    
+|-
+| % ||  %25 
+|-
+| # ||  %23
+|-
+| { ||  %7B    
+|-
+| } ||  %7D    
+|-
+| | ||  %7C    
+|-
+| \ ||  %5C     
+|-
+| ^ || %5E   
+|-
+| ~ || %7E   
+|-
+| [ ||  %5B    
+|-
+| ] || %5D    
+|-
+| ` ||  %60    
+|-
+| ; ||  %3B
+|-
+| / ||  %2F    
+|-
+| ? ||  %3F
+|-
+| : ||  %3A
+|-
+| @ ||  %40
+|-
+| = ||  %3D
+|-
+| & ||  %26
+|-
+|}
+
+== Service API 调用约定 ==
+几乎所有的Service API都应该支持HTTP Get和HTTP Post两种方式，仅当在Service API需要发送很多的参数数据到服务器方才只能使用 HTTP Post 方式。
+
+=== 调用请求约定 === 
+==== HTTP Get 方式 ====
+在使用HTTP Get 方式的时候，请求的调用参数格式不是Json格式，而是URL参数格式，
+
+请求的调用参数全部在URL参数中安装URL标准约定进行编码.
+* '''URL最后的文档部分'''指明被调的API名称
+* '''id''' URL参数供异步调用使用，服务器必须原样返回该值。(异步调用时候必须)
+* '''v''' URL参数: version 表示要调用方法的版本号，如果没有默认为最新版本。
+* '''callback''' URL参数为仅当跨域调用<ref name="CrossSiteScript">Cross Site Script hack方式的跨域调用应该在未来[http://www.w3.org/TR/access-control/ W3C Access Control](跨域安全检测请求规范)完全执行后废弃</ref>的时候使用的回调函数，以后可能会被废弃。
+* '''key''' URL参数: API_Key 仅当跨域调用<ref name="CrossSiteScript" />需要，以后可能会被废弃。其含义请参阅[[#请求方(Request)|HTTP Header字段]]中的对API_Key相关描述。
+* '''date''' URL参数仅当跨域调用<ref name="CrossSiteScript" />需要，以后可能会被废弃。'''注意'''：这里的日期格式采用ISO8601<ref name="ISO8601">[[WikiMedia:ISO_8601|ISO8601]] 日期时间格式: http://www.iso.org/iso/date_and_time_format</ref>日期时间格式, 如："20081022T234350Z",表示格林威治时间2008年10月22号23点43分50秒。 
+* '''其它'''URL参数为被调的API的参数
+
+
+注意：
+* 参数必须是数组或闭包
+* 注意旧web浏览器和代理可能有URI长度限制<ref>[http://classicasp.aspfaq.com/forms/what-is-the-limit-on-querystring/get/url-parameters.html URI长度限制]</ref>
+* 字符串参数需要按照URL参数标准进行编码
+
+===== 按位置引用 =====
+我们普通的函数调用参数总是按位置引用的，总是按照声明的参数顺序，将参数值传递的
+ int Add(int a, int b);
+ Add(2, 3)
+
+而在HTTP Get方式中，则是用数字来表示位置，0表示第一个参数，1表示第二个参数，依此类推。如：
+<pre>
+<nowiki>http://<end point>/Add?0=2&1=3&id=1</nowiki>
+</pre>
+
+===== 按名称引用 =====
+我们也可以使用参数的名称来传递参数值。如：
+<pre>
+<nowiki>http://<end point>/Add?a=2&b=3&id=1</nowiki>
+</pre>
+
+==== HTTP Post 方式 ====
+在HTTP Post 方式下的调用参数格式是Json对象格式，含有下面三个属性：
+* '''method'''：被调用方法名；
+* '''params'''：被调用方法的按位置引用的参数列表，总是一个JSON数组
+* '''kwparams'''：被调用方法的按名称引用的参数列表，总是一个JSON对象
+* '''id'''：请求id，可以是任何类型，用于与响应匹配。(异步调用时候必须)
+* '''version''': 【可选】表示要调用方法的版本号，如果没有默认为最新版本。
+
+'''注意'''：params 属性和 kwparams 属性不允许混用，只能选择一种方式传递参数。
+
+如，按位置引用：
+<pre>
+POST /myservice HTTP/1.1 
+User-Agent: Wget/1.6
+Host: www.example.com
+Content-Type: application/json
+Content-Length: 181
+Accept: application/json
+
+{
+    "version" : "1.1",
+    "id": 1,
+    "method"  : "add",
+    "params"  : [ 2, 3 ]
+}
+</pre>
+
+按名称引用：
+<pre>
+POST /myservice HTTP/1.1 
+User-Agent: Wget/1.6
+Host: www.example.com
+Content-Type: application/json
+Content-Length: 181
+Accept: application/json
+
+{
+    "version" : "1.1",
+    "id": 1,
+    "method"  : "add",
+    "kwparams"  : {"a":2,"b":3}
+}
+</pre>
+
+=== 调用返回约定 === 
+当Service API调用完成后，服务器必须给出一个响应，而这个响应也是一个由JSON协议串行化的对象，其含有三个属性：
+
+* '''result'''：是一个由被调用方法返回的对象，如果没有返回值时，则其值为null；
+* '''error''' ：【可选】如果没有错误，该属性可以不存在，或者让其值为null，否则为一个错误信息对象；
+* '''id''' ：与要响应的请求约定的id相同(如果请求方传入了id参数才有)。
+
+ { "result": 5, "error": null, "id": 1} 
+
+==== 错误对象 ====
+
+错误对象有如下三个属性：
+;code: 实际错误的错误号，整数类型
+;message: 错误的简短描述信息。
+;data: 【可选】由应用定义的错误附加信息，如详细错误细节，嵌套错误等等。
+
+例子：
+ {"code": 123, "message": "An error occurred parsing the request object"}
+
+===== 错误号 =====
+错误号<ref name="ErrCodeNum">对象错误号使用与XML-RPC相同的规范： http://xmlrpc-epi.sourceforge.net/specs/rfc.fault_codes.php</ref>从 -32768 到 -32000（包括该数字） 被保留作为服务器的预定义错误，SNDA-RPC预定义的错误号<ref name="ErrCodeNum"/>如下：
+{| cellspacing="0" border="1"
+! code || message || Meaning
+|-
+| -32700 || Parse error. || Invalid JSON. An error occurred on the server while parsing the JSON text.
+|-
+| -32600 || Invalid Request. || The received JSON not a valid JSON-RPC Request.
+|-
+| -32601 || Method not found. || The requested remote-procedure does not exist / is not available.
+|-
+| -32602 || Invalid params. || Invalid method parameters.
+|-
+| -32603 || Internal error. || Internal JSON-RPC error.
+|-
+| -32099..-32000 || Server error. || Reserved for implementation-defined server-errors.
+|-
+| -32399..-32300 || transport error || Reserved for implementation-defined transport error 
+|-
+| -32499..-32400 || system error || Reserved for implementation-defined system error 
+|-
+| -32500.. || application error || for application defined errors. 
+|}
+
+余下的则作为应用的自定义错误号。
+
+== Data API 调用约定 ==
+Data API 吸取了 [[Representational_State_Transfer|RESTful]]<ref name="REST"/> 的一些架构思想。我们认为一切 Data API 都是资源，针对资源可能有创建，读取，更新，删除(CRUD)四种操作，除读取外，其余三种操作一般都有权限限制。
+
+=== 读取资源 — HTTP Get 方式 ===
+使用 HTTP Get 方式读取指定的资源，URI 为该资源的全球唯一标识。
+
+例如：
+ 列举所有商品Id列表。
+ GET http://www.example.com/products
+
+读取资源可以指定参数，这些参数既可以在报头中，也可以在URI参数上中指定。注意，也许有的参数只能在报头中，有的参数也许只能在URI参数上，这样的参数需要在API中说明。如果请求的一个参数同时存在于报头和URI参数中，那么以报头中的参数为准。
+例如：
+ 获取指定语言为简体中文的122号文章
+ GET http://www.example.com/article/12?lng=zh-cn
+
+为了减少URI长度，URI的参数名称与报头中参数名称可能存在差异——更为简短。标准的参数对照表如下：
+{|cellspacing="0" border="1"
+!报头参数 || URI参数 || 说明
+|-
+| Accept || fmt || 请求接受的数据格式，如: "application/json", "application/atom","application/rss",在URI中参数内容 "application/" 可以省略不写。
+|-
+| Accept-Language || lng || 请求接受的语言，如: "zh-cn"。
+|-
+| Protocol-Version || pv || 协议版本号
+|-
+| API_Key || key || URL参数仅当跨域调用<ref name="CrossSiteScript" />需要，以后可能会被废弃。授权API_Key（仅当访问受限API服务的时候必须）
+|-
+| Content-Type,charset || c || 请求资源的字符集，对应于Content-Type报头中的子参数charset，只允许UTF-8
+|-
+| Content-Type,Version || v || 请求资源的版本号，对应于Content-Type报头中的扩展子参数Version
+|}
+
+返回结果的相关描述请参阅 [[#HTTP 状态码|HTTP 状态码]] 和[[#错误对象|Object错误对象]] 一节
+
+=== 创建资源 — HTTP Post 方式 ===
+我们采用HTTP Post 方法来创建(添加)从属资源(subordinate resources)——即从属于父资源存在的资源，父资源一般为聚合形式的资源，如所有的文章，所有的订单。创建后的新资源的URI是由服务器决定的，新资源的URI通过响应报头Location告诉给客户端。如建立新订单:
+<pre>
+<nowiki>
+POST http://www.example.com/orders
+{"item1": ..., "item2": ...,}
+</nowiki>
+</pre>
+
+HTTP Post 方法还用来追加数据，如日志记录。这个时候没有新的从属资源被产生，数据只是被附加到资源中。
+
+返回结果的相关描述请参阅 [[#HTTP 状态码|HTTP 状态码]] 和[[#错误对象|Object错误对象]] 一节
+
+=== 更新资源 — HTTP Put 方式 ===
+HTTP Put 方式多用于更新资源，但是也可以用于创建资源，与HTTP Post方式创建资源不同之处在于，HTTP Put 方式创建的资源URI是由客户预先指定的，而HTTP Post方式创建的新资源URI是由服务器指定的。
+
+以博客网站平台为例，该博客网站平台可以入驻多个博客站点。 
+;/Weblogs: 汇集所有的博客站点列表
+;/Weblogs/myblog: 某个博客站点
+
+来描述PUT和POST动作差异：
+{| cellspacing="0" border="1"
+! || 向新资源请求PUT || 向已有资源请求PUT || POST
+|-
+| /weblogs || N/A(资源已存在) || 修改博客网站平台的设置 || 创建一个新的博客站点
+|-
+| /weblogs/myblog || 创建该博客站点 || 修改该博客站点的设置 || 添加一篇文章到该博客站点
+|-
+| /weblogs/myblog/entries/1 || N/A(无法得知博文的URI) || 编辑该博文 || 为该博文添加评论
+|-
+|}
+
+返回结果的相关描述请参阅 [[#HTTP 状态码|HTTP 状态码]] 和[[#错误对象|Object错误对象]] 一节
+
+=== 删除资源 — HTTP Delete 方式 ===
+Http Delete方式用于删除已有的资源。
+
+返回结果的相关描述请参阅 [[#HTTP 状态码|HTTP 状态码]] 和[[#错误对象|Object错误对象]] 一节
+
+= 服务描述简单规范 =
+如果需要在同一服务器上支持多个子服务，那么就必须要使用服务前缀来区分API，比如系统服务的API全部是以“system.”<ref name="SysService">系统服务: 系统服务必须作为子服务存在，不能作为独立服务</ref>打头的。对服务的命名必须保障唯一性。为了不产生名称冲突，应该由一个中心统一命名。
+
+== Service Descripion(服务描述) ==
+服务描述是一个简单的JSON对象，通过该对象的属性描述了服务的名称，版本，说明等内容：
+;name: 服务本身的名称，如“myservice”。
+;URL: 服务的URL地址，如：“api.sdo.com/myservice”
+;URN: 服务的URN（全球统一资源名称），采用Uniform Resource Name(URN)<ref name="URN"/>国际标准命名，如： “urn:service:myservice.system”。【URN一般由Service中心根据服务名称(name)自动生成。】
+;IsDefault: 【可选】是否为主服务（默认服务），布尔类型。如没有则默认为False。
+;version: 【可选】以字符串表示的服务版本号。
+;description: 【可选】服务的描述性文字。
+;例子:
+<pre>
+{
+  "name": "myservice",
+  "URL" : "api.sdo.com/myservice",
+  "URN" : "urn:service:myservice",
+  "version" : "1.0.0.1".
+  "description" : "This is a sample service."
+}
+</pre>
+
+== API Descriptor(API描述) ==
+API描述是一个简单的JSON对象，通过该对象的属性描述了API的名称，版本，说明等内容： 
+;name: 遵循命名规范的API名称
+;type: 描述该API的类型，API的类型有两类，是远程方法(Service API)：“method”，还是数据API(Data API)：“data”。
+;methods: 描述该API支持的HTTP Method 操作，操作之间用英文半角逗号“,”分隔，如:  "GET,POST"。
+;returns: 一个简单的JSON对象，描述该API返回的数据类型和说明，
+* type: 描述该API返回的数据类型，对于没有返回值的特殊API（如：通知等）则数据类型为“nil”。
+* description: 【可选】描述该API返回数据的说明
+;format: 【Data API才有】描述该Data API支持的数据格式，格式之间用英文半角逗号“,”分隔，如："json,rss,atom".
+;params: 【可选】参数列表数组，参数描述内容详见下一节《API参数描述》。当有参数的时候需要。
+;version: 【可选】该API的当前版本号
+;description: 【可选】该API的功能说明
+;例子:
+<pre>
+{
+  "name": "divide",
+  "description":"Divide one number by another",
+  "type":"method",
+  "methods": "GET,POST",
+  "returns":{ "type: ""num", "description": "the result of division." },
+  "params":[{"type":"num","name":"dividend","required":true},
+            {"type":"num","name":"divisor","required":true}]
+}
+
+
+{
+  "name": "system.methods",
+  "description":"list all API for the service",
+  "type":"data",
+  "methods": "GET",
+  "returns":{ "type": "arr", "description": "the list of API names" },
+  "format": "json"
+  "params":[{"type":"str","name":"methods"},
+            {"type":"num","name":"type"}]
+}
+</pre>
+=== API参数描述 ===
+API参数描述是一个简单的JSON对象，通过该对象的属性描述了API参数的名称，类型，说明等内容： 
+;type: 描述API参数的类型，详见下一节《API参数类型描述》。
+;name: API参数名称
+;required: 【可选】是否为必需赋值的参数，该属性没有的时候默认为 false.
+
+=== API参数类型描述 ===
+API参数类型可以是如下的字符串值：
+* "num": 数值类型
+* "bit": 布尔类型
+* "str": 字符串类型
+* "arr": 数组类型
+* "obj": 对象类型
+* "any": 任意类型
+* "nil": 空类型（用于"returns"返回类型中）
+
+= 系统服务 =
+以“system.”打头的标识名被保留作为系统服务的API调用使用。系统服务必须作为依赖子服务存在，它是为主服务(Main Service)服务的，不能作为独立服务存在。
+服务器必须至少实现系统服务中的“system.methods” API，其余方法为可以根据需要有选择的实现。
+
+== system.services ==
+;说明: 枚举出客户能访问该服务器中所有的service名称。【可选实现】
+;API类型: Data API
+;资源属性: 只读聚合资源
+;支持操作: GET
+;支持格式: JSON
+;输入参数: 无
+;使用举例: 
+<pre>
+请求：
+Get /system.services HTTP/1.1
+Accept: application/json
+
+响应：
+200 OK
+Content-Type: application/json; charset=utf-8
+
+["system", "default:myservice"]
+</pre>
+
+== system.methods ==
+;说明: 枚举出客户能访问该服务器中所有的API名称。【必须实现】
+;API类型: Data API
+;资源属性: 只读聚合资源
+;支持操作: GET
+;输入参数: 【可选】
+# 【可选】Service(String): 指定子服务名称后只枚举该子服务下的API名称，默认为所有服务的API名称.
+# 【可选】Type(Integer): API类型有两类Service API和Data API，第0位表示ServiceAPI，第一位表示DataAPI，即1为只枚举Service API；2为只枚举Data API；3为枚举Service API和Data API。默认为3.
+# 【可选】Method(String) 如果存在该参数，表示只枚举支持HTTP Method的API名称。否则枚举所有HTTP Method的API。
+; 返回结果: 返回结果为API名称的数组，如:
+ ["system.methods", "system.version", "add"]
+;使用举例: 
+<pre>
+请求：枚举所有的远程方法API名称列表。
+Get /system.methods?type=1 HTTP/1.1
+Accept: application/json
+
+响应：
+200 OK
+Content-Type: application/json; charset=utf-8; version=1.1
+
+["system.listMethods", "system.version", "add"]
+</pre>
+
+=== system.methods/name ===
+;说明: 获取名为name的指定方法的API描述。【可选实现】
+;API类型: Data API
+;输入参数: 无
+; 返回结果: 返回结果为API描述
+;资源属性: 只读资源
+;支持操作: GET
+
+== system.listMethods() ==
+;说明: 功能同于“system.methods” ，都是枚举出客户能访问该服务器中所有的API名称。"system.listMethods"是为了兼容JSON-RPC而定义的【可选实现】
+;API类型: Service API
+;支持操作: GET, POST
+;输入参数: 【可选】
+# 【可选】APIType(Integer): API类型有两类Service API和Data API，第0位表示ServiceAPI，第一位表示DataAPI，即1为只枚举Service API；2为只枚举Data API；3为枚举Service API和Data API。默认为3.
+# 【可选】HttpMethod(String) 如果存在该参数，表示只枚举支持HTTP Method的API名称。否则枚举所有HTTP Method的API。
+; 返回结果: 返回结果为API名称的数组，如:
+ ["system.methods", "system.listMethods", "system.version", "add"]
+
+== system.methodSignature(Name) ==
+;说明: 功能同于“system.methods/name” ，都是获取名为name的指定方法的API描述。"system.methodSignature"是为了兼容JSON-RPC而定义的【可选实现】
+;API类型: Service API
+;支持操作: GET, POST
+;输入参数: 
+# 【必须】Name(String): 要获取API描述的方法名称。
+; 返回结果: 返回结果为方法名称的API描述
+
+== system.version(Name) ==
+;说明: 返回版本号。如果不带参数则于JSON-RPC的“system.version”一致.【可选实现】
+;API类型: Service API
+;支持操作: GET, POST
+;输入参数: 【可选】
+# 【可选】Name(String): 如果指定则返回指定名称的版本号，如果不输入该参数（null）则返回服务的版本号。
+; 返回结果: 返回结果为版本号，如果对象不存在版本号则返回 null。
+
+== system.echo(Data) ==
+;说明: 原样返回data参数的内容，该API主要用于测试服务。【可选实现】
+;API类型: Service API
+;输入参数: 
+# Data(Any): 回显的数据参数
+; 返回结果: 原样返回data参数的内容。
+
+== system.multicall(calls) ==
+;说明: 批量调用，服务成批的执行调用。【可选实现】
+;API类型: Service API
+;支持操作: GET, POST
+;输入参数: 调用数组列表，每个参数都是一个调用对象，服务器将按照顺序执行每一个调用。
+# 调用对象: 调用对象包括方法名称“method”和参数“params”两个属性：
+## method: 表示方法名称的字符串
+## params: 该方法的参数值数组（按位置引用）或对象（按名称引用）
+; 返回结果: 返回各个调用是否成功的执行结果数组。
+; 注意: 该API不可缓存，除非必要，无需实现——可能加重你的服务负荷。
+; 使用举例:
+<pre>
+请求：
+POST /system HTTP/1.1
+Accept: application/json
+
+{ "method":"system.multicall", 
+  "id" : 1,
+  "params": [
+       { "method":"sum", "params":{"a":1,"b":1} },
+       { "method":"sum", "params":[2,2] },
+       { "method":"sum", "params":{"a":3,"b":3} }
+  ]
+}
+
+响应：
+200 OK
+Content-Type: application/json; charset=utf-8
+
+{
+  "id": 1,
+  "result": [
+      { "result":2 },
+      { "result":4 },
+      { "result":6 }
+  ]
+}
+
+</pre>
+
+= References =
+<references/>
+
+
+[[Category:Remote procedure call]]
+[[Category:Standards]]
+
+2008-7-7
++ Use the MooTools as JavaScript Core OO Library:
+  my mootools-1.2-core.js includes: Core, Array, Function, Number, String, Hash, Event, Class, Class.Extras
+  Total Size: 24kb(not Compressed); 15kb(YUI Compressed).
+
+HTTP-RPC 1.0 Specification proposal
+;Editor: [[User:Riceball|Riceball LEE]](riceballl@hotmail.com)
+
+= Overview =
+HTTP-RPC is a stateless, light-weight remote procedure call (RPC) protocol for inter-networking applications over HTTP. It uses the HTTP protocol([http://www.w3.org/Protocols/rfc2616/rfc2616.html RFC 2616]) as transport. The data is format-independent. It's designed to be simple and RESTful!
+
+By leveraging HTTP, HTTP-RPC allows implementations to immediately benefit from the widely deployed World Wide Web infrastructure that is well-documented and understood today. It introduces no new HTTP verbs or message header extensions. The HTTP-RPC does not assume any data format in it. So u can choose ur favorite data format, eg. Json, Xml, etc.
+
+== Goals ==
+The primary goals of this specification are to define the HTTP-RPC 1.1 protocol in terms of:
+* Expressing a Service API(remote procedure call) and its result(no data format specified)
+* Expressing the DATA API(RESTful) call and its result.
+* Using HTTP to transfer the request and response messages that make up a remote procedure call.
+* Expressing error conditions in HTTP.
+
+== Non-Goals ==
+HTTP-RPC does not address the data format, security, correlation, reliability, sessions management, state management and many other features that may be found in other RPC protocols or distributed systems. Developers are instead encouraged to employ features of HTTP and related Internet technologies that can offer some of these features in an equally compelling, robust and satisfying manner. Some features may be defined as extensions by other specifications.
+
+= Conventions =
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in [http://www.ietf.org/rfc/rfc2119.txt RFC 2119].
+An implementation is not compliant if it fails to satisfy one or more of the MUST requirements for the protocols it implements. An implementation that satisfies all of the MUST and all of the SHOULD requirements for its features is said to be unconditionally compliant; one that satisfies all of the 'must' requirements but not all of the SHOULD requirements for its features is said to be conditionally compliant.
+
+All names (i.e. method-names or parameter-names) are case-sensitive.
+
+Clients are the origin of Request objects. Servers are the origin of Response objects.
+
+= Terminology =
+Below is a summary of some terminology used in this documentation that can help in disambiguation of commonly applied and therefore often overloaded terms:
+
+;Client: The agent that is the initiator of the remote procedure call.
+;Server: Software that implements HTTP-RPC, which may hosts one or more HTTP-RPC services and which also acts as the gateway to lower-level protocols and transports.
+;Service: Provider of one or more procedures that may be the target of remote procedure calls by clients.
+;Procedure: A named operation on a service that may be the target of a remote procedure call. In this document, the terms method and procedure are used to mean the same thing. 
+;Method: Same as Procedure. 
+;Call: An invocation of a procedure on a service that results in a sequential request-response transaction between the client and the server.
+;Data API: A named operation on a service that represent a data resource.
+;Service API: Same as Procedure.
+;Request: The message that frames a call and its parameters.
+;Response: The message that frames the result of a successful call or the error in the case of a failed call.
+;Result: The answer for a successful call.
+;Error: The answer for a failed call.
+;Notification: A one-way (fire and forget) call that produces no results, including any indication of error.
+;Short connection: 
+;Long connection: keep the connection open unitl the client logout.
+
+= Http Header Requirements and Extensions =
+    
+== Http Header for Request ==
+the HTTP request message MUST specify the following headers:
+* The User-Agent MUST be specified.
+* For HTTP POST only, the Content-Type MUST be specified and SHOULD read the data format. eg, application/json.
+* For HTTP POST only, The Content-Length MUST be specified and correct according to the guidelines and rules laid out in [http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.4 Section 4.4, ¡°Message Length¡±], of the HTTP specification.
+* The Accept MUST be specified and SHOULD read the data format. eg, application/json.
+* [Ext]The Protocol-Version MUST be specified to tell the receiver the version of the HTTP-RPC protocol being used by the client. 
+* [Ext]For Data API only, The Content-Version is OPTIONAL to specify the version of the resource, the latest version of the resource used if it is not specified.
+
+== Http Header for Response ==
+* The Protocol-Version MUST be specified to tell the client the version of the HTTP-RPC protocol being used by the server. 
+* the Content-Type MUST be specified and SHOULD read the data format. eg, application/json.
+* For Data API only, The Content-Version is MUST be specified the version of the resource.
+* Others Http Header fllows the HTTP specification.
+
+= Service API - Procedure Call (Request) =
+A remote procedure call is made by sending a request to a remote service using either [http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.5 HTTP POST] or [http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.3 HTTP GET]. How and where the call is encoded within the HTTP message depends on the HTTP method that is employed. It must be employed as Http Get method if it is the cacheabled request or the XCross Site. 
+
+== Http Method ==
+
+=== GET ===
+Almost all the service API and Data API support the GET Http method.
+
+<pre>
+GET /myservice/sum?a=17&b=25 HTTP/1.1 
+User-Agent: Wget/1.6
+Host: www.example.com
+Content-Version: 1.0
+Accept: application/json
+Revision: 1.0
+</pre>
+
+
+=== POST ===
+In the case of HTTP POST, the procedure call is carried in the body of the HTTP message whereas in the case of HTTP GET, it is expressed along the path and query components of the HTTP Request-URI, and the parameters must be encoded via ur data format. And u must appy the http-header parameters to specify the data format and HTTP-RPC protocol version, eg:
+<pre>
+Content-Type: application/json
+Accept: application/json
+Protocol-Version: 1.0
+</pre>
+
+[Or can the common parameters put into the http header field? only the bigger content is put into entity-body.]
+
+Suppose that a service exposes a procedure named sum that takes two Number parameters, as in sum(a, b), and returns their sum which carry the data via Json. The HTTP POST to call this procedure call would be as follows:
+<pre>
+POST /myservice HTTP/1.1 
+User-Agent: Wget/1.6
+Host: www.example.com
+Content-Type: application/json
+Content-Length: 181
+Accept: application/json
+Protocol-Version: 1.0
+
+{
+    "ver"  : "1.0",
+    "method"  : "sum",
+    "params"  : [ 17, 25 ]
+}
+</pre>
+
+In this example, the method being targeted is provided by a service located at http://www.example.com/myservice. The call is expressed as a JSON Object in the body of the HTTP POST message. The "ver" member of this object tells the receiver the version of the HTTP-RPC protocol being used by the client. The Content-Version of the Http Header Field tells the receiver the version of the method being called by the client. if not means current version method.
+
+= Data API (Request) =
+the Data API represents a RESTful data resource.
+快学快用，难题攻关，此为专；
+分门别类，梳理架构，此为成。
+2008-6-27
+  the prototype of MeRemote RPC can work now.
+  but a lot of things need to do.
+    the binary stream format.
+    the Server includes API and the Services:
+      the API is the function only
+      each service is an object.
+      the basic service is system service to  listMethods
+    more unit Test case added.
+    implement the RESTful API.
+    implement RESTful json-RPC API.
+

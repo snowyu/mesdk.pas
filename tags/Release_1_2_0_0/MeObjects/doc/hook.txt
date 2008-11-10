@@ -1,0 +1,325 @@
+我使用的是 Extended Code Overwriting 方式以及变体，不过也许该考虑绝对跳转，如果要在系统API范围内做hook。
+系统范围的API hook可以在uMeHookAPI.pas中实现： IAT(Import Address Table) hook, EAT(export address table) hook.
+
+= System Wide API Hooking =
+
+There are several ways how you can realize system wide API hooking. Due to the quite different system architecture of the two OS families "win9x" and "winNT" system wide hooking normally must be realized by using different solutions for each OS family. The win9x family has a much lower system security, so there we can hack around like crazy and can often do very effective system wide hooking without even having to write a DLL. The winNT family has a much more secure system base. Still we can do some hacks, but doing system wide API hooking in the winNT family without using DLLs is much more difficult than it is in the win9x family.
+
+madCodeHook is meant to free you from having to care about in which OS your program is running. So for the "normal" programmer I strongly recommend to use madCodeHook's general OS independent solution for doing system wide API hooking. This solution is based on putting your hooking code into a little DLL and on then injecting this DLL into all current and in the future created processes. Actually using madCodeHook this is very easy to do. If you want to go this route, please skip the rest of this page and head directly to the How To Use madCodeHook guide.
+
+What - you're still reading!?
+
+That either means, you want to know it all. Or you don't care about writing OS independent code. Okay, so I'll explain to you know how you can hook most system APIs in win9x without using any DLLs. Sadly this solution only works in win9x, but hey, life isn't easy...
+
+In win9x the memory/address area is splitted into 2 halfs. The area from $00000000 - $7FFFFFFF is private to each process. No process can directly access the private memory of another process, except by using the debug APIs "Read/WriteProcessMemory". The area from $80000000 - $FFFFFFFF is the so called "shared area", because the memory in this area is shared between all processes in win9x. In winNT/2000 there is no shared area. There the whole 32bit memory/address area is always private to each process.
+
+In win9x that means, if one process changes memory in the shared area, all other processes will directly see this change. This is the reason why win9x is not a very stable operating system. One crashing application can accidently overwrite important stuff in the shared area and so make other processes or even the whole OS crash, too.
+
+However, the shared area has also its pros. The most important for us now is that it gives us the possibility to hook "shared APIs" (I mean APIs that are located in the shared area) truely system wide. When "madCodeHook" overwrites the code of a shared API with a jump instruction, this ends up in that each and every process which calls this API thereafter, will execute that jump instruction and so jump to our callback function. Voil? - we have system wide API hooking.
+
+But wait! There are some complications. Let us think about where your callback function is located. Normal applications and DLLs are not loaded into the shared area, so your callback function is most probably not located in the shared area, either. That means, it is private to your process, so not accessible in any other process. But what happens now if another process calls the hooked shared API and then executes that jump instruction which wants to jump to your callback function, which is unfortunately not accessible in that other process? This process will crash. You see the problem?
+
+That means, when hooking shared APIs, your callback function MUST be located in the shared area. No way around that. So how we can move your callback function to the shared area? There are 2 possibilities:
+1. 	You can put the callback function into a little DLL and make that DLL being loaded by win9x into the shared area. To do so the image base address must be greater than $80000000, furthermore the code section and all data sections must have the "shared" flag set. This way the whole DLL including your callback function will automatically be loaded into the shared area.
+2. 	We can copy your callback function to the shared area. That is not an easy task, because your callback function may contain relative jumps, which then have to be corrected before anyone can call your copied function successfully. Sounds difficult? Yes, it is. You even need a little disassembler to do something like that. But - we have a little disassembler - and it is also able to copy and relocate functions completely automatically (see CopyFunction)!
+
+Pratically spoken, when you hook a shared API, "madCodeHook" checks whether your callback function is already located in the shared area. If it is not, it is copied there, and all necessary corrections are also done automatically.
+
+Unfortunately the location of the callback function (shared area or not) is not the only problem. There are several additional things you have to be careful about when writing a system wide callback function:
+1. 	Because the hook is meant to be really system wide, and because Windows is a true multitasking system, your callback function has to be fully reentrant and thread safe.
+2. 	You must not access any functions, APIs or variables, that are not located in the shared area, because everything you access in the callback function must be accessible system wide.
+3. 	You can't know which DLLs are initialized in what processes, so you must only use APIs that are exported by "kernel32.dll". It's the only DLL that is guaranteed to be initialized in each and every win32 process. However, you can use "LoadLibrary" to initialize additional DLLs in your callback function, if you really need that. Furthermore when you hook e.g. a "user32.dll" API, you can also use other "user32.dll" APIs in your callback function, because your "user32.dll" API hook can't get called in the context of a process, which has not initialized "user32.dll". That would be paradox.
+4. 	You have to make sure that all CPU registers are restored correctly. Normally Delphi/C++ does that for us. But to be sure you should think about writing your system wide callback function in (inline) assembler.
+5. 	You must not use structured exception handling in the callback function.
+
+If your callback function fulfills all the 5 requirements noted above, you can safely hook any shared API in win9x without risking system stability. To check if a DLL is a shared one or not, please check whether the module handle of the DLL (see "GetModuleHandle") is > $80000000. The most important system DLLs are shared, e.g. "kernel32.dll" and "user32.dll".
+
+Now let us talk about unhooking. If you don't unhook system wide APIs, they remain hooked even after your application has terminated. That's a very big problem, if your callback function was loaded into the shared area by using a little shared DLL, because this DLL gets unloaded automatically when your process terminates. But the API hook does NOT get unhooked automatically. So if someone now calls the still hooked API, it will try to jump to your callback function. But since the DLL was unloaded, your callback function is not there anymore, which will result in a crash. So when using callback functions which are located in a shared DLL, please make sure that you unhook all shared APIs, before you leave - even if your program crashes. Please install an exception handler that unhooks the shared APIs. Alternatively instead of loading your little shared DLL yourself, you can inject it into the "kernel32.dll" win9x system process. This way your DLL will stay loaded until the next reboot.
+
+If your callback function was copied to the shared area by madCodeHook, things are a bit different, because such a copied function remains there in any case - even if your program terminates. That means, it's up to you in this case, whether you want to unhook the API before leaving your program or not. E.g. you can install a kind of patch, which remains installed until the next reboot, although your program has terminated already.
+
+= API Hooking Methods =
+  Writen by Madshi
+
+Sometimes you need to hook a specific function or API. Unfortunately there's no official way to do such things, instead you'll find a lot of different hacks that were invented by a lot of different people. All those API hooking hacks have advantages and disadvantages. There's no perfect solution.
+
+When analysing API hooking methods you should ask the following questions. Each question does have a sense, of course. The questions are meant to make existing differences between all the available API hooking methods more evident:
+ 1. 	Does the method need to manipulate the to-be-hooked binary files on the harddisk or is it capable to do it's work by only patching memory? The latter solution should be prefered in most cases.
+ 2. 	Can the method install a hook on functions, which are not exported? Sometimes it is useful to hook some Delphi/C++ RTL functions or to hook non-virtual methods or similar stuff.
+ 3. 	Can the method safely install a hook on each and every API, regardless of how the binary code of the API is structured? Some API hooking methods get unstable, if the binary code of the to-be-hooked API is shorter than 5 or 6 bytes or if it is structured strangely.
+ 4. 	If hooking a specific API would end up in instability, does the hooking method automatically detect this and does it consequently react to the situation by either refusing to install the hook or even by automatically switching to an appropriate alternative hooking method?
+ 5. 	Can "shared APIs" be hooked process wide? "Shared APIs" are functions which are exported by shared DLLs. A shared DLL is a DLL which is located in the shared area. The shared area is in win9x the memory area from $80000000 - $FFFFFFFF. The most important win9x system DLLs (e.g. kernel32.dll and user32.dll) are shared DLLs. In the winNT family there is no shared area, thus no shared DLLs and no shared APIs, either.
+ 6. 	Can shared APIs be hooked system wide?
+ 7. 	Once installed, does the hook catch those API calls, which were statically linked before the hook was installed?
+ 8. 	Once installed, does the hook catch those API calls, which were statically linked after the hook was installed?
+ 9. 	Once installed, does the hook catch those API calls, which were dynamically linked before the hook was installed?
+ 10. 	Once installed, does the hook catch those API calls, which were dynamically linked after the hook was installed?
+ 11. 	Once installed, does the hook catch those APIs calls, where the caller of the API is a win9x shared DLL?
+ 12. 	Can the method properly undo an API hook?
+ 13. 	Can the original API be called directly without having to temporarily unhook the API?
+ 14. 	Is a real hook chain built automatically? In other words: What happens if you hook an API twice and then unhook in the wrong order? If the hook method doesn't build a real hook queue, you'll leave the hooked API in a wild state, which will result in a crash as soon as the API is called the next time.
+ 15. 	Is it possible to safely unload a hook DLL? If a hook DLL uninstalls its API hooks when being unloaded from a process, some hook callback functions might still be in use. In that case the process will later crash.
+
+Generally I prefer solutions which doesn't touch the standard/system DLLs on harddisk, so I'll only talk about methods here, which work purely in memory. Here comes a description of the most important hooking methods:
+
+== Import Table Patching ==
+
+The best known and most often used method is "Import Table Patching". Each win32 module (application/DLL) has a so-called "import table", which is basically a list of all APIs, which this module calls. Patching this import table is a quite easy job and works very nicely. Unfortunately only the statically linked API calls go through the import table. Dynamically linked API calls (GetProcAddress) are not caught by this method at all. That means: It's absolutely possible, even quite probable that you'll miss some API calls when using this method.
+
+To reduce the danger of missing API calls, you should not only patch the import table of the application's module, but you should also patch the import tables of each and every DLL that is loaded by the application. But please note, that you must not patch the import tables of win9x shared DLLs, because this could eventually make other processes crash. That means: When using "Import Table Patching" the danger of missing API calls is even higher in win9x than in winNT.
+
+There's a slight danger when using import table patching. Some DLLs have a shared import table, even though they are not located in the shared area. One example is the "winspool.drv". When patching the import table of this module in win9x, you risk system stability.
+
+Both [URL=http://www.wheaty.net/ Matt Pietrek]'s and [URL=http://www.jeffreyrichter.com/ Jeffrey Richter]'s API hooking stuff, and also [URL=http://www.geocities.com/SiliconValley/1741 Oleg Kagan's "Syringe"] use the "Import Table Patching" method.
+
+=== Extended Import Table Patching ===
+
+There are some ways to make "Import Table Patching" catch more APIs. You can hook the API "LoadLibrary" to be notified about when new DLLs are loaded. Then you can right away patch those DLLs, too. If you don't do that, you won't catch API calls that are made from DLLs, which are loaded after you did install the hook.
+
+Another extension is to hook the API "GetProcAddress" and then when called not return the real API address, but the address of your callback function instead. This way you would also get those API calls, that are dynamically linked after you've installed your hook. Unfortunately if you do this, you can't unhook such calls, anymore.
+
+
+== Export Table Patching ==
+
+Each win32 module has an "export table", which lists all functions that this module exports. Patching this export table is not very difficult and brings some interesting results: All new linkings (both static and dynamic) to the patched API will automatically be bound to your callback function instead of to the original function. That's very nice! Well, but unfortunately patching an export table has absolutely NO effect on already existing API linkings (e.g. static bindings of already loaded DLLs). So using export table patching alone is only of quite restricted use. Besides, undoing the patch has again no effect on past bindings. So you can't really undo an API hook which was established by export table patching.
+
+You should not patch the export table of DLLs which are loaded in the shared area of win9x. Also you should not patch the export table of DLLs, which are not loaded there, but have a shared export table nevertheless. If you do that, you risk system stability again.
+
+
+== Simple Code Overwriting ==
+
+Instead of changing any tables, you can also directly manipulate the API's binary code in memory. The most often used method is to overwrite the first 5 bytes of the API code with a JMP instruction, which then jumps to your callback function.
+
+This method is quite effective. It catches really 100% of all API calls. But it has also some big disadvantages. The biggest is that you can't call the original API in your callback function anymore, because when you would do that, the JMP instruction would again jump to your callback function, which would result in an endless loop.
+
+Of course you could temporarily undo the hook in order to first restore and then call the original API, but that's a bad idea because of two reasons: (1) Steadily hooking and unhooking consumes precious time. (2) While you've temporarily unhooked the API, you're in big danger to miss a lot of API calls.
+
+Another disadvantage of this method is that you normally can't overwrite the API binary code of win9x shared APIs, because it's protected. Well, and even if you could do that, it would not help too much, because when you change the binary code of a shared API, this change has effect system wide. That means when hooking non-shared APIs we have process wide API hooking, when hooking shared APIs we have system wide hooking. That's not very senseful. System wide API hooking is very difficult, mainly because your callback function has to be accessible system wide while your code is normally only accessible inside of your own process.
+
+Finally the code of the to-be-hooked API has to be at least 5 bytes long. Otherwise you would overwrite more than the original API code, which would most probably result in a crash sooner or later. Furthermore there must not be any jumps later in the API code, which jump into the bytes 2-5 of the API code. In such a case overwriting the first 5 bytes would also probably result in a crash sooner or later.
+
+The hooking package available at both programsalon.com and hookapi.com (actually it's the same hooking package) still uses "Simple Code Overwriting".
+
+=== Extended Code Overwriting ===
+
+The biggest disadvantage of the "Simple Code Overwriting" method was that you can't call the original API, at least as long as the API is hooked. Now clever people thought about it and found a way to erase this problem completely.
+
+The solution sounds simple: We need to overwrite 5 bytes of the API's code. So we simply copy these bytes to another location and call it there, whenever we want to call the original API. Unfortunately it's not as easy as it sounds. You need to know that every binary code consists of single instructions. Each instruction can have a different length. So if we copy 5 bytes from the API, that can be exactly one instruction, or one and a half, or two and a half or ... We don't know that for sure. But we know for sure that when executing half copied instructions we will make our program crash. That means we need a real little disassembler, which can tell us how many bytes we really have to copy, so that we copy complete instructions instead of half instructions.
+
+The "Extended Code Overwriting" method is quite difficult to implement, but once you have it ready, it is a very good method. The only 2 disadvantages are that (1) you can hook shared APIs only system wide and (2) the to-be-hooked API's code may be structured in a way, that doesn't allow you to use the "Code Overwriting" method without risking crashes.
+
+All three packages [URL=http://www.research.microsoft.com/sn/detours Detours], [URL=http://www.internals.com/ ApiSpy32] and [URL=http://www.anticracking.sk/EliCZ/export.htm EliCZ] are using the "Extended Code Overwriting" method. As far as I know neither Detours nor ApiSpy32 care how the binary code of the to-be-hooked API looks like. I think, EliCZ's solution does check the binary code somehow, but I'm not sure how extensive/reliable the check is. If an API is hooked by using code overwriting, although the binary code is not suitable for that, you're almost guaranteed to get crashes sooner or later.
+
+
+=== Madshi's Code Overwriting ===
+
+The method used by my "madCodeHook" package is a slight variation of the "Extended Code Overwriting" method. Instead of overwriting the API code with a 5 byte (relative) JMP instruction I overwrite it with a 6 byte absolute JMP call. That makes it easy to build up a real hook queue. That again makes it possible to realize stable process wide API hooking even for shared APIs. When using my method you can choose whether you want to hook a shared API process wide or system wide. The only remaining problem now is that the code of some APIs is too short (or strangely structured) to be hookable by any code overwriting method.
+
+madCodeHook's disassembler examines the whole to-be-hooked API (in win9x some DLLs are even completely disassembled) before hooking it and then decides whether code overwriting can be safely used. If not, madCodeHook automatically switches to:
+
+
+== Madshi's Mixture Mode ==
+
+Now what can we do with APIs, whose code is too short to be hooked by code overwriting? Well, we can simply enlarge the code! That is quite easily done in 2 steps: (1) We build an API header, which does nothing but jump to the original API. The header itself is long enough to be hooked by code overwriting. (2) Now we patch the export table and all import tables so that everything points to our newly allocated API header. From now on it looks as if the original API has always begun at our API header. And it will remain this way until the process exits (or for shared APIs in win9x: until the next reboot). The result of the whole operation is simply, that now such a manipulated API can be hooked by code overwriting.
+
+Because this solution combines import table patching, export table patching and code overwriting, I've called it the "Mixture Mode". It has one disadvantage: API calls that were linked dynamically before the API was hooked the first time, will not be caught, because they still jump directly to the original API instead of to our enlarged API header.
+
+ 
+= Hooking Rules =
+When doing API hooking you need to follow some basic rules. If you don't follow them, your API hooks might make things unstable. Here's a list of the most important rules:
+ 1. 	Always use *exactly* the same parameters, the same result type and the same calling convention for the original API, your callback function and for the "NextHook" function variable.
+ 2. 	Only do what is absolutely necessary. Don't build monster callback functions, try to keep things short and easy.
+ 3. 	Be careful what you do in your hook DLL, if you plan to inject it into NT system/service processes. You're not allowed to do any GUI stuff (e.g. FindWindow, PostMessage, MessageBox, etc) inside of a non-interactive system process. If you do nevertheless, things like sudden OS reboots can happen. Check out madCodeHook's Tool Functions. They can tell you in what kind of process your DLL is currently running. If you need to do inter process communication, please use madCodeHook's IPC functions instead of FindWindow/PostMessage.
+ 4. 	In your hook DLL link to as few DLLs as possible. Avoid linking to RasApi32.dll, because NT 16-bit processes will otherwise tend to crash when being started the first time. Linking your DLL to oleaut32.dll will make "Paint" crash in win95. However, this problem can be fixed by applying this patch: http://support.microsoft.com/support/kb/articles/Q162/5/00.asp
+ 5. 	Make sure that your hook callback function does not accidently alter the Get/SetLastError value. You may alter it, if you want to signal a failure. But if you are calling the next hook and don't want to impact the flow of things, please make sure that neither you nor any of the functions/APIs you're calling messes around with the last error value. Some APIs like CreateMutex do change this value. So if you call CreateMutex inside of your hook callback function, please save the last error value and restore it afterwards. The madCodeHook Tool Functions are last error neutral.
+ 6. 	Each API hook needs its own callback function and its own "NextHook" variable. Don't try to save code by using callback functions and/or NextHook variables twice.
+ 7. 	In winNT in hook callback function of wide APIs (like e.g. GetModuleFileNameWCallback or CreateFileWCallback) don't do anything which results in the OS trying to convert ansi <-> wide strings. Don't let Delphi automatically convert ansi <-> wide strings for you. Don't ask Windows to convert strings for you. Don't call any ansi APIs (this internally results in ansi <-> wide conversion again). Instead use the madCodeHook Tool Functions to convert strings. This rule doesn't apply to win9x. Also it doesn't apply to ansi hook callback functions in winNT. It only applies to wide hook callbacks in winNT.
+ 8. 	In the initialization of your DLL avoid to directly or indirectly call VirtualAlloc, because otherwise in winNT 16-bit processes will tend to crash.
+
+This all might sound complicated and difficult. But hey, after all API hooking *is* a difficult thing. madCodeHook tries to free you from all problems as far as is possible. But the rules mentioned above can not be controlled by madCodeHook. Those are general hooking rules which are valid regardless of which API hooking method or package you're using and I can't change that.
+
+You have to understand what happens when you hook an API: You are violently breaking into the flow of a program, which someone else has written. This other programmer has not intended that you do that, nor has he even calculated with that. That means you have to be very careful that you don't break his code. You have to try to not change anything which could bring the original program into problems. Try to change only what is necessary, not one bit more.
+
+You can violate some of the rules without big impact, if you're only hooking one specific process. You should then test things deeply, but if no problems arise, it's okay. However, when doing program independent system wide API hooking, things are different. It's totally impossible to check your hooking stuff against all existing programs in the world, there are just too many to check them all. So you can just follow the rules and hope that your hooks don't break anything. But hey, if you are careful, thing are looking quite positive. So don't worry too much about these things. Just make sure that you follow the rules.
+
+
+_______________________________________________________
+Now Aphex made a hooking unit(afxCodeHook) in delphi but sadly it only works on NT systems.  I can inject the library fine in win9x using elicz elirt library.  But actually writing to the import address table seems to be a problem.  Ive tried to fix it by changing the protection attributes but it didnt do much.  Here is the section where it fails:
+
+        if Address = OldAddress then
+        begin
+        EnterCriticalSection(CritSect);
+       if VirtualProtect(Address, sizeof(Address),PAGE_EXECUTE_READWRITE, @dwOldProtect) then
+        try
+         WriteProcessMemory(GetCurrentProcess, ImportCode, @NewAddress, SizeOf(dword), BytesWritten);
+        finally
+         VirtualProtect(Address, sizeof(Address),dwOldProtect, nil);
+         LeaveCriticalSection(CritSect);
+        end;
+        end;
+        Inc(ImportCode);
+      end;
+      Inc(ImageImportEntry);
+    end;
+  end;
+
+Is there something I can test to make sure its writing correctly to right address?
+================
+Thank you for replying.  Ive added in critical section because some hooking tutorials/examples (like some from rootkit.com) do that so no other threads can access the memory page while you are writing to it. Its just some things ive have been trying to make work on 9x.  
+
+The hook simply does not work.  It finds all the imported modules even seems to be writing something because Ive done
+byteswritten :=0
+VirtualProtect(Address, sizeof(Address),PAGE_EXECUTE_READWRITE, @dwOldProtect) then
+ WriteProcessMemory(GetCurrentProcess, ImportCode, @NewAddress, SizeOf(dword), BytesWritten);
+if byteswritten > 0 then
+messagebox(0,'written','test',0);  
+(and i get the msg box.)
+
+I have not seen another api for writing to the IAT accept CopyMemory().  I have tried that too but the params are wrong because it crashes.
+CopyMemory(Address, NewAddress,5); ???
+
+Yes Ive used your collection and it works perfectly but its just a little bulky and I need something smaller and simple.
+====================
+You can use the following code, it's copied from my madExcept package. madCodeHook uses a much better but also much more complicated API hooking method. The missing parts (e.g. GetImageNtHeaders) can be found in the madBasic package (which includes sources) of my collection.
+
+This function works fine. For successful IAT patching you need to patch each and every module in your process. However, in win9x you're not allowed to patch system modules (modules whose handle is bigger than $80000000). If you would do that, you'd make the whole OS unstable. As a result IAT patching doesn't work too well in win9x. After all IAT patching is not the best hooking method. But in normal use you might not notice the difference. It depends on for which purpose you need this stuff.
+
+procedure PatchImportTable(module: dword; old, new: pointer);
+var pinh : PImageNtHeaders;
+    pid  : ^TImageImportDirectory;
+    p1   : TPPointer;
+    c1   : dword;
+    eis  : dword;  // end of import section
+begin
+  pinh := GetImageNtHeaders(module);
+  if pinh <> nil then begin
+    with pinh^.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT] do begin
+      pid := pointer(module + VirtualAddress);
+      eis := VirtualAddress + Size;
+    end;
+    if pid <> nil then
+      while pid^.Name_ <> 0 do begin
+        if pid^.ThunkArray > eis then
+          break;  // invalid import table!
+        if pid^.ThunkArray <> 0 then begin
+          p1 := pointer(module + pid^.ThunkArray);
+          while p1^ <> nil do begin
+            if (p1^ = old) and VirtualProtect(p1, 4, PAGE_EXECUTE_READWRITE, @c1) then
+              p1^ := new;
+            inc(p1);
+          end;
+        end;
+        inc(pid);
+      end;
+  end;
+end;
+===============================
+Ah, finally I get to see some details...   :-)
+
+Okay, the reason for the failure is very probably that you missed what I said here:
+
+"For successful IAT patching you need to patch each and every module in your process. However, in win9x you're not allowed to patch system modules (modules whose handle is bigger than $80000000)"
+
+Patching just the main module (GetModuleHandle(nil)) isn't enough. You have to loop through all modules and patch each and every one (except the system modules in win9x).
+
+Aphex code must do that internally, too, if it works correctly. So I guess you can use his dll enumeration code together with my patching function.
+==============================
+An API is exported by one module (module = dll or exe). E.g. FindNextFileW is exported by kernel32.dll. Each process contains of one exe module and several dll modules, which are either dynamically or statically linked by the exe module. Now each of the dll module may have imported FindNextFileW. If e.g. "user32.dll" calls "FindNextFileW", your only chance the get notification about this is by patching the import table of "user32.dll". In other words: You have to patch the import table of all modules (exe + dlls) in your process. That is the very base logic of import table patching.
+
+madCodeHook uses a completely different approach.
+=================================
+I've just looked at his code. He does not enumerate the modules of the process. But when patching the import table he checks for dlls which are listed in the import table and hooks those, too. That means he hooks all dlls, which are statically linked. But he does not hook dynamically linked dlls.
+
+His code looks more or less alright. The WriteProcessMemory call is a bit strange, but it should work nevertheless.
+
+There are 2 possible reasons why his unit fails on 9x. Either you need to hook dynamically loaded dlls, too. Or import table patching is just not good enough in this specific situation.
+
+Try this:
+
+type
+  TDAModule = array of cardinal;
+
+// returns all modules of the current process
+function GetModuleList : TDAModule;
+var p1, p2 : pointer;
+    mbi    : TMemoryBasicInformation;
+    arrCh  : array [0..MAX_PATH] of char;
+    i1     : integer;
+begin
+  SetLength(result, 10);
+  i1 := 0;
+  p1 := nil;
+  p2 := nil;
+  while VirtualQueryEx(GetCurrentProcess, p1, mbi, sizeOf(mbi)) = sizeOf(mbi) do begin
+    if (mbi.State = MEM_COMMIT) and
+       (mbi.AllocationBase <> p2) and (mbi.AllocationBase = mbi.BaseAddress) and
+       (GetModuleFileName(dword(mbi.AllocationBase), arrCh, MAX_PATH) > 0) then begin
+      if i1 = Length(result) then
+        SetLength(result, i1 * 2);
+      result[i1] := dword(mbi.AllocationBase);
+      inc(i1);
+    end;
+    p2 := mbi.AllocationBase;
+    dword(p1) := dword(p1) + mbi.RegionSize;
+  end;
+  SetLength(result, i1);
+end;
+
+procedure PatchImportTables(old, new: pointer);
+var i1      : integer;
+    modules : TDAModule;
+begin
+  modules := GetModuleList;
+  for i1 := 0 to high(modules) do
+    if (GetVersion and $80000000 = 0) or (modules[i1] < $80000000) then
+      PatchImportTable(modules[i1], old, new);
+end;
+
+Then call PatchImportTables instead of PatchImportTable. This will hook all modules of the current process (excluding the system modules in 9x).
+
+P.S: Please instead of "@FindNextFileW" use "GetProcAddress(kmodule, 'FindNextFileW')". Furthermore in win9x please run your exe *outside* of the IDE. In XP you can run it inside or outside.
+====================
+Maybe, instead of trying to determine clearly if a process is initialized, you could simply repeatedly try to create your remote thread until it succeeds, using SetUnhandledExceptionFilter() to catch any access violations that may occur?
+
+I explain. You put your DLL-loading code into the remote process, probably using WriteProcessMemory(). Then you set the topExcFilter of that process to something that points into the code you just injected (in case it goes wrong or something) and save the old value, of course. Now you repeatedly try to start your remote thread in the process, until it returns no error. No bother if an access violation occurs, because your exception code will handle it to pass silently. In your code, you call LoadLibrary(), load your DLL then finally un-set the exception filter.
+
+MSDN Library says though that calling LoadLibrary() from within DllMain() is not safe, I guess that may apply if the process is not initialized. A quick hack you can do, though, is, from the second thread, constantly monitor the main thread's EIP value, and, and as soon as it is in the range 0x00400000-(end of the executable), load your DLL. 
+
+I wonder what's the precise use of your DLL anyway. Maybe there's another way to achieve the same result anyway.
+
+Here's an odd, but probably working (not depending on LoadLibrary()) idea:
+
+If you absolutely need to inject code in the process, you can probably just manually allocate pages into it, then write only the code (no PE image, only the code) which, at it's beginning, would contain a table of all DLL functions that are used, and that you would patch before injecting the code, finding every of the functions' addresses using GetProcAddress(). Of course your code, unless it was specifically written (probably in assembly) to be run as PIC, will need to always be at a specific location.
+
+That just gave me a better, simpler idea:
+Why don't you have the loader process (the one that injects the DLL into the other processes) load your DLL into the 0x80000000-0xBFFFFFFF shared area? That would probably need a bit of tweak but, after, your DLL would be loaded for ALL processes :-)
+
+That's all the ideas I'd got for now. I hope this may help you
+=============================
+>> Maybe, instead of trying to determine clearly if a process is initialized, you could simply repeatedly try to create your remote thread until it succeeds, using SetUnhandledExceptionFilter() to catch any access violations that may occur?
+
+There are some system and/or third party dlls, which have a thread dependent initialization. The first time their entry point gets called, they think: "Welcome, main thread!!". Now if I create my remote thread too early, those dlls think that the remote thread is the main thread. As a result crashes or wild reactions will happen.
+
+Creating the remote thread itself is not the problem, it does work. Just the consequences (I described above) are the problem.
+
+>> I wonder what's the precise use of your DLL anyway. Maybe there's another way to achieve the same result anyway.
+
+I'm currently working on "madCodeHook 2.0", which will feature system wide dll injection for both 9x and NT. Here you can find the documentation of "madCodeHook 1.0": http://help.madshi.net/madCodeHook.htm . It's an "API hooking" + ... ackage which other programmers can use.
+
+>> Here's an odd, but probably working (not depending on LoadLibrary()) idea:
+
+madCodeHook has a function named "CopyFunction", which can easily just copy a function to another process - including all necessary relocations. I'm already making use of such hacks quite often internally in madCodeHook. But doing such stuff is not that easy and the function you copy has to follow quite special rules. Most of my customers can't do things like that. They just want to call "InjectLibrary(SYSTEM_WIDE, "their.dll")" and they want madCodeHook to do the rest for them.
+
+>> That just gave me a better, simpler idea:
+>> Why don't you have the loader process (the one that injects the DLL into the other processes) load your DLL into the 0x80000000-0xBFFFFFFF shared area? That would probably need a bit of tweak but, after, your DLL would be loaded for ALL processes :-)
+
+Such a shared DLL needs some special tweaking. E.g. (IIRC) it must have shared data segments only. This can make quite some problems. And in Delphi you can't even create such DLLs (without manually hacking the PE structure, that is). So again it's too difficult for my customers.
+
+madCodeHook is supposed to take *any* DLL and inject it into all current and future processes in any OS. And I have to make that work. Well, it does work. As I wrote some comments earlier I've implemented an ugly but (more or less) working solution for my last remaining problem (injection into already running processes in 9x). But I'd still like to have it solved a bit cleaner.
+
+hook_func : IAT MandatoryFunctions hook.
+export_hook: EAT hook
+packdll: IAT be compressed.
+
+
+

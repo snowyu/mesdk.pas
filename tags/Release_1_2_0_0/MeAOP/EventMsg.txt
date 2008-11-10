@@ -1,0 +1,70 @@
+asynchronous  (异步)
+synchronous   (同步)
+
+
+Message - Publisher Subscriber 
+Event   - Register Listener
+
+Object.Dispatch(var Message);
+  SendMsg: synchronous
+  PostMsg: asynchronous
+
+DOM event model
+
+ActionScript 3.0 event model
+
+EventId(MsgId)
+addEventListener(MouseEvent.CLICK, clickHander);
+
+how to pass the event parameters?
+
+
+Event Driven Architecture，EDA = Message Driven Architecture, MDA
+
+(1) an activity that happens (一个发生的活动)
+(2) something that represents that activity in a computer system (计算机系统里面代表某个活动的事物)
+
+http://www.infoq.com/news/2008/08/cep-and-eda
+Luckham和Shulte将“复杂事件”定义成“一个对多个其它子事件的抽象的事件。
+
+
+Multi-Events Supports:
+  original envent message dispatch:
+    hook the dispatch method.
+    
+    GMeEvent.addListener(aEventId, aObj, aHandler);
+    One MeEvent only response one kind of eventId.
+      I will keep the publishers(aObj), EventHandler(aHandler).
+      FEventId:
+      FPublishers:
+        Publisher, EventHandler1, EventHandler2...
+        Publisher, EventHandler1, EventHandler2...
+      
+    GMeClickEvent.addListener(aObj, aHandler);
+       GMeEvent.addListener(ClickEventId, aObj, aHandler);
+       
+
+  TSupported : can use the AOP inject the class to suport the event?
+  TMeEventHelper = 
+    FSubscribers
+
+  TObject = Class(TXXXObject, IPublisher);
+  protected
+    //IPublisher methods?
+  public
+  end;
+
+;Event (event object, event message, event tuple): An object that represents, encodes, or records an event, 
+generally for the purpose of computer processing.
+
+event object lifetime: from event start to event end.
+   1. Events are processed by computer systems by processing their representations as event objects. 
+      The same activity may be represented by more than one event object; each event object might 
+      record different attributes of the activity. In many event processing systems, for example 
+      simulation systems, events are immutable. In such systems, a modification or transformation 
+      of an event must be achieved by creating a new event object and not by altering the original 
+      event. Deletion would entail removing an event from further processing.
+   2. Overloading: Event objects contain data. The word -event is overloaded so that it can be used 
+      as a synonym for event object. In discussing event processing, the word -event is used to denote 
+      both the everyday meaning (anything that happens) and the computer science meaning (an event object 
+      or message). The context of each use indicates which meaning is intended.

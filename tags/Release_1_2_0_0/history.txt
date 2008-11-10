@@ -1,0 +1,135 @@
+MeSDK v.1.2 Release Cardinal 2008-11-10 Rev.347
+
++ [DUnit] UnitTest for MeService
+* [Bug][DUnit] the ClassName is removed for the error optimal by Delphi7 
++ Init MeService
+* [uMeObject] AnsiString type instead of String type.
+* [uMeStrUtils] AnsiString type instead of String type.
+* [uMeSysUtils] TMeThreadSafeList can use an external list object.
+* [uRegExpr] 
+  * AnsiChar type instead of Char type.
+  + TRegExpr.ExecutionTimeOut (ms)
+* [uMeRemoteServerFunc] [Bug] Register remote method.
+* [uMeProcType] [Bug] TMeParam.AsXXX Float value error.
+* [Bug] can not work on IE
++ IsDebugged for console.log on firefox.
+* [Bug] fixed CrossSite URL error
+* TMeParam
+  * AsString use AnsiString instead of String.
+  * [Bug] GetAsString can not get proper value when paramType is not ByRef.
+* [Bug][MeAOP] the OnXXXExecute event forget to pass the params.
+* [Bug][MeAOP] AddToProperty
++ [DUnit] AddToProperty for mpsGet
+* [Bug] Request.js
+  the error will not be triggered onComplete event.
+* Request.js
+  + setUrl method
+  + send(aUrl, aData) XSS supports
+* replace the String and Char type to AnsiString and AnsiChar
+* Minor Changed.
+* [TMeWindowMessageFeature] can work now.
++ [DUnit] test for WindowMessageFeature.
+* TMeThreadSafeList
+  + Delete method
+  * Add Method return the index of the list.
+* uMeEventFeature has almost done.
++ MultiCast Event Feature
+* redesign the MeScript Interpreter
+* [Bug] fixed the regular expression error for google Chrome browser.
+* [Bug] TMeThreadMgrTask force to terminate the threads error. 
++ example document for SetMeIdleProc
+* [Bug] the VCL controls will freeze the GLogger
+  + use the SetMeIdleProc to process message loop.
+* [Bug] [TMeThreadMgrTask.Run]the AutoStopped will make the Thread Manager quit immediately.
++ [uMeThread] MeSleep procedure.
++ VM Instruction Execution Core(not work yet) 
++ [MeScript] English Document 
+* Seperate the VM Execution and script.
+  you can set by SetVMExecutorProc() procedure.
++ TMeThreadTimer and DUnit Test for TMeThreadTimer
+* [Bug] Can not compile on the Delphi7.
++ [MeRemote]execution error report in the simple binary protocol.
+* TMeTask
+  + property ActiveThreads
+  + property ThreadPool
++ TMeTask.Execute the task can be executed without thread.
+* TMeThreadMgrTask
+  + AutoStopped: Boolean //it will be stopped when no Active threads running
+* Add test to AddFreeNotification, RemoveFreeNotification for PMeDynamicObject
+* AddFreeNotification, RemoveFreeNotification support the TObject and PMeDynamicObject now.
+- property OnTaskDone(remove to TMeTask.OnTaskDone
+* [Bug] can not get SubExpression with matchStr after ExecNext
++ TMeCustomThread.OnAfterRun
+*.[MeRemote] example minor changed.
++ property TMeTask.OnTaskDone
++ property TMeThreadMgrTask.OnThreadDone
+* [Bug] raise Error when Strings is nil
++ IndyBinServer is KeepAlive now.
+* RegExprSubExpressions supports the: (?<name>...),
+  (?'name'..), (?P<name>...)
+* [uRegExpr] Minor Changed.
++ TMeConsoleLogger for console application.
+* [Bug] a memory leak found and fixed.
+~ [Demo] Remote Add function console application:
+  client 12 3
+  return the result of the 12+3.
+* [Bug][MeRemote] Minor bug fixed.
+* [Bug] MeRemote can work now.
+* Update TMeParam.AsString Property to support OrdinalType
++ [MeRemote] IndyBin protocol example[not done]
+* [MeRemote] under-construct
++ [Test] TTest_MeStrings.Test_AddDelimitedText
+* [MeRemote] Transport still under-construct!
+* TMeRemmoteFunction
+  + procedure Execute(const aIn, aOut: PMeStream);
+* TMeRemmoteFunctions
+  + procedure Execute(const aIndex: Integer; const aIn, aOut: PMeStream);
+* [Bug] the parent of TMeRemmoteFunctions should be TMeTreadSafeList.
+* [Bug] [Test] InterceptorTest passed on Delphi 7
+* [Bug] Can not compile on Delphi7
+* [Interceptor] use const E: Exception parameter instead in TMeAfterExceptionEvent.
+* [Bug] uMeScript and uMeThread Can not Compile on Delphi7
+
+
+MeSDK v.1.1 Release 2008.6.16
+
+* [Bug] TMeTokenizer can not process this: {aaa();}
+* [Bug] uMeYield
+* [Bug] uMeCoRoutine
+* uMeTypInfo: Get more support the pulbished method RTTI.
+* uMeTypes: remove the TCallingConvention type to uMeTypInfo.
+* uMeProcType
+  + TMeParam.LoadFromStream
+  + TMeParam.SaveToStream
++ uRegExpr: modified and enhanced
+  + SubExprName define and parse: "():SubExprName:"
+  + property MatchStrPos, MatchStrLen, MatchStr by SubExprName index.
+  + function GetSubExprIndexByName
+  + property SubExprNames to get the SubExprName by integer index.
+  + Subtitute the SubExprName by : $[SubExprName].
+  * the SubExprName is CaseSensitive!
+  * more speedup for a large-text search.
+    * remove Length(aPChar) in ExecPrim 
+      //len := Length(aPChar); it will be very slow on a large pchar.
+  + procedure SetSubjectStr(const Value: RegExprString);
+  + procedure SetSubjectStr(const Value: PRegExprChar);
+      it do not assigned the InputString, just point it directly. so u must do not free the string(be careful this)!!
+  + keep the more compatible with the Perl RegExpr: (?:....)
+      the non-capuring Group, but not whole impl it.
+  + \-[1..9]: means prev SubExpr in Expression.
+    (['|"])\S+\-1
+    match: 'dddd', "word".
+  + add more compatible with the Perl RegExpr:  (?<name>...) or (?'name'...)
+  + add compatible with the Python RegExpr:  (?P<name>...)
++ uMeRegExpr: the RegExpr extension object 
++ uMeRegExprCoRoutine: the CoRountine object of the MeRegExpr 
++ uMeThread: the thread object for the MeSDK Core.
++ uMeSyncObjs: collects the thread synchronization objects instead of the standard SyncObjs of Delphi.
++ uMeSysUtils: some helper functions and classes. eg u can AddFreeNotification for any TObject class.
++ uMeURI: Represents the Uniform Resource Identifier object.
++ uMeURL: the abstract Uniform/Universal Resource Accessor class and factory.
++ uMeLog: the Logging of Application class that defines a framework for logging general purposed information.
++ uMeLoggerEx: the extented logger objects.
++ uStringsLogger: for logging to TStrings.
+
+MeAOP v.1.0 first release. 2008.2.9
