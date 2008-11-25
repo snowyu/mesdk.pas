@@ -1,3 +1,6 @@
+/** 
+@author Riceball LEE(riceballl@hotmail.com)
+*/
 /** helper function for inject */
 function Arguments(args) {
   //convert arguments object to array
@@ -149,13 +152,13 @@ function Arguments(args) {
       /** 
                    get the public activities of the ptId by async
                    @param  aPitId  the activities of the ptId
-                   @param  aAppId [optional] only get public activities of  the AppId(app_key) if any
+                   @param  aSource [optional] only get public activities of  the AppId(app_key) if any
                    @param  aOnComplete the callback event when async over.
                 */
-      get: function(aPtId, aOnComplete, aAppId){
+      get: function(aPtId, aOnComplete, aSource){
          if (SNDA.expectFunctionParam(aOnComplete)) {
             var vActivities = false;
-            var vUrl = window.SNDA.serviceUrl + '/sdo/users/' + aPtId + '/activities?key=' + aAppId;
+            var vUrl = window.SNDA.serviceUrl + '/sdo/users/' + aPtId + '/activities?key=' + aSource;
             var vJsonRequest = new Request.JSON({
               url: vUrl, 
               onComplete: function(aResult){
@@ -176,10 +179,10 @@ function Arguments(args) {
          }
       },
       //get the firends' activities of the ptId by async
-      getFriends: function(aPtId, aOnComplete, aAppId){
+      getFriends: function(aPtId, aOnComplete, aSource){
          if (SNDA.expectFunctionParam(aOnComplete)) {
             var vActivities = false;
-            var vUrl = window.SNDA.serviceUrl + '/sdo/users/' + aPtId + '/friends/activities?key=' + aAppId;
+            var vUrl = window.SNDA.serviceUrl + '/sdo/users/' + aPtId + '/friends/activities?key=' + aSource;
             var vJsonRequest = new Request.JSON({
               url: vUrl, 
               onComplete: function(aResult){
