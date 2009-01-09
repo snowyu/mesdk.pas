@@ -427,7 +427,9 @@ I treat the Aspect Oriented Programming as Feature Oriented Programming.
 
 * MeRemote *
 The MeRemote Features Library is the remote function and remote object Library for delphi. It's the feature-layer of the MeAOP.
-not ready yet.
+
+* MeService *
+The MeService Library is a mini general SOA(service(plugin)-oriented architecture) system framework. 
 
 * MeScript *
 the MeSDK Script Engine Core. It's the functional language script engine. but not ready yet.
