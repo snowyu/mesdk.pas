@@ -32,7 +32,8 @@ uses
   Windows,
   {$ENDIF MSWINDOWS}
   {$IFDEF COMPILER6_UP}
-  Types,
+  Types, 
+  Libc, //getpagesize
   {$ENDIF COMPILER6_UP}
   SysUtils
   , uMeConsts
@@ -552,7 +553,7 @@ procedure ReadMem(const Location, Buffer: Pointer; const Size: Cardinal);
 var
   ReadBytes: Cardinal;
 begin
-  if (not ReadProcessMemory(FCurrentProcess, Location,
+  if (not ReadProtectedMemory(Location,
     Buffer, Size, ReadBytes)) or (ReadBytes <> Size) then
       raise EMeError.CreateResFmt(@rsMemoryReadError, [SysErrorMessage(GetLastError)]);
 end;
@@ -560,17 +561,23 @@ end;
 procedure WriteMem(const Location, Buffer: Pointer; const Size: Cardinal);
 var
   WrittenBytes: DWORD;
+  {$IFDEF MSWINDOWS}
   SaveFlag: DWORD;
+  {$ENDIF}
 begin
   //! StH: WriteProcessMemory IMO is not exactly the politically correct approach;
   // better VirtualProtect, direct patch, VirtualProtect
+  {$IFDEF MSWINDOWS}
   if VirtualProtect(Location, Size, PAGE_EXECUTE_READWRITE, @SaveFlag) then
   try
+  {$ENDIF}
     if not WriteProtectedMemory(Location, Buffer, Size, WrittenBytes) then
       raise EMeError.CreateResFmt(@rsMemoryWriteError, [SysErrorMessage(GetLastError)]);
+  {$IFDEF MSWINDOWS}
   finally
     VirtualProtect(Location, Size, SaveFlag, @SaveFlag);
   end;
+  {$ENDIF}
 
   if WrittenBytes <> Size then
     raise EMeError.CreateResFmt(@rsMemoryWriteError, [IntToStr(WrittenBytes)]);
