@@ -50,22 +50,22 @@ uses
 type
   TMeRemoteFuncFeature = class(TMeCustomInterceptor)
   protected
-    FTransport: TMeTransport;
+    FTransport: TMeClientTransport;
     function AllowExecute(Sender: TObject; MethodItem: TMeInterceptedMethodItem;
             const Params: PMeProcParams = nil): Boolean; override;
-    procedure SetTransport(const Value: TMeTransport);
-    procedure TransportFreeNotify(Instance : TObject);
+    procedure SetTransport(const Value: TMeClientTransport);
+    procedure TransportFreeNotify(Instance : Pointer);
   public
     class function AddTo(aProc:Pointer; const aProcName: string;
-            aMethodParams: PTypeInfo = nil; const aTransport: TMeTransport = nil): TMeAbstractInterceptor; overload;
+            aMethodParams: PTypeInfo = nil; const aTransport: TMeClientTransport = nil): TMeAbstractInterceptor; overload;
     destructor Destroy; override;
-    property Transport: TMeTransport read FTransport write SetTransport;
+    property Transport: TMeClientTransport read FTransport write SetTransport;
   end;
 
 implementation
 
 class function TMeRemoteFuncFeature.AddTo(aProc:Pointer; const aProcName: string;
-         aMethodParams: PTypeInfo; const aTransport: TMeTransport): TMeAbstractInterceptor;
+         aMethodParams: PTypeInfo; const aTransport: TMeClientTransport): TMeAbstractInterceptor;
 begin
   Result := inherited AddToProcedure(aProc, aProcName, aMethodParams);
   
@@ -110,7 +110,7 @@ begin
   end;
 end;
 
-procedure TMeRemoteFuncFeature.SetTransport(const Value: TMeTransport);
+procedure TMeRemoteFuncFeature.SetTransport(const Value: TMeClientTransport);
 begin
   if FTransport <> Value then
   begin
@@ -120,11 +120,11 @@ begin
     end;
     FTransport := Value;
     if Assigned(FTransport) then
-      AddFreeNotification(FTransport, TransportFreeNotify);
+      AddFreeNotification(Pointer(FTransport), TransportFreeNotify);
   end;
 end;
 
-procedure TMeRemoteFuncFeature.TransportFreeNotify(Instance : TObject);
+procedure TMeRemoteFuncFeature.TransportFreeNotify(Instance : Pointer);
 begin
   if FTransport = Instance then
     FTransport := nil;

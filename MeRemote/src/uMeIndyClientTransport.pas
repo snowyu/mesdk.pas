@@ -59,7 +59,7 @@ type
     property Port;
   end;
 
-  TMeIndyClientTransport = class(TMeTransport)
+  TMeIndyClientTransport = class(TMeClientTransport)
   protected
     FClient: TMeIndyBinClient;
     //procedure iSendAsyn(const aCmd: string; const aRequest: TStream; const aReply: PMeStream; const aTimeOut: Integer = 0);override;
@@ -86,7 +86,7 @@ end;
 
 procedure TMeIndyBinClient.SendCmd(const aCmd: string; const aRequest: PMeStream; const aReply: PMeStream); 
 var
-  b: byte;
+  b: word;
   vStream: TMeStreamProxy;
   s: string;
 begin
@@ -94,7 +94,7 @@ begin
   IOHandler.WriteLn('cmd '+ aCmd);
   //IOHandler.LargeStream := False;
   CheckConnected;
-  b := IOHandler.ReadByte;
+  b := IOHandler.ReadSmallInt;
   if b <> 200 then
     raise EMeError.Create('Can not Execute Cmd: '+ aCmd + ' Error Status:' + IntToStr(b));
   CheckConnected;
@@ -103,7 +103,7 @@ begin
     //pass true means write the stream size first.
     IOHandler.Write(vStream, 0, True);
     CheckConnected;
-    b := IOHandler.ReadByte;
+    b := IOHandler.ReadSmallInt;
     vStream.MeStream := aReply;
     //b := IOHandler.ReadLongInt;
     //writeln('LoadParamsFromStream:',b);

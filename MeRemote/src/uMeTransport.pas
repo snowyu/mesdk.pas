@@ -48,15 +48,15 @@ uses
   ;
 
 type
-  TMeTransportClass = class of TMeTransport;
+  TMeTransportClass = class of TMeClientTransport;
   //how to convert the params to stream?
   {
   http://host/cat/aMethod?param=xx
   i will use REST protocol to do?
   }
   TMeReceivedDataEvent = procedure (const Sender: TObject; const aCmd: string; const aReply: PMeStream) of object;
-  //abstract Transport class
-  TMeTransport = class
+  //abstract  client Transport class
+  TMeClientTransport = class
   protected
     //for Async method:
     //the default timeout
@@ -118,20 +118,20 @@ var
 
 implementation
 
-{ TMeTransport }
-constructor TMeTransport.Create;
+{ TMeClientTransport }
+constructor TMeClientTransport.Create;
 begin
   inherited;
   New(FLock, Create);
 end;
 
-destructor TMeTransport.Destroy;
+destructor TMeClientTransport.Destroy;
 begin
   FLock.Free;
   inherited;
 end;
 
-procedure TMeTransport.Connect();
+procedure TMeClientTransport.Connect();
 begin
   if not FConnected then
   begin
@@ -145,7 +145,7 @@ begin
   end;
 end;
 
-procedure TMeTransport.Disconnect();
+procedure TMeClientTransport.Disconnect();
 begin
   if FConnected then
   begin
@@ -160,7 +160,7 @@ begin
 end;
 
 {
-procedure TMeTransport.SendAsyn(const aCmd: string; const aRequest: PMeStream; const aReply: PMeStream; aTimeOut: Integer = 0);
+procedure TMeClientTransport.SendAsyn(const aCmd: string; const aRequest: PMeStream; const aReply: PMeStream; aTimeOut: Integer = 0);
 begin
   if Assigned(aRequest) and Assigned(aReply) then
   begin
@@ -177,7 +177,7 @@ begin
 end;
 //}
 
-procedure TMeTransport.Send(const aCmd: string; const aRequest: PMeStream; const aReply: PMeStream);
+procedure TMeClientTransport.Send(const aCmd: string; const aRequest: PMeStream; const aReply: PMeStream);
 begin
   if Assigned(aRequest) and Assigned(aReply) then
   begin
@@ -194,7 +194,7 @@ begin
   end;
 end;
 
-procedure TMeTransport.SetURL(const Value: string);
+procedure TMeClientTransport.SetURL(const Value: string);
 begin
   if (FURL <> Value) then
   begin

@@ -49,7 +49,7 @@ uses
 type
   //return -1 means not found.
   TMeCmdSearchEvent = function(const aCmd: string): Integer of object;
-  TMeCmdExecuteEvent = procedure(const aCmd: Integer; const aParams: PMeStream; var aSuccessful: Boolean) of object;
+  TMeCmdExecuteEvent = procedure(const aCmd: Integer; const aParams: PMeStream; var aSuccessful: WordBool) of object;
   TMeIndyRemoteFunctionServer = class(TIdCustomTCPServer)
   protected
     FOnCmdExecute: TMeCmdExecuteEvent;
@@ -101,7 +101,8 @@ function TMeIndyRemoteFunctionServer.DoExecute(aContext: TIdContext): Boolean;
 var
   vLine: string;
 begin
-    if aContext.Connection.Connected then 
+    Result := False;
+	if aContext.Connection.Connected then 
     begin
       vLine := ReadCommandLine(aContext);
       Result := (vLine <> '');
@@ -133,7 +134,7 @@ begin
     Result := vCmdId >= 0;
     if Result then 
     begin
-      aContext.Connection.IOHandler.Write(200);
+      aContext.Connection.IOHandler.Write(SmallInt(200));
       Result := aContext.Connection.Connected;
       if Result then
       begin
@@ -161,7 +162,7 @@ begin
             end;
             if Result then
             begin
-            	aContext.Connection.IOHandler.Write(Word(Result));
+            	aContext.Connection.IOHandler.Write(SmallInt(Result));
               vStream.SetPosition(0);
               aContext.Connection.IOHandler.Write(vStreamProxy, 0, True);
             end;
