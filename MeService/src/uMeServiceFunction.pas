@@ -135,11 +135,6 @@ begin
 end;
 {$ENDIF}
 
-{$IFDEF MeRTTI_SUPPORT}
-const
-  cMeCustomServiceClassName: PChar = 'TMeAbstractService';
-{$ENDIF}
-
 initialization
   SetMeVirtualMethod(TypeOf(TMeServiceFunction), ovtVmtParent, TypeOf(TMeProcParams));
 
