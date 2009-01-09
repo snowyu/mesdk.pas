@@ -31,6 +31,9 @@ uses
   {$IFDEF MSWINDOWS}
   Windows,
   {$ENDIF MSWINDOWS}
+  {$IFDEF COMPILER6_UP}
+  Types,
+  {$ENDIF COMPILER6_UP}
   SysUtils
   , uMeConsts
   , uMeDisAsmEngine
@@ -427,9 +430,40 @@ end;
 
 function ReadProtectedMemory(BaseAddress, Buffer: Pointer; Size: Cardinal;
   out ReadBytes: Cardinal): Boolean;
+{$IFDEF MSWINDOWS}
 begin
   Result := ReadProcessMemory(FCurrentProcess, BaseAddress, Buffer, Size, ReadBytes);
 end;
+{$ENDIF MSWINDOWS}
+{$IFDEF LINUX}
+var
+  AlignedAddress: Cardinal;
+  PageSize, ProtectSize: Cardinal;
+begin
+  Result := False;
+  ReadBytes := 0;
+
+  PageSize := Cardinal(getpagesize);
+  AlignedAddress := Cardinal(BaseAddress) and not (PageSize - 1); // start memory page
+  // get the number of needed memory pages
+  ProtectSize := PageSize;
+  while Cardinal(BaseAddress) + Size > AlignedAddress + ProtectSize do
+    Inc(ProtectSize, PageSize);
+
+  if mprotect(Pointer(AlignedAddress), ProtectSize,
+       PROT_READ or PROT_WRITE or PROT_EXEC) = 0 then // obtain write access
+  begin
+    try
+      Move(BaseAddress^, Buffer^, Size); // replace code
+      Result := True;
+      ReadBytes := Size;
+    finally
+      // Is there any function that returns the current page protection?
+//    mprotect(p, ProtectSize, PROT_READ or PROT_EXEC); // lock memory page
+    end;
+  end;
+end;
+{$ENDIF LINUX}
 
 function WriteProtectedMemory(BaseAddress, Buffer: Pointer;
   Size: Cardinal; out WrittenBytes: Cardinal): Boolean;
