@@ -24,7 +24,8 @@ uses
   {$IFDEF MSWINDOWS}
   Windows,
   {$ENDIF MSWINDOWS}
-  SysUtils, Classes
+  SysUtils
+  , Classes
   //, uMeConsts
   , uMeTypInfo
   , uMeObject

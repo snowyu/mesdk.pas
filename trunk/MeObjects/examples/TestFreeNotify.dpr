@@ -3,7 +3,10 @@ program TestFreeNotify;
 {$APPTYPE Console}
 	
 uses
-  Windows, SysUtils
+  {$IFDEF MSWINDOWS}
+  Windows, 
+  {$ENDIF}
+  SysUtils
   , uMeSystem
   , uMeObject
   , uMeSysUtils
