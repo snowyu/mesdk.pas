@@ -24,6 +24,10 @@ uses
   {$IFDEF MSWINDOWS}
   Windows,
   {$ENDIF MSWINDOWS}
+  {$IFDEF LINUX}
+  Types,
+  Libc,
+  {$ENDIF LINUX}
   SysUtils
   , Classes
   //, uMeConsts
@@ -80,6 +84,7 @@ RemoveFreeNotification removes the NotificationProc specified by the aProc param
 }
 procedure RemoveFreeNotification(const aInstance : Pointer; const aProc : TFreeNotifyProc);
 
+{$IFDEF MSWINDOWS}
 //the thread safe version:
 function FormatDateTimeS(const Format: string; aDateTime: TDateTime): string;
 function FormatS(const aFormat: string; const Args: array of const): string;
@@ -88,6 +93,7 @@ function DateToStrS(const aDate: TDateTime): string;
 function DateTimeToStrS(const aDateTime: TDateTime): string;
 
 procedure GetDefaultFormatSettings(var Result: TFormatSettings);
+{$ENDIF}
 
 //return GMT now.
 function GMTNow: TDateTime;
@@ -113,7 +119,7 @@ function OffsetFromUTC: TDateTime;
 begin
   Result := System.Timezone.CurrentTimezone.GetUTCOffset(now).TotalDays;
 end;
-{$ENDIF}
+{$ENDIF DOTNET}
 {$IFDEF MSWINDOWS}
 function OffsetFromUTC: TDateTime;
 var
@@ -145,13 +151,14 @@ begin
     Result := 0 - Result;
   end;
 end;
-{$ENDIF}
+{$ENDIF MSWINDOWS}
 
 function GMTNow: TDateTime;
 begin
   Result := Now - OffsetFromUTC;
 end;
 
+{$IFDEF MSWINDOWS}
 function FormatS(const aFormat: string; const Args: array of const): string;
 var
   vFormatSettings:  TFormatSettings;
@@ -205,6 +212,45 @@ begin
   vFormatSettings.ShortTimeFormat := LongTimeFormat;
   Result := SysUtils.TimeToStr(aTime, vFormatSettings);
 end;
+
+procedure GetDefaultFormatSettings(var Result: TFormatSettings);
+var
+  i: Integer;
+begin
+  //GetLocaleFormatSettings(LOCALE_SYSTEM_DEFAULT, Result);
+  
+  with Result do
+  begin
+    CurrencyFormat:= SysUtils.CurrencyFormat;
+    NegCurrFormat := SysUtils.NegCurrFormat;;
+    ThousandSeparator := SysUtils.ThousandSeparator;
+    DecimalSeparator := SysUtils.DecimalSeparator;
+    CurrencyDecimals := SysUtils.CurrencyDecimals;
+    DateSeparator := SysUtils.DateSeparator;
+    TimeSeparator := SysUtils.TimeSeparator;
+    ListSeparator :=  SysUtils.ListSeparator;
+    CurrencyString := SysUtils.CurrencyString;
+    ShortDateFormat := SysUtils.ShortDateFormat;
+    LongDateFormat := SysUtils.LongDateFormat;
+    TimeAMString :=  SysUtils.TimeAMString;
+    TimePMString := SysUtils.TimePMString;
+    ShortTimeFormat:= SysUtils.ShortTimeFormat;
+    LongTimeFormat:= SysUtils.LongTimeFormat;
+
+    for i:= 1 to 12 do
+    begin
+      ShortMonthNames[i] := SysUtils.ShortMonthNames[i];
+      LongMonthNames[i] := SysUtils.LongMonthNames[i];
+    end;
+    for i := 1 to 7 do
+    begin
+      ShortDayNames[i]:= SysUtils.ShortDayNames[i];
+      LongDayNames[i]:= SysUtils.LongDayNames[i];
+    end;
+    TwoDigitYearCenturyWindow:= SysUtils.TwoDigitYearCenturyWindow;
+  end; //}
+end;
+{$ENDIF MSWINDOWS}
 
 type
   TDestructorProc = procedure(const aInstance: Pointer; const aFlag: Boolean);
@@ -676,44 +722,6 @@ end;
 procedure TMeThreadSafeList.UnlockList;
 begin
   FLock.Leave;
-end;
-
-procedure GetDefaultFormatSettings(var Result: TFormatSettings);
-var
-  i: Integer;
-begin
-  //GetLocaleFormatSettings(LOCALE_SYSTEM_DEFAULT, Result);
-  
-  with Result do
-  begin
-    CurrencyFormat:= SysUtils.CurrencyFormat;
-    NegCurrFormat := SysUtils.NegCurrFormat;;
-    ThousandSeparator := SysUtils.ThousandSeparator;
-    DecimalSeparator := SysUtils.DecimalSeparator;
-    CurrencyDecimals := SysUtils.CurrencyDecimals;
-    DateSeparator := SysUtils.DateSeparator;
-    TimeSeparator := SysUtils.TimeSeparator;
-    ListSeparator :=  SysUtils.ListSeparator;
-    CurrencyString := SysUtils.CurrencyString;
-    ShortDateFormat := SysUtils.ShortDateFormat;
-    LongDateFormat := SysUtils.LongDateFormat;
-    TimeAMString :=  SysUtils.TimeAMString;
-    TimePMString := SysUtils.TimePMString;
-    ShortTimeFormat:= SysUtils.ShortTimeFormat;
-    LongTimeFormat:= SysUtils.LongTimeFormat;
-
-    for i:= 1 to 12 do
-    begin
-      ShortMonthNames[i] := SysUtils.ShortMonthNames[i];
-      LongMonthNames[i] := SysUtils.LongMonthNames[i];
-    end;
-    for i := 1 to 7 do
-    begin
-      ShortDayNames[i]:= SysUtils.ShortDayNames[i];
-      LongDayNames[i]:= SysUtils.LongDayNames[i];
-    end;
-    TwoDigitYearCenturyWindow:= SysUtils.TwoDigitYearCenturyWindow;
-  end; //}
 end;
 
 initialization
