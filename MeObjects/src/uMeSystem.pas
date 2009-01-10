@@ -665,11 +665,11 @@ begin
       vHoleAddr := PatchLocation;
 	  {$IFDEF MSWINDOWS}
       if VirtualProtect(PatchLocation, 64, PAGE_EXECUTE_READWRITE, @SaveFlag) then
-      try
 	  {$ENDIF MSWINDOWS}
 	  {$IFDEF UNIX}
       if mprotect(PatchLocation, 64, PROT_READ or PROT_WRITE or PROT_EXEC)  = 0 then
 	  {$ENDIF UNIX}
+      try
         while I < cNearJMPDirectiveSize do
         begin
           vOpCodeLen := GetX86OpCodeLength(vHoleAddr);
@@ -687,11 +687,11 @@ begin
           Inc(I, vOpCodeLen);
           Integer(vHoleAddr) := Integer(PatchLocation) + I;
         end; //while
-	  {$IFDEF MSWINDOWS}
       finally
+	  {$IFDEF MSWINDOWS}
         VirtualProtect(PatchLocation, 64, SaveFlag, @SaveFlag);
-      end;
 	  {$ENDIF MSWINDOWS}
+      end;
       ReadMem(PatchLocation, @PatchLocationBackup, I);
       Assert(I <= cRedirectCodeRecSize, 'the OpCode lenth should not be greater than ' + IntToStr(cRedirectCodeRecSize) + 'bytes');
       {//if Last OpCode is RET or JUMP the exit;
@@ -732,11 +732,11 @@ begin
     {$IFDEF STATIC_METHOD_SCRAMBLING_CODE_SUPPORT}
     {$IFDEF MSWINDOWS}
     if VirtualProtect(PatchLocation, 64, PAGE_EXECUTE_READWRITE, @SaveFlag) then
-    try
     {$ENDIF MSWINDOWS}
     {$IFDEF UNIX}
     if mprotect(PatchLocation, 64, PROT_READ or PROT_WRITE or PROT_EXEC)  = 0 then
     {$ENDIF UNIX}
+    try
       I := 0;
       p := PatchLocation;
       while I < cNearJMPDirectiveSize do
@@ -755,11 +755,11 @@ begin
         Inc(I, vOpCodeLen);
         Inc(Integer(p),  vOpCodeLen);
       end;
-    {$IFDEF MSWINDOWS}
     finally
+    {$IFDEF MSWINDOWS}
       VirtualProtect(PatchLocation, 64, SaveFlag, @SaveFlag);
-    end;
     {$ENDIF MSWINDOWS}
+    end;
     {$ENDIF}
   end;
 end;
