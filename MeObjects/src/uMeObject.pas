@@ -79,8 +79,10 @@ interface
 {.$DEFINE PUREPASCAL}
 
 uses
-  Windows
-  , SysUtils
+  {$IFDEF MSWINDOWS}
+  Windows, 
+  {$ENDIF MSWINDOWS}
+  SysUtils
   , TypInfo
   , uMeConsts
   , uMeSystem
