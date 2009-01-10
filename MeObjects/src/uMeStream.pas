@@ -45,11 +45,10 @@ uses
   {$ENDIF}
   ;
 
-//const
+const
 { TMeFileStream create mode }
-  {$IFDEF MSWINDOWS}
-  const
     fmCreate         = $FFFF;
+  {$IFDEF MSWINDOWS}
     fmOpenRead       = $0000;
     fmOpenWrite      = $0001;
     fmOpenReadWrite  = $0002;
@@ -62,7 +61,6 @@ uses
   {$ENDIF}
 
   {$IFDEF LINUX}
-  const
     fmOpenRead       = O_RDONLY;
     fmOpenWrite      = O_WRONLY;
     fmOpenReadWrite  = O_RDWR;
@@ -177,7 +175,7 @@ begin
   Win32Check(SetEndOfFile(FHandle));
   {$WARN SYMBOL_PLATFORM ON}
 {$ELSE}
-  if ftruncate(FHandle, Position) = -1 then
+  if ftruncate(FHandle, GetPosition) = -1 then
     raise EMeError(sStreamSetSize);
 {$ENDIF}
 end;
@@ -201,7 +199,7 @@ procedure TMeFileStream.Open(const AFileName: string; Mode: Word);
 begin
 {$IFDEF MSWINDOWS}
   Open(AFilename, Mode, 0);
-{$ELSE}
+{$ELSE LINUX}
   OpenEx(AFilename, Mode, FileAccessRights);
 {$ENDIF}
 end;
