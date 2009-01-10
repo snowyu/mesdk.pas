@@ -33,6 +33,10 @@ uses
   {$IFDEF MSWINDOWS}
   Windows,
   {$ENDIF MSWINDOWS}
+  {$IFDEF LINUX}
+  Types,
+  Libc,
+  {$ENDIF LINUX}
   SysUtils, Classes, TypInfo
   , uMeConsts
   //, uMeDisAsmEngine
