@@ -840,6 +840,7 @@ end;
 function GetActualAddress(AnAddr: Pointer): Pointer;
 begin
   {$IFDEF INJECT_DLL_SUPPORT}
+  {$IFDEF MSWINDOWS}
   if Assigned(AnAddr) then
   begin
     if (SysUtils.Win32Platform <> VER_PLATFORM_WIN32_NT) then
@@ -850,7 +851,8 @@ begin
     else //Only IsWin32NT CAN write the system dll memory !!
       AnAddr := GetDirectedAddr(AnAddr); 
   end;
-  {$ENDIF}
+  {$ENDIF MSWINDOWS}
+  {$ENDIF INJECT_DLL_SUPPORT}
   Result := AnAddr;
 end;
 
@@ -863,7 +865,12 @@ var
   SaveFlag: DWORD;
 begin
   Integer(p) := Integer(aProc) + cNearJMPDirectiveSize;
+  {$IFDEF MSWINDOWS}
   if VirtualProtect(aProc, Integer(aPatchHoleAddr) - Integer(aProc), PAGE_EXECUTE_READWRITE, @SaveFlag) then
+  {$ENDIF MSWINDOWS}
+  {$IFDEF UNIX}
+  if mprotect(aProc, Integer(aPatchHoleAddr) - Integer(aProc), PROT_READ or PROT_WRITE or PROT_EXEC)  = 0 then
+  {$ENDIF UNIX}
   try
     Move(aProc^, p^, Integer(aPatchHoleAddr) - Integer(aProc));
     FillChar(aProc^, cNearJMPDirectiveSize, cX86NoOpDirective);
@@ -890,7 +897,9 @@ begin
       Inc(Integer(p),vCodeLen);
     end;
   finally
+  {$IFDEF MSWINDOWS}
     VirtualProtect(aProc, Integer(aPatchHoleAddr) - Integer(aProc), SaveFlag, @SaveFlag);
+  {$ENDIF MSWINDOWS}
   end;
 end;
 
@@ -954,13 +963,17 @@ end;
 {$ENDIF}
 
 function GetModuleFromAddr(const Addr:Pointer): HModule;
+{$IFDEF MSWINDOWS}
 var
   vMI: TMemoryBasicInformation;
+{$ENDIF MSWINDOWS}
 begin
+{$IFDEF MSWINDOWS}
   VirtualQuery(Addr, vMI, SizeOf(vMI));
   if vMI.State = MEM_COMMIT then
     Result := HModule(vMI.AllocationBase)
   else
+{$ENDIF MSWINDOWS}
     Result := 0;
 end;
 
