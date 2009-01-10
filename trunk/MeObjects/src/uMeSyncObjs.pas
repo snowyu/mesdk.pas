@@ -121,6 +121,7 @@ type
 
 implementation
 
+{$IFDEF MSWINDOWS}
 type
   TCoWaitForMultipleHandlesProc = function (dwFlags: DWORD; dwTimeOut: DWORD;
     cHandles: LongWord; var Handles; var lpdwIndex: DWORD): HRESULT; stdcall;
@@ -226,6 +227,7 @@ begin
     LookupProc;
   Result := CoWaitForMultipleHandlesProc(dwFlags, dwTimeOut, cHandles, Handles, lpdwIndex)
 end;
+{$ENDIF MSWINDOWS}
 
 { TMeSynchroObject }
 
