@@ -31,10 +31,10 @@ uses
   {$IFDEF MSWINDOWS}
   Windows,
   {$ENDIF MSWINDOWS}
-  {$IFDEF COMPILER6_UP}
-  Types, 
+  {$IFDEF LINUX}
+  Types,
   Libc, //getpagesize
-  {$ENDIF COMPILER6_UP}
+  {$ENDIF LINUX}
   SysUtils
   , uMeConsts
   , uMeDisAsmEngine

@@ -28,9 +28,13 @@ interface
 {$I MeSetting.inc}
 
 uses
-{$IFDEF MSWINDOWS}
+  {$IFDEF MSWINDOWS}
   Windows, 
-{$ENDIF}
+  {$ENDIF}
+  {$IFDEF LINUX}
+  Types,
+  Libc,
+  {$ENDIF LINUX}
   //TypInfo,
   SysUtils
   , uMeConsts
