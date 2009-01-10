@@ -119,6 +119,11 @@ type
     procedure Leave;
   end;
 
+{$IFDEF LINUX}
+const
+  INFINITE = $FFFFFFFF;
+{$ENDIF LINUX}
+
 implementation
 
 {$IFDEF MSWINDOWS}
@@ -324,7 +329,7 @@ end;
 {$IFDEF LINUX}
 function TMeEvent.WaitFor(Timeout: LongWord): TWaitResult;
 begin
-  if Timeout = LongWord($FFFFFFFF) then
+  if Timeout = LongWord(INFINITE) then
   begin
     sem_wait(FEvent);
     Result := wrSignaled;
@@ -424,9 +429,14 @@ begin
     lpName := PChar(Name)
   else
     lpName := nil;
+  {$IFDEF MSWINDOWS}
   FHandle := CreateMutex(MutexAttributes, InitialOwner, lpName);
   if FHandle = 0 then
     RaiseLastOSError;
+  {$ENDIF MSWINDOWS}
+  {$IFDEF LINUX}
+  {$Message Warning 'the mutex has not been implemeted yet on linux.'}
+  {$ENDIF LINUX}
 end;
 
 constructor TMeMutex.Create(DesiredAccess: LongWord; InheritHandle: Boolean;
@@ -439,15 +449,25 @@ begin
     lpName := PChar(Name)
   else
     lpName := nil;
+  {$IFDEF MSWINDOWS}
   FHandle := OpenMutex(DesiredAccess, InheritHandle, lpName);
   if FHandle = 0 then
     RaiseLastOSError;
+  {$ENDIF MSWINDOWS}
+  {$IFDEF LINUX}
+  {$Message Warning 'the mutex has not been implemeted yet on linux.'}
+  {$ENDIF LINUX}
 end;
 
 procedure TMeMutex.Release;
 begin
+  {$IFDEF MSWINDOWS}
   if not ReleaseMutex(FHandle) then
     RaiseLastOSError;
+  {$ENDIF MSWINDOWS}
+  {$IFDEF LINUX}
+  {$Message Warning 'the mutex has not been implemeted yet on linux.'}
+  {$ENDIF LINUX}
 end;
 
 initialization
