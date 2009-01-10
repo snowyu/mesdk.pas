@@ -424,18 +424,18 @@ constructor TMeMutex.Create(MutexAttributes: PSecurityAttributes;
 var
   lpName: PChar;
 begin
+  {$IFDEF MSWINDOWS}
   inherited Create(UseCOMWait);
   if Name <> '' then
     lpName := PChar(Name)
   else
     lpName := nil;
-  {$IFDEF MSWINDOWS}
   FHandle := CreateMutex(MutexAttributes, InitialOwner, lpName);
   if FHandle = 0 then
     RaiseLastOSError;
   {$ENDIF MSWINDOWS}
   {$IFDEF LINUX}
-  {$Message Warning 'the mutex has not been implemeted yet on linux.'}
+  {$Message Warn 'the mutex has not been implemeted yet on linux.'}
   {$ENDIF LINUX}
 end;
 
@@ -444,18 +444,18 @@ constructor TMeMutex.Create(DesiredAccess: LongWord; InheritHandle: Boolean;
 var
   lpName: PChar;
 begin
+  {$IFDEF MSWINDOWS}
   inherited Create(UseCOMWait);
   if Name <> '' then
     lpName := PChar(Name)
   else
     lpName := nil;
-  {$IFDEF MSWINDOWS}
   FHandle := OpenMutex(DesiredAccess, InheritHandle, lpName);
   if FHandle = 0 then
     RaiseLastOSError;
   {$ENDIF MSWINDOWS}
   {$IFDEF LINUX}
-  {$Message Warning 'the mutex has not been implemeted yet on linux.'}
+  {$Message Warn 'the mutex has not been implemeted yet on linux.'}
   {$ENDIF LINUX}
 end;
 
@@ -466,7 +466,7 @@ begin
     RaiseLastOSError;
   {$ENDIF MSWINDOWS}
   {$IFDEF LINUX}
-  {$Message Warning 'the mutex has not been implemeted yet on linux.'}
+  {$Message Warn 'the mutex has not been implemeted yet on linux.'}
   {$ENDIF LINUX}
 end;
 
