@@ -6,6 +6,8 @@
 
 Description
 经过测试在DLL中使用FastMM或D2007以上版本可以互相访问代码段以及公用一个heap.
+the service function name and event name is full URI(includes the ServiceName):
+  ServiceName.FuncName
 
   License:
     * The contents of this file are released under a dual \license, and
@@ -60,7 +62,7 @@ const
   {$ENDIF}
 
   //MEAPI Info constants:
-  MEAPI_VER                = 0;        // the supports api protocaol version
+  MEAPI_VER                = 0;        // the supports api protocal version
   MEAPI_NAME               = 1;        // Service name
   MEAPI_TITLE              = 2;        // Service Title
   MEAPI_DESCRIPTION        = 3;        // Service Description
@@ -74,6 +76,7 @@ const
   MEID_PATH                = '/';
 
   MESRV_SYSTEM         = 'System';
+  //All Modules loaded notification event.
   MESRV_SYSTEM_MODULESLOADED    = MESRV_SYSTEM + '/OnModulesLoaded';
 
 

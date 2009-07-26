@@ -40,7 +40,7 @@ uses
   {$IFDEF MSWINDOWS}
   Windows,
   {$ENDIF MSWINDOWS}
-  SysUtils, Classes
+  SysUtils //, Classes
   , TypInfo
   , uMeObject
   , uMeProcType
@@ -66,7 +66,7 @@ type
   public
     destructor Destroy; virtual; {override}
 
-    function Initialize(AInitInfo: TNsmPluginInitInfo): Integer;
+    function Initialize(aInitInfo: TMeServiceInitInfo): Integer;
     function Terminate: Integer;
 
     function CreateService(const ServiceName: TMeIdentity): HMeService;
@@ -74,21 +74,22 @@ type
     //note: U must keep the object instance alive!!
     function CreateMethod(const aName: TMeIdentity; const aMethod: TMeServiceMethod): HMeServiceFunction;
     function GetService(const aName: TMeIdentity): HMeService;
-    function GetFunction(const aName: TMeIdentity): HMeService;
-    function CallService(ServiceHandle: HNsmService; wParam, lParam: Cardinal): Integer; overload;
-    function CallService(ServiceName: TMeIdentity; wParam, lParam: Cardinal): Integer; overload;
-    function CreateEvent(EventName: TMeIdentity): HMeEvent;
-    function GetEvent(EventName: TMeIdentity): HMeEvent;
-    function NotifyEvent(EventHandle: HMeEvent; wParam, lParam: Cardinal): Integer;
+    function GetFunction(const aName: TMeIdentity): HMeServiceFunction;
+    function Call(aFunctionHandle: HMeServiceFunction; wParam, lParam: Cardinal): Integer; overload;
+    function Call(aFunctionName: TMeIdentity; wParam, lParam: Cardinal): Integer; overload;
+    function CreateEvent(EventName: TMeIdentity): HMeServiceEvent;
+    function GetEvent(EventName: TMeIdentity): HMeServiceEvent;
+    function NotifyEvent(EventHandle: HMeServiceEvent; wParam, lParam: Cardinal): Integer;
     function HookEvent(const aEventName: TMeIdentity; const aProc: TMeServiceEventProc): Integer; overload;
     function HookEvent(const aEventName: TMeIdentity; const aMethod: TMeServiceEventMethod): Integer; overload;
     function UnHookEvent(const aEventName: TMeIdentity; const aProc: TMeServiceEventProc): Integer; overload;
     function UnHookEvent(const aEventName: TMeIdentity; const aMethod: TMeServiceEventMethod): Integer; overload;
   public
+    property Initialized: Boolean read FInitialized;
   end;
 
 function ServiceInfo(nInfoNo: Integer; lpBuffer: LPTSTR; nSize: Integer): Integer; stdcall;
-function Initialize(lpPluginInitInfo: PNsmPluginInitInfo): Integer; stdcall;
+function Initialize(lpPluginInitInfo: PMeServiceInitInfo): Integer; stdcall;
 function Terminate: Integer; stdcall;
 
 
@@ -136,27 +137,36 @@ begin
     Result := 0;
 end;
 
-
-function Initialize(lpPluginInitInfo: PNsmPluginInitInfo): Integer; stdcall;
+function Initialize(lpPluginInitInfo: PMeServiceInitInfo): Integer; stdcall;
 begin
   Result := GPlugin.Initialize(lpPluginInitInfo^)
 end;
 
 function Terminate: Integer; stdcall;
 begin
-  if GPlugin.Initialized then
+  if GPlugin.FInitialized then
     Result := GPlugin.Terminate
   else
     Result := MEAPI_ERR_UNINITIALIZED;
 end;
 
 { TMePluginService }
-function TMePluginService.Initialize(AInitInfo: TNsmPluginInitInfo): Integer;
+procedure TMePluginService.Init; 
+begin
+  inherited;
+end;
+
+destructor TMePluginService.Destroy;
+begin
+  inherited;
+end;
+
+function TMePluginService.Initialize(aInitInfo: TMeServiceInitInfo): Integer;
 begin
   if not FInitialized then
   begin
     FInitialized := True;
-    FInitInfo := AInitInfo;
+    FInitInfo := aInitInfo;
     Result := DoInitialize;
   end
   else
@@ -185,18 +195,23 @@ begin
   Result := MEAPI_OK;
 end;
 
+procedure TMePluginService.DoAllModulesLoaded;
+begin
+end;
+
 function TMePluginService.CreateService(const ServiceName: TMeIdentity): HMeService;
 begin
-  Result := FInitInfo.CreateService(LPTSTR(ServiceName));
+  Result := FInitInfo.RegisterService(LPTSTR(ServiceName));
 end;
 
 function TMePluginService.OnAllModulesLoaded(const wParam, lParam, lResult: Cardinal): Integer; 
 begin
   DoAllModulesLoaded;
+  Result := 0;
 end;
 
 initialization
-  SetMeVirtualMethod(TypeOf(TMePluginService), ovtVmtParent, TMeAbstractService);
+  SetMeVirtualMethod(TypeOf(TMePluginService), ovtVmtParent, TypeOf(TMeAbstractService));
 
   {$IFDEF MeRTTI_SUPPORT}
   SetMeVirtualMethod(TypeOf(TMePluginService), ovtVmtClassName, nil);

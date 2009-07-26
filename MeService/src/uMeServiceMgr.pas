@@ -1,7 +1,7 @@
 {Summary The MeService Manager is an abstract Service Manager for the general SOA(service-oriented architecture) system framework.}
 {
    @author  Riceball LEE(riceballl@hotmail.com)
-   @version $Revision: 1.2 $
+   @version $Revision: 1.3 $
 
 Description
 
@@ -145,7 +145,7 @@ type
     function CreateEvent(aName: TMeIdentity): HMeServiceEvent;
     function GetEvent(aName: TMeIdentity): HMeServiceEvent;
     function NotifyEvent(const aHandle: HMeServiceEvent; const wParam, lParam: Cardinal): Integer;
-    {return 0 means failed.}
+    {return 0 means failed. the return is list index + 1}
     function HookEvent(aName: TMeIdentity; const ProcAddr: Pointer; const lpInstance: Pointer = nil): Integer;
     function UnhookEvent(aName: TMeIdentity; const ProcAddr: Pointer; const lpInstance: Pointer = nil): Integer;
 
@@ -161,7 +161,7 @@ function GetServiceInitInfo: TMeServiceInitInfo;
 implementation
 
 var
-  FMeServiceManager: PMeCustomServiceManager = nil; //NsmCom
+  FMeServiceManager: PMeCustomServiceManager = nil; 
 
 function GMeServiceManager: PMeCustomServiceManager;
 begin
@@ -323,7 +323,7 @@ begin
   vService := FindService(vServiceName);
   if Assigned(vService) then
   begin
-    Result := HMeServiceFunction(vService.RegisterEvent(aName));
+    Result := HMeServiceEvent(vService.RegisterEvent(aName));
   end
   else
     Result := 0;
@@ -331,21 +331,24 @@ end;
 
 function TMeCustomServiceManager.CreateService(const aName: TMeIdentity): HMeService;
 var
-  vService: PMeCustomService;
+  i: Integer;
 begin
   Result := 0;
   with FServices.LockList^ do
   try
-    for Result := 0 to Count - 1 do
+    for i := 0 to Count - 1 do
     begin
-      vService := PMeCustomService(Items[Result]);
-      if Assigned(vService) and (vService.Name = aName) then
-        exit;
+      Result := HMeService(Items[i]);
+      if (Result <> 0) and (PMeCustomService(Result).Name = aName) then
+	  begin
+        Result := 0;
+		exit;
+      end;
     end;
-    vService := PMeCustomService(NewMeObject(ServiceClass));
-    vService.Name := aName;
-    Add(vService);
-    Result := HMeService(vService);
+    Result := HMeService(NewMeObject(ServiceClass));
+    PMeCustomService(Result).Name := aName;
+    Add(PMeCustomService(Result));
+    //Result := HMeService(vService);
   finally
     FServices.UnLockList;
   end;
@@ -447,11 +450,14 @@ var
 begin
   with FServices.LockList^ do
   try
-    for Result := 0 to Count - 1 do
+    Result := 0;
+    while Result < Count do
+    //for Result := 0 to Count - 1 do
     begin
       vService := PMeCustomService(Items[Result]);
       if Assigned(vService) and (vService.Name = aServiceName) then
         exit;
+	  Inc(Result);  
     end;
   finally
     FServices.UnLockList;
