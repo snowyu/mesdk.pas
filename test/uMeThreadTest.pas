@@ -272,10 +272,17 @@ begin
 end;
 
 { TTest_MeThreadMgr }
+type
+  TMeThreadMgrAccess = object(TMeThreadMgr) end;
+  PMeThreadMgrAccess = ^ TMeThreadMgrAccess;
+  TMeThreadMgrTaskAccess = object(TMeThreadMgrTask) end;
+  PMeThreadMgrTaskAccess = ^ TMeThreadMgrTaskAccess;
+
 procedure TTest_MeThreadMgr.SetUp;
 begin
   //FThreadMgr := New(PMeThread, Create(New(PMeThreadMgrTask, Create)));
   FThreadMgr := New(PMeThreadMgr, Create);
+  PMeThreadMgrTaskAccess(PMeThreadMgrAccess(FThreadMgr)^.GetTask).FFreeTask := false;
   {$IFDEF NamedThread}
   FThreadMgr.Name := 'ThreadMgr';
   {$ENDIF}
@@ -288,8 +295,8 @@ end;
 
 procedure TTest_MeThreadMgr.Test_Run();
 var
-  i : Integer;
-  vTask: PMyTask;
+  i,j : Integer;
+  vTask: array [1..3] of PMyTask;
   //vMgr: PMeThreadMgrTask;
 begin
   //vMgr := PMeThreadMgrTask(FThreadMgr.Task);
@@ -297,11 +304,11 @@ begin
   FThreadMgr.Start;
   for i := 1 to 3 do
   begin
-    New(vTask, Create);
-    vTask.Id := i;
-    vTask.Count := i;
+    New(vTask[i], Create);
+    vTask[i].Id := i;
+    vTask[i].Count := i;
     //vMgr.Add(vTask);
-    FThreadMgr.AddTask(vTask);
+    FThreadMgr.AddTask(vTask[i]);
   end;
   //Writeln('Run....');
   //while vMgr.TaskQueue.Count > 0 do
@@ -312,6 +319,16 @@ begin
     Application.ProcessMessages; //}
 
   FThreadMgr.TerminateAndWaitFor;
+  for i := 1 to 3 do
+  begin
+    //vTask[i].Id := i;
+    //vTask[i].Count := i;
+	CheckEquals(i, vTask[i].Id, 'vTask['+IntToStr(i)+'].Id mismatch');
+	//CheckEquals(i+3000 div 100, vTask[i].count, 'vTask['+IntToStr(i)+'].Count mismatch');
+	j := i+3000 div 100;
+	Check((vTask[i].count in [j-2..j+2]), 'vTask['+IntToStr(i)+'].Count not within [' +intToStr(j-2)+ '..'+IntToStr(j+2)+'] err count:'+IntToSTR(vTask[i].count));
+	vTask[i].Free;
+  end;
 end;
 
 Initialization
