@@ -377,9 +377,8 @@ var
   vS, vS1: string;
   vObj: TTestPropObj;
 begin
-  vS := ClassName;
-  i :=Pos('_', vS);
-  vS := Copy(vS, i+1, MaxInt);
+  i :=Pos('_', ClassName);
+  vS := Copy(ClassName, i+1, MaxInt);
   {$IFDEF Debug_WriteToConsole_Support}
   Status(' Check '+ vS +' Test_AddToProperty');
   {$ENDIF}
@@ -417,6 +416,7 @@ begin
     end;
     //CheckEquals(vS, RunResult, 'the Run Result mismatch!');
   finally
+    //FInterceptorClass.RemoveFrom(@TTestPropObj.GetName);
     FInterceptorClass.RemoveFrom(TTestPropObj, @TTestPropObj.GetName);
     FInterceptorClass.RemoveFrom(TTestPropObj, @TTestPropObj.SetName);
   end;
