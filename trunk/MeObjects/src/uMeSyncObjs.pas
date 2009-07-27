@@ -14,7 +14,7 @@
     * The Original Code is $RCSfile: uMeSyncObjs.pas,v $.
     * The Initial Developers of the Original Code are Borland.
     * Portions created by Borland is Copyright (C) 1995-2007
-    * Portions created by Riceball LEE is Copyright (C) 2008
+    * Portions created by Riceball LEE is Copyright (C) 2008-2009
     * All rights reserved.
 
     * Contributor(s):
