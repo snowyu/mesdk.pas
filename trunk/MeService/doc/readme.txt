@@ -1,8 +1,15 @@
 The MeService Library is a mini general SOA(service-oriented architecture) system framework
 
-
 Purpose:
-  1. Fast and Small Service Library
+  1. Fast and Small 
+  2. Mini Remote Service Library
+  3. Mini Local Plugin(DLL) Library
+
+Vocatons(词汇表):
+Host:
+Service:
+Plugin: the plugin is a special local service for DLL.
+System Plugin: 
 
 the unit Levels:
 
@@ -11,8 +18,8 @@ uMeServiceTypes
     uMeServiceMgr
       uMePluginMgr
     uMePlugin : the plugin features implement in it(for Delphi object).
-      DLL 插件必须 export 3 个函数: ServiceInfo, InitializeService,  TerminateService
-      One DLL means one plugin only.
+      DLL plugin MUST export 3 funcions: ServiceInfo, InitializeService,  TerminateService
+      One DLL means one plugin ONLY.
 
 plugin flowchart(流程):
   Host Load System Plugin via LoadFromDLL check three functions whether exists.

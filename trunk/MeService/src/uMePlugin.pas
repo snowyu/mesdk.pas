@@ -204,6 +204,15 @@ begin
   Result := FInitInfo.RegisterService(LPTSTR(ServiceName));
 end;
 
+function TMePluginService.CreateFunction(const aName: TMeIdentity; const aProc: TMeServiceFunctionProc): HMeServiceFunction;
+begin
+  Result := FInitInfo.RegisterFunction(LPTSTR(aName), Addr(aProc));
+end;
+
+function TMePluginService.CreateMethod(const aName: TMeIdentity; const aMethod: TMeServiceMethod): HMeServiceFunction;
+begin
+end;
+
 function TMePluginService.OnAllModulesLoaded(const wParam, lParam, lResult: Cardinal): Integer; 
 begin
   DoAllModulesLoaded;
