@@ -34,6 +34,7 @@ type
   TTest_MeCustomService = class(TTest_MeAbstractService)
   protected
     procedure Setup;override;
+	function SubTest(const a, b: integer): integer;
   public
   published
     procedure Test_RegisterFunction;
@@ -57,6 +58,13 @@ type
   TMeServiceAccess = object(TMeCustomService)
   end;
 
+function TTest_MeCustomService.SubTest(const a, b: integer): integer;
+begin
+ status('1ok');
+   Result := a - b;
+  CheckEquals(a, Integer(@self), ' the sub method owner is not match.');
+end;
+
 procedure TTest_MeCustomService.Test_RegisterFunction();
 var
   vFunc: PMeServiceFunction;
@@ -72,7 +80,24 @@ begin
   
     {$IFDEF SUPPORTS_MESERVICE_CALLEX}
     vFunc.ExecuteByVariant(VarArrayOf([a,b]));
-    CheckEquals(a+b, vFunc.ResultParam.AsInteger, ' the function add result error.');
+    CheckEquals(a+b, vFunc.ResultParam.AsInteger, ' the callex function add result error.');
+    {$ENDIF}
+  end;
+  vFunc := PMeServiceAccess(FService).RegisterFunction('sub', @TTest_MeCustomService.SubTest, TypeInfo(TAddProc), @self);
+  Check(Assigned(vFunc),  ' the sub vfunc is nil.');
+  
+  for i := 0 to 9 do
+  begin
+    a := Integer(@self);
+    b := Random(MaxInt);
+  status(inttostr(i));
+    vFunc.ExecuteByArray([a,b]);
+  status('ok');
+    CheckEquals(a-b, vFunc.ResultParam.Value, ' the function sub result error.');
+  
+    {$IFDEF SUPPORTS_MESERVICE_CALLEX}
+    vFunc.ExecuteByVariant(VarArrayOf([a,b]));
+    CheckEquals(a-b, vFunc.ResultParam.AsInteger, ' the callex function sub result error.');
     {$ENDIF}
   end;
 end;
