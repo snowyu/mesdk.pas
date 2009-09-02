@@ -108,10 +108,10 @@ end;
 
 function TMePluginInfo.GetInfoEx(InfoNo: Integer): AnsiString;
 var
-  buf: array[0..255] of Char;
+  vBuf: array[0..255] of Char;
 begin
-  if GetInfo(InfoNo, buf, SizeOf(buf)) > 0 then
-    Result := buf
+  if GetInfo(InfoNo, vBuf, SizeOf(vBuf)) > 0 then
+    Result := vBuf
   else
     Result := '';
 end;
@@ -154,8 +154,11 @@ begin
   end;
 
   if Result then 
-    for i := MEAPI_INFO_FIRST to MEAPI_INFO_LAST do
+  begin
+    Result := Initialize(Addr(PMePluginManager(GMeServiceManager).FServiceInitInfo)) = MEAPI_OK;
+	if result then for i := MEAPI_INFO_FIRST to MEAPI_INFO_LAST do
       FInfo[i] := GetInfoEx(i);
+  end;
 end;
 
 { TMePluginManager }

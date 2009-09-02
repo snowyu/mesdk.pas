@@ -112,7 +112,8 @@ type
   { this is the singleton }
   TMeCustomServiceManager = object(TMeDynamicObject)
   protected
-    FServices: PMeThreadSafeList; 
+    FServices: PMeThreadSafeList;
+	FServiceInitInfo: TMeServiceInitInfo;
 
     procedure Init; virtual; //override
     class function ServiceClass: TMeClass; virtual;
@@ -151,6 +152,7 @@ type
 
     //the service count
     property Count: Integer read GetCount;
+	property ServiceInitInfo: TMeServiceInitInfo read FServiceInitInfo;
   end;
 
 function GMeServiceManager: PMeCustomServiceManager;
@@ -257,6 +259,7 @@ procedure TMeCustomServiceManager.Init;
 begin
   inherited;
   New(FServices, Create);
+  FServiceInitInfo := GetServiceInitInfo();
 end;
 
 destructor TMeCustomServiceManager.Destroy;
