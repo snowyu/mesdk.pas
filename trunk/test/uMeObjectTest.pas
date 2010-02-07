@@ -168,7 +168,8 @@ End;
 procedure TTest_MeObject.CreateMeObject;
 begin
   FMeObject := New(PMeDynamicObject, Create);
-{$IFDEF MeRTTI_SUPPORT}
+  CheckEquals(Integer(TypeOf(TMeDynamicObject)), Integer(FMeObject.ClassType), 'the DynamicObject Type is not match..');
+ {$IFDEF MeRTTI_SUPPORT}
   CheckObjectClassName;
 {$ENDIF}
 end;
@@ -177,7 +178,6 @@ end;
 procedure TTest_MeObject.CheckObjectClassName;
 begin
   CheckEquals('TMeDynamicObject', FMeObject.ClassName, 'the MeObject classname is mismatch.');
-  
   //CheckEquals(Integer(FMeObject), Integer(FindMeObject('TMeDynamicObject')), 'the FindMeObject is Error.');
 end;
 {$ENDIF}
@@ -224,8 +224,10 @@ var
   i: Integer;
 begin
   CheckEquals(Integer(TypeOf(FMeObject^)), Integer(FMeObject.ClassType), 'the VMT Address is mismatch.');
+  {$IFDEF BORLAND}
   i := PInteger(Integer(FMeObject.ClassType) + ovtVMTAddress)^;
   CheckEquals(Integer(FMeObject.ClassType), i, 'the VMT Offset address is mismatch.');
+  {$ENDIF BORLAND}
   i := PInteger(Integer(FMeObject.ClassType) + ovtInstanceSize)^;
   CheckEquals(SizeOf(FMeObject^), i, 'the VMT instance Size address is mismatch.');
 end;
@@ -511,14 +513,16 @@ begin
 end;
 
 procedure TTest_MeStrings.Test_LoadSave;
+const
+  cFileName = {$IFDEF UNIX} 'dat/strings.txt' {$ELSE}'dat\strings.txt'{$ENDIF};
 begin
   TestClear;
   TestAdd;
   with PMeStrings(FMeObject)^ do
   begin
-    SaveToFile('dat\strings.txt');
+    SaveToFile(cFileName);
     Clear;
-    LoadFromFile('dat\strings.txt');
+    LoadFromFile(cFileName);
   end;
   TestAddCheck;
 end;
