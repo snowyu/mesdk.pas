@@ -55,13 +55,13 @@ uses
   {$IFDEF Borland}
   , TestFramework
   , TestExtensions
-  {$IFDEF LINUX}
+   {$IFDEF LINUX}
   , QGUITestRunner
-  {$ELSE}
+   {$ELSE}
   , GUITestRunner
-  {$ENDIF}
+   {$ENDIF}
   , TextTestRunner
-  {$ENDIF}
+   {$ENDIF BORLAND}
   {$IFDEF FPC}
     , custapp
     , fpcunit
@@ -86,7 +86,6 @@ uses
   , uMeInterceptorTest
   , uMeFeature
   , uMeEventFeatureTest
-  {$ENDIF}
   , uMeScriptTest
   , uMeURITest
   , uMeSysUtilsTest
@@ -94,6 +93,7 @@ uses
   , uRegExprTest
   , uMeServiceTest
   , uMeServiceMgrTest
+  {$ENDIF}
   ;
 
 
@@ -157,7 +157,7 @@ begin
   if HasOption('h', 'help') or (ParamCount = 0) then
   begin
     writeln(Title);
-    writeln(Version);
+    //writeln(Version);
     writeln('Usage: ');
     writeln('-l or --list to show a list of registered tests');
     writeln('default format is xml, add --format=latex to output the list as latex source');
@@ -213,7 +213,7 @@ begin
   App.Free;
 end.
 
-{$ENDIF}
+{$ENDIF FPC}
 
 {$IFDEF Borland}
 { NOTE:
@@ -251,10 +251,10 @@ begin
     {$IFDEF LINUX}
     TGUITestRunner.RunRegisteredTests;
     {$ELSE}
-     	{$IFDEF BORLAND}
+     	{ .$IFDEF BORLAND}
     GUITestRunner.RunRegisteredTests;
-      {$ENDIF}
+      { .$ENDIF}
     {$ENDIF}
   end;
 end.
-{$ENDIF}
+{$ENDIF BORLAND}
