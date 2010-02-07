@@ -499,7 +499,7 @@ type
   protected
     FDefined: TStringsDefined;
     FDelimiter: AnsiChar;
-    FLineBreak: String[2];
+    FLineBreak: array [0..1] of AnsiChar;
     FQuoteChar: AnsiChar;
     FNameValueSeparator: AnsiChar;
     FStrictDelimiter: Boolean;

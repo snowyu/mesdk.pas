@@ -52,7 +52,7 @@ end;
     * rights and limitations under the \license.
     * The Original Code is $RCSfile: uMeTypes.pas,v $.
     * The Initial Developers of the Original Code are Riceball LEE.
-    * Portions created by Riceball LEE is Copyright (C) 2006-2008
+    * Portions created by Riceball LEE is Copyright (C) 2006-2010
     * All rights reserved.
 
     * Contributor(s):
@@ -87,10 +87,10 @@ type
 
   TMePropertySpecifier = (mpsGet, mpsSet, mpsStored);
   TMePropertySpecifiers = set of TMePropertySpecifier;
-  {: 最基本的类型}
+  {: the most basis types 最基本的类型}
   {
-    @param mtkLString Long String
-    @param mtkString  Short String
+    @param mtkLString Long AnsiString
+    @param mtkString  Short AnsiString
     @param mtkQWord   8 bytes
     @param mtkClass   the class type
     @param mtkObject  the object type
@@ -126,7 +126,7 @@ type
           mtkInteger:    (VInteger: Longint);
           //mtkSet:        (VSet: Byte);
           mtkLString:    (VAnsiString: Pointer);
-          mtkChar:       (VChar: Char);
+          mtkChar:       (VChar: AnsiChar);
           mtkWString:    (VWideString: Pointer);
           mtkString:     (VString: PShortString);
           mtkPointer:    (VPointer: Pointer);
@@ -159,7 +159,7 @@ type
 
 
   PMeIdentityString = ^TMeIdentityString;
-  TMeIdentityString = String;//String[cMaxIdentityNameLen];
+  TMeIdentityString = AnsiString;//AnsiString[cMaxIdentityNameLen];
 
   PMeRegisteredTypes = ^TMeRegisteredTypes;
   PPMeType = ^PMeType;
@@ -323,8 +323,8 @@ type
   protected
     procedure Init;virtual;
     procedure AssignFromTypeData(aTypeData: PTypeData);virtual;
-    function GetEnumValue(const aName: string): Integer;
-    function GetEnumName(Value: Integer): String;
+    function GetEnumValue(const aName: AnsiString): Integer;
+    function GetEnumName(Value: Integer): AnsiString;
     //function GetEnumUnitName: ShortString;
   public
     destructor Destroy; virtual;
@@ -335,8 +335,8 @@ type
   public
     Property BaseType: PMeType read FBaseType;
     Property NameList: PMeStrings read FNameList;
-    Property EnumName[Index: Longint]: String read GetEnumName;
-    Property EnumValue[const Name: string]: Integer read GetEnumValue;
+    Property EnumName[Index: Longint]: AnsiString read GetEnumName;
+    Property EnumValue[const Name: AnsiString]: Integer read GetEnumValue;
     //Property EnumUnitName: ShortString read GetEnumUnitName;
   end;
 
@@ -531,7 +531,7 @@ function IsRequiredAlignMem(const aType: PMeType): Boolean;
 
 
 procedure RegisterClass(const aClass: TClass);
-function FindClass(const aClassName: string): TClass;
+function FindClass(const aClassName: AnsiString): TClass;
 
 const
   cEmptyMeVar: TMeVarRec = (VInt64s:(0,0));
@@ -558,7 +558,7 @@ begin
   Result := FRegisteredClasses;
 end;
 
-function FindClass(const aClassName: string): TClass;
+function FindClass(const aClassName: AnsiString): TClass;
 var
   i: Integer;
 begin
@@ -1595,13 +1595,13 @@ begin
   Result := FNameList.Count; //FMaxValue - FMinValue + 1;
 end;
 
-function TMeEnumerationType.GetEnumValue(const aName: string): Integer;
+function TMeEnumerationType.GetEnumValue(const aName: AnsiString): Integer;
 begin
   Result := FNameList.IndexOf(aName);
   if (Result <> -1) then Result := FNameList.Objects[Result];
 end;
 
-function TMeEnumerationType.GetEnumName(Value: Integer): String;
+function TMeEnumerationType.GetEnumName(Value: Integer): AnsiString;
 begin
   if not FIsCustomValue then
     Value := Value - FMinValue
@@ -1720,7 +1720,7 @@ procedure TMeRecordType.LoadFromStream(const aStream: TStream; aOnLoadType: TMeT
 var
   i: Integer;
   Len, L: Integer;
-  vFieldName: string;
+  vFieldName: AnsiString;
   vFieldType: PMeType;
 begin
   inherited LoadFromStream(aStream, aOnLoadType);
@@ -1931,11 +1931,11 @@ begin
     RegisterTypeInfo(Typeinfo(Byte));
     RegisterTypeInfo(Typeinfo(Word));
     RegisterTypeInfo(Typeinfo(Int64));
-    RegisterTypeInfo(Typeinfo(String));
+    RegisterTypeInfo(Typeinfo(AnsiString));
     RegisterTypeInfo(Typeinfo(ShortString));
     RegisterTypeInfo(Typeinfo(WideString));
     RegisterTypeInfo(Typeinfo(WideChar));
-    RegisterTypeInfo(Typeinfo(Char));
+    RegisterTypeInfo(Typeinfo(AnsiChar));
   
     RegisterTypeInfo(Typeinfo(Real));
     RegisterTypeInfo(Typeinfo(Single));
@@ -1997,7 +1997,6 @@ initialization
 
 
   {$IFDEF MeRTTI_SUPPORT}
-  //Make the ovtVmtClassName point to PShortString class name
   SetMeVirtualMethod(TypeOf(TMeClassType), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeFloatType), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeInt64Type), ovtVmtClassName, nil);
