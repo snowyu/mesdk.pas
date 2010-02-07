@@ -49,7 +49,7 @@ About the Property of object:
   (the VMT record must be filled first!!)
 
 
-需要废弃Exception Class 使用自己的 MeExceptionObject??
+Do we need abondon the Exception Class to make a new MeExceptionObject??
 No, use the EMeError instead of create new Exception Class.
 All Object use the EMeError class only!
 
@@ -83,9 +83,10 @@ uses
   Windows, 
   {$ENDIF MSWINDOWS}
   SysUtils
-  , TypInfo
+ // , TypInfo
   , uMeConsts
-  , uMeSystem
+  , uMeException
+  //, uMeSystem
   {$IFDEF DEBUG}
   , DbugIntf
   {$ENDIF}
@@ -93,6 +94,7 @@ uses
 
 {
 NOTE:
+  The Object Type CAN NOT USE the CLASS Method. So...
   Dont use TypeOf() get the VMT address of the object instance, the VMT address is always the first field in the TMeDynamicObject!!
   and SizeOf() can not used!! use the TMeClass to cast!
   
@@ -102,10 +104,11 @@ NOTE:
   in my TMeDynamicObject the ovtVmtPtrOffs is always 0, so i decide use it as ovtVmtParent. It's impossible, if i change the program will be raise critical error.
 }
 const
+{$IFDEF BORLAND}
   //## VMT offset
   ovtVMTAddress   = -12;  { keep the VMT address. here means the address of the ovtVMTInit }
   ovtInstanceSize = -8;   { instance size in OBJECTs    }
-  //in my TMeDynamicObject the ovtVmtPtrOffs is always 0, so i decide use it as ovtVmtParent. It's impossible, if i change the program will be raise critical error.
+  //in my TMeDynamicObject the ovtVmtPtrOffs is always 0, so i decide use it as ovtVmtParent. Its impossible, if i change the program will be raise critical error.
   ovtVmtPtrOffs   = -4;   { the VMTPtr offset in the instance. It always is 0.}
   ovtVmtParent    = 8;    { point to the VMT of parent object if any }
   ovtVmtInit      = 0;    { the Init virtual method entry.}
@@ -113,8 +116,10 @@ const
   {$IFDEF MeRTTI_SUPPORT}
   ovtVmtClassName = 12;    { the class name PShortString. }
   {$ENDIF}
+{$ENDIF}
+{$IFDEF FPC}
 {
-FPC:
+FPC: ./rtl/inc/objects.pp:
    VMT=RECORD
      Size,NegSize:Longint;
      ParentLink:PVMT;
@@ -123,6 +128,12 @@ FPC:
        vmtInstanceSize         = 0;
        vmtParent               = sizeof(ptrint)*2;
 }
+  ovtInstanceSize         = 0;
+  ovtVmtParent               = sizeof(ptrint)*2;
+  {$IFDEF MeRTTI_SUPPORT}
+  ovtVmtClassName = 12;    { the class name PAnsiChar. }
+  {$ENDIF}
+{$ENDIF}
 
   MaxListSize = Maxint div SizeOf(Pointer);
 
@@ -147,7 +158,7 @@ type
     Destroy: Pointer;
     ParentClass: TMeClass;
   {$IFDEF MeRTTI_SUPPORT}
-    ClassName: PChar;
+    ClassName: PAnsiChar;
   {$ENDIF}
   end;
 
@@ -200,18 +211,19 @@ type
     { if it is the MeObject then the parent is nil.
       it should be a class method but....
     }
-    class function ClassParent: TMeClass;
+    function ClassParent: TMeClass;
     {Summary the address of virtual methods table of object.}
     { NOTE: you MUST call the constructor first before use.
     }
+    {$IFDEF BORLAND}
     {$IFDEF Delphi_ObjectTypeClassMethod_BUG}
     class
-    {$ENDIF}
-    function ClassType: TMeClass;
+    {$ENDIF}function ClassType: TMeClass; {$ENDIF BORLAND}
+    {$IFDEF FPC}function ClassType: TMeClass;{$ENDIF FPC} 
     {Summary the size of the object instance.}
     { NOTE: you MUST call the constructor first before use, or you can use SizeOf(TMeDynamicObject), it is same.
     }
-    class function InstanceSize: Integer;
+    function InstanceSize: Integer;
     {Summary Determines the relationship of two object types.}
     {
     Use InheritsFrom to determine if a particular class type or object is an instance of a class or one of its descendants.
@@ -221,11 +233,12 @@ type
       TMeList.InheritsFrom(TypeOf(TMeContainer));
       TMeList.InheritsFrom(TypeOf(TMeDynamicObject));
     }
-    class function InheritsFrom(aClass: TMeClass): Boolean;
+    function InheritsFrom(aClass: TMeClass): Boolean;
     {$IFDEF MeRTTI_SUPPORT}
-    class function ClassName: PChar;
+    function ClassName: PAnsiChar;
     {$ENDIF}
   protected
+    {$IFDEF BORLAND}
     class function ParentClassAddress: TMeClass;virtual;abstract;
     {$IFDEF MeRTTI_SUPPORT}
     {the VMT is the ClassName PShortString address: @ClassNameAddress = PShortString.
@@ -233,8 +246,9 @@ type
      NOTE: If you wanna create a new MeClass in Delphi, you should update the VMT like this:
      see initialization section!!
     }
-    class function ClassNameAddress: PChar;virtual;abstract;
+    class function ClassNameAddress: PAnsiChar;virtual;abstract;
     {$ENDIF}
+    {$ENDIF BORLAND}
   end;
 
   {Summary the abstract dynamic object --- the mini-class. }
@@ -308,7 +322,7 @@ type
     destructor Destroy; virtual;
     { Summary Increments the reference count for this instance and returns the new reference count.}
     function AddRef: Integer;
-     {Summary Decrements reference count for this instance.
+    {Summary Decrements reference count for this instance.
 
       If it is becoming <0, and Free
         method was already called, object is (self-) destroyed. Otherwise,
@@ -325,7 +339,7 @@ type
         do it immediately BEFORE call of last Release (to avoid situation,
         when object is released in result of Release, and attempt to
         destroy it follow leads to AV exception).
-     }
+    }
     function Release: Integer;
 
 
@@ -333,8 +347,7 @@ type
     { Description 
       that means this obj is relying on it. the objects in the the DependentList will be free
        when the it is destroyed. 
-       
-       表明 Obj 依赖于自己. 当自己被释放后, Obj 也将会被释放.
+              
     }
     procedure AddDependent(Obj: PMeDynamicObject);
     {Summary This Notification Proc will be executed before the object is free. }
@@ -354,7 +367,7 @@ type
   protected
     FCount: Integer;
   public
-    class procedure Error(const Msg: string; Data: Integer);overload;
+    class procedure Error(const Msg: AnsiString; Data: Integer);overload;
     class procedure Error(Msg: PResStringRec; Data: Integer);overload;
   public
     property Count: Integer read FCount write FCount;
@@ -439,9 +452,9 @@ type
     {Summary Adds a list of items given by a dynamic array. }
     procedure AddItems(const aItems: array of Pointer);
     {$ENDIF}
-    procedure LoadFromFile(const FileName: string);
+    procedure LoadFromFile(const FileName: AnsiString);
     procedure LoadFromStream(const aStream: PMeStream);
-    procedure SaveToFile(const FileName: string);
+    procedure SaveToFile(const FileName: AnsiString);
     procedure SaveToStream(const aStream: PMeStream);
   public
     {Summary Returns count of items in the list. It is possible to delete a number
@@ -479,42 +492,42 @@ type
     function GetItemLen(Idx: Integer): Integer;
     function GetObject(Idx: Integer): LongWord;
     procedure SetObject(Idx: Integer; const Value: LongWord);
-    function GetValue(AName: PChar): PChar;
-    function GetName(const Index: Integer): string;
+    function GetValue(AName: PAnsiChar): PAnsiChar;
+    function GetName(const Index: Integer): AnsiString;
   protected
     procedure Init; virtual; {override}
   protected
     FDefined: TStringsDefined;
-    FDelimiter: Char;
-    FLineBreak: string[2];
-    FQuoteChar: Char;
-    FNameValueSeparator: Char;
+    FDelimiter: AnsiChar;
+    FLineBreak: String[2];
+    FQuoteChar: AnsiChar;
+    FNameValueSeparator: AnsiChar;
     FStrictDelimiter: Boolean;
     FList: PMeList;
     FCaseSensitiveSort: Boolean;
-    FTextBuf: PChar;
+    FTextBuf: PAnsiChar;
     FTextSize: LongWord;
     FUsedSize: LongWord;
   protected
     procedure ProvideSpace( AddSize: LongWord );
-    function Get(Idx: integer): string;
-    function GetTextStr: string;
-    procedure Put(Idx: integer; const Value: string);
-    procedure SetTextStr(const Value: string);
-    function GetPChars( Idx: Integer ): PChar;
+    function Get(Idx: integer): AnsiString;
+    function GetTextStr: AnsiString;
+    procedure Put(Idx: integer; const Value: AnsiString);
+    procedure SetTextStr(const Value: AnsiString);
+    function GetPChars( Idx: Integer ): PAnsiChar;
     function GetStrictDelimiter: Boolean;
     procedure SetStrictDelimiter(const Value: Boolean);
 
+ public
     destructor Destroy; virtual;(*override;*)
-  public
-    {Summary Adds Ansi String to a list. }
-    function Add(const S: String): Integer;
-    {Summary Adds Ansi String and correspondent object to a list. }
-    function AddObject(const S: String; Obj: LongWord): Integer;
-    {Summary Adds a string to list. }
-    function AddPChar(S: PChar): integer;
-    {Summary Adds a string to list. The string can contain #0 characters. }
-    function AddPCharLen(S: PChar; Len: Integer): integer;
+    {Summary Adds Ansi AnsiString to a list. }
+    function Add(const S: AnsiString): Integer;
+    {Summary Adds Ansi AnsiString and correspondent object to a list. }
+    function AddObject(const S: AnsiString; Obj: LongWord): Integer;
+    {Summary Adds a AnsiString to list. }
+    function AddPChar(S: PAnsiChar): integer;
+    {Summary Adds a AnsiString to list. The AnsiString can contain #0 characters. }
+    function AddPCharLen(S: PAnsiChar; Len: Integer): integer;
     {Summary Adds a group of strings to the list}
     {
     Call AddStrings to add the strings from another TStrings object to the list. If both the source and destination TStrings objects support objects associated with their strings, references to the associated objects will be added as well.
@@ -528,97 +541,97 @@ type
     strings, or if the order of the strings in the two lists differ.
     }
     function Equals(Strings: PMeStrings): Boolean;
-    procedure LoadFromFile(const FileName: string);
+    procedure LoadFromFile(const FileName: AnsiString);
     procedure LoadFromStream(const aStream: PMeStream);
-    procedure SaveToFile(const FileName: string);
+    procedure SaveToFile(const FileName: AnsiString);
     procedure SaveToStream(const aStream: PMeStream);
   public
-    {Summary Makes string list empty. }
+    {Summary Makes AnsiString list empty. }
     procedure Clear;
-    {Summary Deletes string with given index (it *must* exist). }
+    {Summary Deletes AnsiString with given index (it *must* exist). }
     procedure Delete(Idx: integer);
-    {Summary Returns index of first string, equal to given one. }
-    function IndexOf(const S: string): integer;
+    {Summary Returns index of first AnsiString, equal to given one. }
+    function IndexOf(const S: AnsiString): integer;
     {Summary Returns index of object, equal to given one. }
     function IndexOfObject(const aObj: LongWord): integer;
-    {Summary Returns index of first string, equal to given one (while comparing it
+    {Summary Returns index of first AnsiString, equal to given one (while comparing it
        without case sensitivity). }
-    function IndexOf_NoCase(const S: string): integer;
-    {Summary Returns index of first string, equal to given one (while comparing it
+    function IndexOf_NoCase(const S: AnsiString): integer;
+    {Summary Returns index of first AnsiString, equal to given one (while comparing it
        without case sensitivity). }
-    function IndexOfStrL_NoCase( Str: PChar; L: Integer ): integer;
-    {Summary Searches string starting from 'AName=' in string list like ini-file. }
-    function IndexOfName(AName: PChar): Integer;
-    {Summary Returns Index of the first string, equal or greater to given pattern, but
-       works only for sorted TMeStrings object. Returns TRUE if exact string found,
-       otherwise nearest (greater then a pattern) string index is returned,
+    function IndexOfStrL_NoCase( Str: PAnsiChar; L: Integer ): integer;
+    {Summary Searches AnsiString starting from 'AName=' in AnsiString list like ini-file. }
+    function IndexOfName(AName: PAnsiChar): Integer;
+    {Summary Returns Index of the first AnsiString, equal or greater to given pattern, but
+       works only for sorted TMeStrings object. Returns TRUE if exact AnsiString found,
+       otherwise nearest (greater then a pattern) AnsiString index is returned,
        and the result is FALSE. }
-    function Find(const S: String; var Index: Integer): Boolean;
-    {Summary Inserts ANSI string before one with given index. }
-    procedure Insert(Idx: integer; const S: String);
-    {Summary Inserts ANSI string before one with given index. }
-    procedure InsertObject(Idx: integer; const S: String; Obj: LongWord);
-    {Summary Inserts string before one with given index. }
-    procedure InsertPChar(Idx: integer; S: PChar);
-    {Summary Inserts string from given PChar. It can contain #0 characters. }
-    procedure InsertPCharLen( Idx: Integer; S: PChar; Len: Integer );
-    {Summary Moves string to another location. }
+    function Find(const S: AnsiString; var Index: Integer): Boolean;
+    {Summary Inserts ANSI AnsiString before one with given index. }
+    procedure Insert(Idx: integer; const S: AnsiString);
+    {Summary Inserts ANSI AnsiString before one with given index. }
+    procedure InsertObject(Idx: integer; const S: AnsiString; Obj: LongWord);
+    {Summary Inserts AnsiString before one with given index. }
+    procedure InsertPChar(Idx: integer; S: PAnsiChar);
+    {Summary Inserts AnsiString from given PAnsiChar. It can contain #0 characters. }
+    procedure InsertPCharLen( Idx: Integer; S: PAnsiChar; Len: Integer );
+    {Summary Moves AnsiString to another location. }
     procedure Move(CurIndex, NewIndex: integer);
-    {Summary Allows to set strings of string list from given string (in which
+    {Summary Allows to set strings of AnsiString list from given AnsiString (in which
        strings are separated by $0D,$0A or $0D characters). Text can
        contain #0 characters. Works very fast. This method is used in
        all others, working with text arrays (LoadFromFile, MergeFromFile,
        Assign, AddStrings). }
-    procedure SetText(const S: string; Append2List: boolean);
-    {Summary Last item (or '', if string list is empty). }
-    function Last: String;
+    procedure SetText(const S: AnsiString; Append2List: boolean);
+    {Summary Last item (or '', if AnsiString list is empty). }
+    function Last: AnsiString;
     {Summary Swaps to strings with given indeces. }
     procedure Swap(Idx1, Idx2 : Integer);
-    {Summary Call it to sort string list. }
+    {Summary Call it to sort AnsiString list. }
     procedure Sort(CaseSensitive: Boolean);
   public
-    procedure AddDelimitedText(const Value: string; aDelimiter: Char = #0);
-    {Summary Adds string S (null-terminated) with associated object Obj. }
-    function AddPCharObject(S: PChar; Obj: LongWord): Integer;
-    {Summary Adds string S of length Len with associated object Obj. }
-    function AddObjectLen(S: PChar; Len: Integer; Obj: LongWord): Integer;
-    {Summary Inserts string S (null-terminated) at position Idx in the list,
+    procedure AddDelimitedText(const Value: AnsiString; aDelimiter: AnsiChar = #0);
+    {Summary Adds AnsiString S (null-terminated) with associated object Obj. }
+    function AddPCharObject(S: PAnsiChar; Obj: LongWord): Integer;
+    {Summary Adds AnsiString S of length Len with associated object Obj. }
+    function AddObjectLen(S: PAnsiChar; Len: Integer; Obj: LongWord): Integer;
+    {Summary Inserts AnsiString S (null-terminated) at position Idx in the list,
        associating it with object Obj. }
-    procedure InsertPCharObject(Idx: Integer; S: PChar; Obj: LongWord);
-    {Summary Inserts string S of length Len at position Idx in the list,
+    procedure InsertPCharObject(Idx: Integer; S: PAnsiChar; Obj: LongWord);
+    {Summary Inserts AnsiString S of length Len at position Idx in the list,
        associating it with object Obj. }
-    procedure InsertObjectLen( Idx: Integer; S: PChar; Len: Integer; Obj: LongWord );
+    procedure InsertObjectLen( Idx: Integer; S: PAnsiChar; Len: Integer; Obj: LongWord );
   public
-    {Summary Appends S (null-terminated) to the last string in FastStrListEx object, very fast. }
-    procedure AppendPChar(S: PChar);
-    {Summary Appends S of length Len to the last string in FastStrListEx object, very fast. }
-    procedure AppendPCharLen( S: PChar; Len: Integer );
-    {Summary Converts N to hexadecimal and appends resulting string to the last
-       string, very fast. }
+    {Summary Appends S (null-terminated) to the last AnsiString in FastStrListEx object, very fast. }
+    procedure AppendPChar(S: PAnsiChar);
+    {Summary Appends S of length Len to the last AnsiString in FastStrListEx object, very fast. }
+    procedure AppendPCharLen( S: PAnsiChar; Len: Integer );
+    {Summary Converts N to hexadecimal and appends resulting AnsiString to the last
+       AnsiString, very fast. }
     procedure AppendInt2Hex( N: LongWord; MinDigits: Integer );
-    function GetValueByIndex(const Index: Integer): PChar;
+    function GetValueByIndex(const Index: Integer): PAnsiChar;
   public
     {Summary the Clear method only clear FList.count to zero if true.}
     FastClear: Boolean;
 
     {Summary Access to objects associated with strings in the list. }
     property Objects[Idx: Integer]: LongWord read GetObject write SetObject;
-    {Summary Returns a value correspondent to the Name an ini-file-like string list
-       (having Name1=Value1 Name2=Value2 etc. in each string). }
-    property Values[Name: PChar]: PChar read GetValue;
-    property Names[const index: Integer]: string read GetName;
-    {Summary Number of strings in a string list. }
+    {Summary Returns a value correspondent to the Name an ini-file-like AnsiString list
+       (having Name1=Value1 Name2=Value2 etc. in each AnsiString). }
+    property Values[Name: PAnsiChar]: PAnsiChar read GetValue;
+    property Names[const index: Integer]: AnsiString read GetName;
+    {Summary Number of strings in a AnsiString list. }
     property Count: integer read fCount;
-    {Summary Strings array items. If item does not exist, empty string is returned.
-       But for assign to property, string with given index *must* exist. }
-    property Items[Idx: integer]: string read Get write Put; default;
+    {Summary Strings array items. If item does not exist, empty AnsiString is returned.
+       But for assign to property, AnsiString with given index *must* exist. }
+    property Items[Idx: integer]: AnsiString read Get write Put; default;
     {Summary Fast access to item strings as PChars. }
-    property ItemPtrs[Idx: Integer]: PChar read GetPChars;
-    {Summary Length of string item. }
+    property ItemPtrs[Idx: Integer]: PAnsiChar read GetPChars;
+    {Summary Length of AnsiString item. }
     property ItemLen[Idx: Integer]: Integer read GetItemLen;
-    {Summary Content of string list as a single string (where strings are separated
+    {Summary Content of AnsiString list as a single AnsiString (where strings are separated
        by characters $0D,$0A). }
-    property Text: string read GetTextStr write SetTextStr;
+    property Text: AnsiString read GetTextStr write SetTextStr;
     property StrictDelimiter: Boolean read GetStrictDelimiter write SetStrictDelimiter;
   end;
 
@@ -645,7 +658,7 @@ type
     procedure AddDouble(const aValue: Double);
     procedure AddByte(const aValue: Byte);
     procedure AddWord(const aValue: Word);
-    procedure AddPChar(const aValue: string);
+    procedure AddPChar(const aValue: AnsiString);
     procedure AddBuffer(const aValue; aSize: Integer);
     procedure Align;
     procedure AllocSpace(const aSize: Integer);
@@ -674,14 +687,14 @@ type
     function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; virtual;
     procedure ReadBuffer(var Buffer; Count: Longint);
     procedure WriteBuffer(const Buffer; Count: Longint);
-    function ReadString: string;
-    procedure WriteString(const Value: string);
+    function ReadString: AnsiString;
+    procedure WriteString(const Value: AnsiString);
     function ReadInteger: Integer;
     procedure WriteInteger(const Value: Integer);
     //the position is End Of Stream
     function EOF: Boolean;
     function CopyFrom(Source: PMeStream; Count: Int64): Int64;
-    procedure WriteResourceHeader(const ResName: string; out FixupInfo: Integer);
+    procedure WriteResourceHeader(const ResName: AnsiString; out FixupInfo: Integer);
     procedure FixupResourceHeader(FixupInfo: Integer);
     procedure ReadResHeader;
 
@@ -705,15 +718,15 @@ type
     destructor Destroy; virtual;{override}
     procedure Clear;
     procedure Assign(const aObjs: PMeNamedObjects);
-    function IndexOf(const aName: string; const aBeginIndex: Integer = 0): Integer;
-    function Find(const aName: string): PMeNamedObject;
+    function IndexOf(const aName: AnsiString; const aBeginIndex: Integer = 0): Integer;
+    function Find(const aName: AnsiString): PMeNamedObject;
   public
     property Items[Index: Integer]: PMeNamedObject read GetItem; default;
   end;
 
 var 
-  {Summary An table to convert char to uppercase very fast. First call InitUpper. }
-  Upper: array[Char] of Char;
+  {Summary An table to convert AnsiChar to uppercase very fast. First call InitUpper. }
+  Upper: array[AnsiChar] of AnsiChar;
   Upper_Initialized: Boolean;
 
 {Summary Call this fuction ones to fill Upper[ ] table before using it. }
@@ -740,7 +753,7 @@ function NewListInit(const AItems: array of Pointer): PMeList;
    Given elements must exist. Count must be > 0. }
 procedure FillListIn(List: TMeList; FromIdx, Count, Value: Integer);
 
-function FindMeComponent(const Name: String): PMeComponent;
+function FindMeComponent(const Name: AnsiString): PMeComponent;
 function GComponentNameList: PMeList;
 
 {Summary Obj.Free and Obj := nil, where Obj *MUST* be TMeDynamicObject or its descendant
@@ -758,12 +771,12 @@ function MeSizeOf(const aObj: TMeVMTHelper): Integer; {$IFDEF PUREPASCAL}{$IFDEF
 {Summary: replace the VirtualMethod of the MeObject to new Method Pointer. return the original method entry pointer.}
 function SetMeVirtualMethod(const aClass: TMeClass; const Offset: Integer; const Method: Pointer): Pointer;
 
-//##[String FUNCTIONS DECLARATIONS]
+//##[AnsiString FUNCTIONS DECLARATIONS]
 {Summary Compare two strings fast without case sensitivity.
    Terminating 0 is not considered, so if strings are equal,
    comparing is continued up to MaxLen bytes.
    Since this, pass minimum of lengths as MaxLen. }
-function StrLComp_NoCase(const Str1, Str2: PChar; MaxLen: Cardinal): Integer;
+function StrLComp_NoCase(const Str1, Str2: PAnsiChar; MaxLen: Cardinal): Integer;
 
 
 {
@@ -829,19 +842,216 @@ function MeInheritsFrom(aClass: TMeClass; const aParentClass: TMeClass): Boolean
 implementation
 
 uses
-  uMeStream
+ uMeStream,
 {$IFDEF BORLAND}
   {$IFDEF Compiler6_UP}
-  , RTLConsts, SysConst
+  RTLConsts, SysConst
   {$ELSE}
-  , Consts
+  Consts
   {$ENDIF}
 {$ELSE}
-  , RTLConsts, SysConst
+  RTLConsts, SysConst
 {$ENDIF}
-  ;
+;
+
+{$IFDEF FPC}
+type
+  {maintain the metadata of the TMeObject Class}
+  PMetaMeObject = ^ TMetaMeObject;
+  TMetaMeObject = object
+  protected
+    FClass: TMeClass;
+    FParentClass: TMeClass;
+    {$IFDEF MeRTTI_SUPPORT}
+    FClassName: PAnsiChar;
+    {$ENDIF}
+  end;
+  {maintain the metadata of the PMetaMeObject}
+  TMetaMeObjects = object(TMeList)
+  protected
+  public
+    function AddClass(const aClass: TMeClass; const aParentCLass: TMeClass
+       {$IFDEF MeRTTI_SUPPORT}; const aClassName: PAnsiChar{$ENDIF}): Integer;
+    function GetParentClass(const aClass: TMeClass): TMeClass;
+    function SetParentClass(const aClass: TMeClass; const aParentClass: TMeClass): Integer;
+    {$IFDEF MeRTTI_SUPPORT}
+    function GetClassName(const aClass: TMeClass): PAnsiChar;
+    function SetClassName(const aClass: TMeClass; const aClassName: PAnsiChar): Integer;
+    {$ENDIF}
+    function IndexOfClass(const Value: TMeClass): Integer;
+    function IndexOfParentClass(const Value: TMeClass): Integer;
+    function FindClass(const Value: TMeClass): PMetaMeObject;
+    function FindParentClass(const Value: TMeClass): PMetaMeObject;
+    function InheritsFrom(aClass: TMeClass; const aParentClass: TMeClass): Boolean;
+
+    procedure Clear;
+  end;
+
+function TMetaMeObjects.FindParentClass(const Value: TMeClass): PMetaMeObject;
+var
+  i: Integer;
+begin
+  i := IndexOfParentClass(Value);
+  if i >=0 then
+    Result := get(i)
+  else
+    Result := nil;
+end;
+
+function TMetaMeObjects.GetParentClass(const aClass: TMeClass): TMeClass;
+var
+  vItem: PMetaMeObject;
+begin
+  Pointer(Result) := FindClass(aClass);
+  if Assigned(Result) then 
+  begin
+    Result := PMetaMeObject(Result).FParentClass;
+  end;
+end;
+
+function TMetaMeObjects.IndexOfParentClass(const Value: TMeClass): Integer;
+begin
+  for Result := 0 to Count - 1 do
+  begin
+    if (PMetaMeObject(Get(Result)).FParentClass = Value) then
+      exit;
+  end; 
+  Result := -1;
+end;
+
+function TMetaMeObjects.InheritsFrom(aClass: TMeClass; const aParentClass: TMeClass): Boolean;
+begin
+  while (aClass <> nil) and (aClass <> aParentClass) do
+  begin
+    Pointer(aClass) := FindClass(aClass);
+    if Assigned(aClass) then
+      aClass := PMetaMeObject(aClass).FParentClass;
+  end;
+  Result := aClass = aParentClass;
+end;
+
+function TMetaMeObjects.SetParentClass(const aClass: TMeClass; const aParentClass: TMeClass): Integer;
+var
+  vItem: PMetaMeObject;
+  vIndex: Integer;
+begin
+  Result := IndexOfClass(aClass);
+//writeln('b=',Result);
+//if aClass = TypeOf(TMeDynamicObject) then writeln('iws');
+  if Result < 0 then
+  begin
+    New(vItem);
+    with vItem^ do 
+    begin
+      FClass := aClass;
+      FParentClass := aParentClass;
+    end;
+    Result := Add(vItem);
+    if Result < 0 then Dispose(vItem);
+//writeln('r=',Result);
+  end
+  else 
+  begin
+    vItem := Get(Result);
+    vItem.FParentClass := aParentClass;
+  end;
+end;
+
+{$IFDEF MeRTTI_SUPPORT}
+function TMetaMeObjects.GetClassName(const aClass: TMeClass): PAnsiChar;
+begin
+  Pointer(Result) := FindClass(aClass);
+  if Assigned(Result) then
+    Result := PMetaMeObject(Result).FClassName;
+end;
+
+function TMetaMeObjects.SetClassName(const aClass: TMeClass; const aClassName: PAnsiChar): Integer;
+var
+  vItem: PMetaMeObject;
+begin
+  Result := IndexOfClass(aClass);
+  if Result < 0 then
+  begin
+    New(vItem);
+    with vItem^ do 
+    begin
+      FClass := aClass;
+      FClassName := aClassName;
+    end;
+    Result := inherited Add(vItem);
+    if Result < 0 then Dispose(vItem);
+  end
+  else
+  begin
+    vItem := get(Result);
+    vItem.FClassName := aClassName;
+  end;
+  Assert(aClassName = GetClassName(aClass), 'GetClassName mismatch');
+end;
+{$ENDIF}
+
+function TMetaMeObjects.AddClass(const aClass: TMeClass; 
+  const aParentCLass: TMeClass{$IFDEF MeRTTI_SUPPORT}; const aClassName: PAnsiChar{$ENDIF}): Integer;
+var
+  vItem: PMetaMeObject;
+begin
+  Result := IndexOfClass(aClass);
+  if Result < 0 then
+  begin
+    Result := IndexOfClass(aParentClass);
+    if Result < 0 then exit; //no parent meta data.
+    New(vItem);
+    with vItem^ do 
+    begin
+      FClass := aClass;
+      FParentClass := Items[Result];
+      {$IFDEF MeRTTI_SUPPORT}; 
+      FClassName := aClassName;
+      {$ENDIF}
+    end;
+    Result := inherited Add(vItem);
+    if Result < 0 then Dispose(vItem);
+  end;
+end;
+
+function TMetaMeObjects.FindClass(const Value: TMeClass): PMetaMeObject;
+var
+  i: integer;
+begin
+  i := IndexOfClass(Value);
+  if i >= 0 then
+    Result := get(i)
+  else
+    Result := nil;
+end;
+
+function TMetaMeObjects.IndexOfClass(const Value: TMeClass): Integer;
+begin
+  for Result := 0 to Count - 1 do
+  begin
+    if {Assigned(Items[Result]) and} (PMetaMeObject(Items[Result]).FClass = Value) then
+      exit;
+  end; 
+  Result := -1;
+end;
+
+procedure TMetaMeObjects.Clear;
+begin
+  FreePointers;
+  inherited Clear;
+end;
+
+var
+  FMetaMeClasses: TMetaMeObjects;
+{$ENDIF FPC}
 
 function MeInheritsFrom(aClass: TMeClass; const aParentClass: TMeClass): Boolean;
+{$IFDEF FPC}
+begin
+  Result := FMetaMeClasses.InheritsFrom(aClass, aParentClass);
+end;
+{$ENDIF FPC}
+{$IFDEF BORLAND}
 {$IFDEF PUREPASCAL}
 begin
   while (aClass <> nil) and (aClass <> aParentClass) do
@@ -867,8 +1077,32 @@ asm
 @@exit:
 end;
 {$ENDIF}
+{$ENDIF BORLAND}
 
 function NewMeObject(const aClass: TMeClass): PMeDynamicObject;
+{$IFDEF FPC}
+var
+  vSize: Integer;
+begin
+ // TODO: ///
+  if Assigned(aClass) then
+  begin
+    vSize := Integer(aClass);
+    Inc(vSize, ovtInstanceSize);
+    vSize := PInteger(vSize)^;
+    GetMem(Result, vSize);
+    {.$IFDEF COMPILER4_UP}
+    FillChar(Result^, vSize, 0);
+    {.$ENDIF}
+    PInteger(Result)^ := Integer(aClass);
+    Result.Init;
+    //writeLn('__________NewMeObject:Size:', vSize);
+  end
+  else
+   Result := nil;
+end;
+{$ENDIF FPC}
+{$IFDEF BORLAND}
 {$IFDEF PUREPASCAL}
 var
   vSize: Integer;
@@ -896,17 +1130,41 @@ asm
   JMP  TMeDynamicObject.Create
 end;
 {$ENDIF}
+{$ENDIF BORLAND}
 
 function SetMeVirtualMethod(const aClass: TMeClass; const Offset: Integer; const Method: Pointer): Pointer;
+{$IFDEF BORLAND}
 var
   PatchAddress: PPointer;
+{$ENDIF}
 begin
+{$IFDEF BORLAND}
   PatchAddress := Pointer(Integer(aClass) + Offset);
   ReadMem(PatchAddress, @Result, SizeOf(Result));
   if Result <> Method then
     WriteMem(PatchAddress, @Method, SizeOf(Method))
   else
     Result := nil;
+{$ENDIF BORLAND}
+
+{$IFDEF FPC}
+  case Offset of
+  ovtVmtParent: 
+  begin
+    if FMetaMeClasses.SetParentClass(aClass, Method) < 0 then
+      raise EMeError.Create('SetMeVirtualMethod: CAN NOT SET ParentCLass!');
+  end
+  {$IFDEF MeRTTI_SUPPORT}
+  ;ovtVmtClassName:
+  begin
+    if FMetaMeClasses.SetClassName(aClass, Method) < 0 then
+      raise EMeError.Create('SetMeVirtualMethod: CAN NOT SET ClassName!');
+   end
+  {$ENDIF}
+  else
+     Result := nil;
+  end;
+{$ENDIF FPC}
 end;
 
 var
@@ -920,7 +1178,7 @@ begin
   Result := FObjectNameList;
 end;
 
-function FindMeComponent(const Name: String): PMeComponent;
+function FindMeComponent(const Name: AnsiString): PMeComponent;
 var i: Integer;
     Obj: PMeComponent;
 begin
@@ -1026,12 +1284,14 @@ end;
 
 procedure TMeVMTHelper.Init;
 begin
-{$IFNDEF COMPILER4_UP} //fill 0 for D2, D3
+{$IFDEF BORLAND}
+  {$IFNDEF COMPILER4_UP} //fill 0 for D2, D3
   FillChar(Pointer(Integer(@Self) + SizeOf(Integer))^, Sizeof(Self) - SizeOf(Integer), 0);
+  {$ENDIF}
 {$ENDIF}
 end;
 
-class function TMeVMTHelper.InstanceSize: Integer;
+function TMeVMTHelper.InstanceSize: Integer;
 {$IFDEF PUREPASCAL}
 begin
   {.$IFDEF Delphi_ObjectTypeClassMethod_BUG}
@@ -1051,6 +1311,16 @@ asm
 end;
 {$ENDIF PUREPASCAL}
 
+{$IFDEF FPC}
+function TMeVMTHelper.ClassType: TMeClass;
+begin
+  //writeln('Self:', Integer(@Self));
+  //writeln('MeDynamicObjTpye=', Integer(typeOf(TMeDynamicObject)));
+  Result := PPointer(@Self)^;//TypeOf(self);//Pointer(@Self);
+  //writeln('resul=',integer(result));
+end;
+{$ENDIF FPC}
+{$IFDEF BORLAND}
 {$IFDEF Delphi_ObjectTypeClassMethod_BUG}
 class 
 {$ENDIF}
@@ -1066,8 +1336,15 @@ asm
   MOV EAX, [EAX]
 end;
 {$ENDIF PUREPASCAL}
+{$ENDIF BORLAND}
 
-class function TMeVMTHelper.ClassParent: TMeClass;
+function TMeVMTHelper.ClassParent: TMeClass;
+{$IFDEF FPC}
+begin
+  Result := FMetaMeClasses.GetParentClass(PPointer(@Self)^);
+end;
+{$ENDIF FPC}
+{$IFDEF BORLAND}
 {$IFDEF PUREPASCAL}
 begin
   {$IFDEF Delphi_ObjectTypeClassMethod_BUG}
@@ -1089,18 +1366,27 @@ asm
         //MOV     EAX,[EAX]
 @@exit:
 end;
-{$ENDIF}
+{$ENDIF PUREPASCAL}
+{$ENDIF BORLAND}
 
-class function TMeVMTHelper.InheritsFrom(aClass: TMeClass): Boolean;
+function TMeVMTHelper.InheritsFrom(aClass: TMeClass): Boolean;
+{$IFDEF FPC}
+begin
+  //writeln('clast=',integer(ClassType));
+  //writeln('self=',Integer(@self));
+  Result := FMetaMeClasses.InheritsFrom(PPointer(@Self)^, aClass);
+end;
+{$ENDIF FPC}
+{$IFDEF BORLAND}
 {$IFDEF PUREPASCAL}
 var
   ClassPtr: TMeClass;
 begin
-  {$IFDEF Delphi_ObjectTypeClassMethod_BUG}
+  {.$IFDEF Delphi_ObjectTypeClassMethod_BUG}
   ClassPtr := PPointer(@Self)^;
-  {$ELSE}
-  ClassPtr := Pointer(@Self);
-  {$ENDIF}
+  {.$ELSE}
+  //ClassPtr := Pointer(@Self);
+  {.$ENDIF}
   while (ClassPtr <> nil) and (ClassPtr <> AClass) do
     ClassPtr := ClassPtr.ParentClass;
   Result := ClassPtr = AClass;
@@ -1110,9 +1396,9 @@ asm
         { ->    EAX     Pointer to our class    }
         {       EDX     Pointer to AClass               }
         { <-    AL      Boolean result          }
-       {$IFDEF Delphi_ObjectTypeClassMethod_BUG}
+       {.$IFDEF Delphi_ObjectTypeClassMethod_BUG}
         MOV     EAX,[EAX]
-       {$ENDIF}
+       {.$ENDIF}
 @@loop:
         CMP     EAX,EDX
         JE      @@success
@@ -1125,6 +1411,7 @@ asm
 @@exit:
 end;
 {$ENDIF}
+{$ENDIF BORLAND}
 
 function TMeVMTHelper.IsObject(pObj: Pointer): Boolean;
 {$IFDEF PUREPASCAL}
@@ -1155,17 +1442,23 @@ end;
 {$ENDIF PUREPASCAL}
 
 {$IFDEF MeRTTI_SUPPORT}
-class function TMeVMTHelper.ClassName: PChar;
+function TMeVMTHelper.ClassName: PAnsiChar;
+{$IFDEF FPC}
+begin
+  Result := FMetaMeClasses.GetClassName(ClassType);
+end;
+{$ENDIF}
+{$IFDEF BORLAND}
 {$IFDEF PUREPASCAL}
 (*
 var
   p: PShortString;
 begin
-  {$IFDEF Delphi_ObjectTypeClassMethod_BUG}
+  {.$IFDEF Delphi_ObjectTypeClassMethod_BUG}
   p := PShortString(PPointer(PInteger(@Self)^ + ovtVmtClassName)^);
-  {$ELSE}
-  p := PShortString(PPointer(Integer(@Self) + ovtVmtClassName)^);
-  {$ENDIF}
+  {.$ELSE}
+  //p := PShortString(PPointer(Integer(@Self) + ovtVmtClassName)^);
+  {.$ENDIF}
   //Result := PShortString(@TMeVMTHelper.ClassNameAddress)^;
   if Assigned(p) then
     Result := p^
@@ -1179,20 +1472,20 @@ end;
 
 {$ELSE PUREPASCAL}
 asm
-        {$IFDEF Delphi_ObjectTypeClassMethod_BUG}
+        {.$IFDEF Delphi_ObjectTypeClassMethod_BUG}
         MOV     EAX, [EAX]  //this is a Delphi Bug: the Class method in Object do not pass the VMT
-        {$ENDIF}
+        {.$ENDIF}
         MOV     EAX,[EAX].ovtVmtClassName
   
 (*
         { ->    [EAX] VMT                         }
-        {       EDX Pointer to result string    }
+        {       EDX Pointer to result AnsiString    }
         PUSH    ESI
         PUSH    EDI
         MOV     EDI,EDX
-        {$IFDEF Delphi_ObjectTypeClassMethod_BUG}
+        {.$IFDEF Delphi_ObjectTypeClassMethod_BUG}
         MOV     EAX, [EAX]  //this is a Delphi Bug: the Class method in Object do not pass the VMT
-        {$ENDIF}
+        {.$ENDIF}
         MOV     ESI,[EAX].ovtVmtClassName
         XOR     ECX,ECX
         CMP     ESI, ECX
@@ -1210,7 +1503,8 @@ asm
 *)
 end;
 {$ENDIF PUREPASCAL}
-{$ENDIF}
+{$ENDIF BORLAND}
+{$ENDIF MeRTTI_SUPPORT}
 
 constructor TMeDynamicObject.Create;
 {$IFDEF PUREPASCAL}
@@ -1496,7 +1790,7 @@ end;
 
 { TMeContainer }
 
-class procedure TMeContainer.Error(const Msg: string; Data: Integer);
+class procedure TMeContainer.Error(const Msg: AnsiString; Data: Integer);
 
   function ReturnAddr: Pointer;
   asm
@@ -2109,7 +2403,7 @@ begin
   end;
 end;
 
-procedure TMeList.LoadFromFile(const FileName: string);
+procedure TMeList.LoadFromFile(const FileName: AnsiString);
 var
   vStream: PMeFileStream;
 begin
@@ -2133,7 +2427,7 @@ begin
      aStream.ReadBuffer(List^[i], SizeOf(Pointer));
 end;
 
-procedure TMeList.SaveToFile(const FileName: string);
+procedure TMeList.SaveToFile(const FileName: AnsiString);
 var
   Stream: PMeFileStream;
 begin
@@ -2163,7 +2457,7 @@ begin
 end;
 
 procedure InitUpper;
-var c: Char;
+var c: AnsiChar;
 begin
   for c := #0 to #255 do
     Upper[ c ] := AnsiUpperCase( c + #0 )[ 1 ];
@@ -2172,19 +2466,19 @@ end;
 
 { TMeStrings }
 
-function TMeStrings.Add(const S: String): Integer;
+function TMeStrings.Add(const S: AnsiString): Integer;
 begin
-  Result := AddObjectLen( PChar( S ), Length( S ), 0 );
+  Result := AddObjectLen( PAnsiChar( S ), Length( S ), 0 );
 end;
 
-procedure TMeStrings.AddDelimitedText(const Value: string; aDelimiter: Char);
+procedure TMeStrings.AddDelimitedText(const Value: AnsiString; aDelimiter: AnsiChar);
 var
-  P, P1: PChar;
-  S: string;
+  P, P1: PAnsiChar;
+  S: AnsiString;
 begin
     if aDelimiter = #0 then
       aDelimiter := FDelimiter;
-    P := PChar(Value);
+    P := PAnsiChar(Value);
     if not FStrictDelimiter then
       while P^ in [#1..' '] do
       {$IFDEF MSWINDOWS}
@@ -2238,31 +2532,31 @@ begin
     end;
 end;
 
-function TMeStrings.AddObject(const S: String; Obj: LongWord): Integer;
+function TMeStrings.AddObject(const S: AnsiString; Obj: LongWord): Integer;
 begin
-  Result := AddObjectLen( PChar( S ), Length( S ), Obj );
+  Result := AddObjectLen( PAnsiChar( S ), Length( S ), Obj );
 end;
 
-function TMeStrings.AddPChar(S: PChar): integer;
+function TMeStrings.AddPChar(S: PAnsiChar): integer;
 begin
   Result := AddObjectLen( S, StrLen( S ), 0 )
 end;
 
-function TMeStrings.AddPCharLen(S: PChar; Len: Integer): integer;
+function TMeStrings.AddPCharLen(S: PAnsiChar; Len: Integer): integer;
 begin
   Result := AddObjectLen( S, Len, 0 )
 end;
 
-function TMeStrings.AddPCharObject(S: PChar; Obj: LongWord): Integer;
+function TMeStrings.AddPCharObject(S: PAnsiChar; Obj: LongWord): Integer;
 begin
   Result := AddObjectLen( S, StrLen( S ), Obj )
 end;
 
-function TMeStrings.AddObjectLen(S: PChar; Len: Integer; Obj: LongWord): Integer;
-var Dest: PChar;
+function TMeStrings.AddObjectLen(S: PAnsiChar; Len: Integer; Obj: LongWord): Integer;
+var Dest: PAnsiChar;
 begin
   ProvideSpace( Len + 9 );
-  Dest := PChar( LongWord( FTextBuf ) + FUsedSize );
+  Dest := PAnsiChar( LongWord( FTextBuf ) + FUsedSize );
   Result := fCount;
   Inc( fCount );
   FList.Add( Pointer( LongWord(Dest)-LongWord(FTextBuf) ) );
@@ -2333,7 +2627,7 @@ begin
   Result := True;
 end;
 
-function TMeStrings.Find(const S: String; var Index: Integer): Boolean;
+function TMeStrings.Find(const S: AnsiString; var Index: Integer): Boolean;
 var
   i: Integer;
 begin
@@ -2348,10 +2642,10 @@ begin
   Result := FALSE;
 end;
 
-function TMeStrings.Get(Idx: integer): string;
+function TMeStrings.Get(Idx: integer): AnsiString;
 begin
   if (Idx >= 0) and (Idx <= Count) then
-    SetString( Result, PChar( LongWord( FTextBuf ) + LongWord( FList.Items[ Idx ] ) + 8 ),
+    SetString( Result, PAnsiChar( LongWord( FTextBuf ) + LongWord( FList.Items[ Idx ] ) + 8 ),
                ItemLen[ Idx ] )
   else
     Result := '';
@@ -2381,10 +2675,10 @@ begin
     else Result := 0;
 end;
 
-function TMeStrings.GetPChars(Idx: Integer): PChar;
+function TMeStrings.GetPChars(Idx: Integer): PAnsiChar;
 begin
   if (Idx >= 0) and (Idx <= Count) then
-    Result := PChar( LongWord( FTextBuf ) + LongWord( FList.Items[ Idx ] ) + 8 )
+    Result := PAnsiChar( LongWord( FTextBuf ) + LongWord( FList.Items[ Idx ] ) + 8 )
   else Result := nil;
 end;
 
@@ -2395,15 +2689,15 @@ begin
   Result := FStrictDelimiter;
 end;
 
-function TMeStrings.GetTextStr: string;
+function TMeStrings.GetTextStr: AnsiString;
 var L, i: Integer;
-    p: PChar;
+    p: PAnsiChar;
 begin
   L := 0;
   for i := 0 to Count-1 do
     Inc( L, ItemLen[ i ] + 2 );
   SetLength( Result, L );
-  p := PChar( Result );
+  p := PAnsiChar( Result );
   for i := 0 to Count-1 do
   begin
     L := ItemLen[ i ];
@@ -2427,17 +2721,17 @@ begin
   Result := -1;
 end;
 
-function TMeStrings.IndexOf(const S: string): integer;
+function TMeStrings.IndexOf(const S: AnsiString): integer;
 begin
   if not Find( S, Result ) then Result := -1;
 end;
 
-function TMeStrings.IndexOf_NoCase(const S: string): integer;
+function TMeStrings.IndexOf_NoCase(const S: AnsiString): integer;
 begin
-  Result := IndexOfStrL_NoCase( PChar( S ), Length( S ) );
+  Result := IndexOfStrL_NoCase( PAnsiChar( S ), Length( S ) );
 end;
 
-function TMeStrings.IndexOfStrL_NoCase(Str: PChar;
+function TMeStrings.IndexOfStrL_NoCase(Str: PAnsiChar;
   L: Integer): integer;
 var i: Integer;
 begin
@@ -2459,38 +2753,38 @@ begin
   FDelimiter := ',';
 end;
 
-procedure TMeStrings.Insert(Idx: integer; const S: String);
+procedure TMeStrings.Insert(Idx: integer; const S: AnsiString);
 begin
-  InsertObjectLen( Idx, PChar( S ), Length( S ), 0 );
+  InsertObjectLen( Idx, PAnsiChar( S ), Length( S ), 0 );
 end;
 
-procedure TMeStrings.InsertObject(Idx: integer; const S: String;
+procedure TMeStrings.InsertObject(Idx: integer; const S: AnsiString;
   Obj: LongWord);
 begin
-  InsertObjectLen( Idx, PChar( S ), Length( S ), Obj );
+  InsertObjectLen( Idx, PAnsiChar( S ), Length( S ), Obj );
 end;
 
-procedure TMeStrings.InsertPChar(Idx: integer; S: PChar);
+procedure TMeStrings.InsertPChar(Idx: integer; S: PAnsiChar);
 begin
   InsertObjectLen( Idx, S, StrLen( S ), 0 )
 end;
 
-procedure TMeStrings.InsertPCharLen(Idx: Integer; S: PChar; Len: Integer);
+procedure TMeStrings.InsertPCharLen(Idx: Integer; S: PAnsiChar; Len: Integer);
 begin
   InsertObjectLen( Idx, S, Len, 0 )
 end;
 
-procedure TMeStrings.InsertPCharObject(Idx: Integer; S: PChar; Obj: LongWord);
+procedure TMeStrings.InsertPCharObject(Idx: Integer; S: PAnsiChar; Obj: LongWord);
 begin
   InsertObjectLen( Idx, S, StrLen( S ), Obj );
 end;
 
-procedure TMeStrings.InsertObjectLen(Idx: Integer; S: PChar;
+procedure TMeStrings.InsertObjectLen(Idx: Integer; S: PAnsiChar;
   Len: Integer; Obj: LongWord);
-var Dest: PChar;
+var Dest: PAnsiChar;
 begin
   ProvideSpace( Len+9 );
-  Dest := PChar( LongWord( FTextBuf ) + FUsedSize );
+  Dest := PAnsiChar( LongWord( FTextBuf ) + FUsedSize );
   FList.Insert( Idx, Pointer( LongWord(Dest)-LongWord(FTextBuf) ) );
   PLongWord( Dest )^ := Obj;
   Inc( Dest, 4 );
@@ -2504,7 +2798,7 @@ begin
   Inc( fCount );
 end;
 
-function TMeStrings.Last: String;
+function TMeStrings.Last: AnsiString;
 begin
   if Count > 0 then
     Result := Items[ Count-1 ]
@@ -2512,7 +2806,7 @@ begin
     Result := '';
 end;
 
-procedure TMeStrings.LoadFromFile(const FileName: string);
+procedure TMeStrings.LoadFromFile(const FileName: AnsiString);
 var
   vStream: PMeFileStream;
 begin
@@ -2528,12 +2822,12 @@ end;
 procedure TMeStrings.LoadFromStream(const aStream: PMeStream);
 var
   vSize: Integer;
-  S: string;
+  S: AnsiString;
 begin
     //writeln('L=',aStream.Size);
     vSize := aStream.GetSize - aStream.GetPosition;
     SetString(S, nil, vSize);
-    aStream.Read(PChar(S)^, vSize);
+    aStream.Read(PAnsiChar(S)^, vSize);
     SetTextStr(S);
 end;
 
@@ -2545,7 +2839,7 @@ begin
 end;
 
 procedure TMeStrings.ProvideSpace(AddSize: LongWord);
-var OldTextBuf: PChar;
+var OldTextBuf: PAnsiChar;
 begin
   Inc( AddSize, 9 );
   if AddSize > FTextSize - FUsedSize then
@@ -2563,15 +2857,15 @@ begin
     FList.Capacity := Max( 100, FList.Count * 2 );
 end;
 
-procedure TMeStrings.Put(Idx: integer; const Value: string);
-var Dest: PChar;
+procedure TMeStrings.Put(Idx: integer; const Value: AnsiString);
+var Dest: PAnsiChar;
     OldLen: Integer;
     OldObj: LongWord;
 begin
   OldLen := ItemLen[ Idx ];
   if Length( Value ) <= OldLen then
   begin
-    Dest := PChar( LongWord( FTextBuf ) + LongWord( FList.Items[ Idx ] ) + 4 );
+    Dest := PAnsiChar( LongWord( FTextBuf ) + LongWord( FList.Items[ Idx ] ) + 4 );
     PLongWord( Dest )^ := Length( Value );
     Inc( Dest, 4 );
     if Value <> '' then
@@ -2592,11 +2886,11 @@ begin
       Delete( Idx );
     end;
     if Idx = Count then
-      AddObjectLen( PChar( Value ), Length( Value ), OldObj )
+      AddObjectLen( PAnsiChar( Value ), Length( Value ), OldObj )
     else
     begin
       ProvideSpace( Length( Value ) + 9 );
-      Dest := PChar( LongWord( FTextBuf ) + FUsedSize );
+      Dest := PAnsiChar( LongWord( FTextBuf ) + FUsedSize );
       FList.Items[ Idx ] := Pointer( LongWord(Dest)-LongWord(FTextBuf) );
       Inc( Dest, 4 );
       PLongWord( Dest )^ := Length( Value );
@@ -2610,7 +2904,7 @@ begin
   end;
 end;
 
-procedure TMeStrings.SaveToFile(const FileName: string);
+procedure TMeStrings.SaveToFile(const FileName: AnsiString);
 var
   Stream: PMeFileStream;
 begin
@@ -2625,7 +2919,7 @@ end;
 
 procedure TMeStrings.SaveToStream(const aStream: PMeStream);
 var
-  S: string;
+  S: AnsiString;
 begin
   S := GetTextStr;
   aStream.WriteBuffer(Pointer(S)^, Length(S));
@@ -2651,15 +2945,15 @@ begin
   end
 end;
 
-procedure TMeStrings.SetText(const S: string; Append2List: boolean);
+procedure TMeStrings.SetText(const S: AnsiString; Append2List: boolean);
 var Len2Add, NLines, L: Integer;
-    p0, p: PChar;
+    p0, p: PAnsiChar;
 begin
   if not Append2List then Clear;
 
   Len2Add := 0;
   NLines := 0;
-  p := Pchar( S );
+  p := PAnsiChar( S );
   p0 := p;
   L := Length( S );
   while L > 0 do
@@ -2687,7 +2981,7 @@ begin
   ProvideSpace( Len2Add - 9 );
   if FList.Capacity <= FList.Count + NLines then
     FList.Capacity := Max( (FList.Count + NLines) * 2, 100 );
-  p := PChar( S );
+  p := PAnsiChar( S );
   p0 := p;
   L := Length( S );
   while L > 0 do
@@ -2708,7 +3002,7 @@ begin
     AddObjectLen( p0, LongWord(p)-LongWord(p0), 0 );
 end;
 
-procedure TMeStrings.SetTextStr(const Value: string);
+procedure TMeStrings.SetTextStr(const Value: AnsiString);
 begin
   SetText( Value, FALSE );
 end;
@@ -2716,7 +3010,7 @@ end;
 function CompareFast(const Data: Pointer; const e1,e2 : LongWord) : Integer;
 var FSL: PMeStrings;
     L1, L2: Integer;
-    S1, S2: PChar;
+    S1, S2: PAnsiChar;
 begin
   FSL := Data;
   S1 := FSL.ItemPtrs[ e1 ];
@@ -2753,9 +3047,9 @@ begin
   FList.Swap( Idx1, Idx2 );
 end;
 
-function TMeStrings.GetName(const Index: Integer): string;
+function TMeStrings.GetName(const Index: Integer): AnsiString;
 var
-  s: PChar;
+  s: PAnsiChar;
 begin
   if (Index >=0) and (Index < FCount) then
   begin
@@ -2776,9 +3070,9 @@ begin
     Result := '';
 end;
 
-function TMeStrings.GetValueByIndex(const Index: Integer): PChar;
+function TMeStrings.GetValueByIndex(const Index: Integer): PAnsiChar;
 var
-  s: PChar;
+  s: PAnsiChar;
 begin
     s := ItemPtrs[ Index ];
     while (s^ <> '=') and (s^ <> #0) do
@@ -2794,9 +3088,9 @@ begin
       Result := ItemPtrs[ Index ];
 end;
 
-function TMeStrings.GetValue(AName: PChar): PChar;
+function TMeStrings.GetValue(AName: PAnsiChar): PAnsiChar;
 var i: Integer;
-    s, n: PChar;
+    s, n: PAnsiChar;
 begin
   if not Upper_Initialized then
     InitUpper;
@@ -2819,9 +3113,9 @@ begin
   Result := nil;
 end;
 
-function TMeStrings.IndexOfName(AName: PChar): Integer;
+function TMeStrings.IndexOfName(AName: PAnsiChar): Integer;
 var i: Integer;
-    s, n: PChar;
+    s, n: PAnsiChar;
 begin
   if not Upper_Initialized then
     InitUpper;
@@ -2843,13 +3137,13 @@ begin
   Result := -1;
 end;
 
-procedure TMeStrings.AppendPChar(S: PChar);
+procedure TMeStrings.AppendPChar(S: PAnsiChar);
 begin
   AppendPCharLen( S, StrLen( S ) );
 end;
 
 procedure TMeStrings.AppendInt2Hex(N: LongWord; MinDigits: Integer);
-var Buffer: array[ 0..9 ] of Char;
+var Buffer: array[ 0..9 ] of AnsiChar;
     Mask: LongWord;
     i, Len: Integer;
     B: Byte;
@@ -2877,29 +3171,29 @@ begin
     B := (N and Mask) shr (MinDigits * 4);
     Mask := Mask shr 4;
     if B <= 9 then
-      Buffer[ i ] := Char( B + Ord( '0' ) )
+      Buffer[ i ] := AnsiChar( B + Ord( '0' ) )
     else
-      Buffer[ i ] := Char( B + Ord( 'A' ) - 10 );
+      Buffer[ i ] := AnsiChar( B + Ord( 'A' ) - 10 );
     Inc( i );
   end;
   Buffer[ i ] := #0;
   AppendPCharLen( @ Buffer[ 0 ], Len );
 end;
 
-procedure TMeStrings.AppendPCharLen(S: PChar; Len: Integer);
-var Dest: PChar;
+procedure TMeStrings.AppendPCharLen(S: PAnsiChar; Len: Integer);
+var Dest: PAnsiChar;
 begin
   if Count = 0 then
     AddPCharLen( S, Len )
   else
   begin
     ProvideSpace( Len );
-    Dest := PChar( LongWord( FTextBuf ) + FUsedSize - 1 );
+    Dest := PAnsiChar( LongWord( FTextBuf ) + FUsedSize - 1 );
     System.Move( S^, Dest^, Len );
     Inc( Dest, Len );
     Dest^ := #0;
     Inc( FUsedSize, Len );
-    Dest := PChar( LongWord( FTextBuf ) + LongWord( FList.Items[ Count-1 ] ) );
+    Dest := PAnsiChar( LongWord( FTextBuf ) + LongWord( FList.Items[ Count-1 ] ) );
     Inc( Dest, 4 );
     PLongWord( Dest )^ := PLongWord( Dest )^ + LongWord( Len );
   end;
@@ -3013,7 +3307,7 @@ begin
   Inc(FUsedSize, SizeOf(aValue));
 end;
 
-procedure TMeDynamicMemory.AddPChar(const aValue: string);
+procedure TMeDynamicMemory.AddPChar(const aValue: AnsiString);
 var
   p: Pointer;
 begin
@@ -3121,7 +3415,7 @@ begin
     raise EMeError.CreateRes(@SReadError);
 end;
 
-function TMeStream.ReadString: string;
+function TMeStream.ReadString: AnsiString;
 var
   i: Integer;
 begin
@@ -3134,7 +3428,7 @@ begin
   end;
 end;
 
-procedure TMeStream.WriteString(const Value: string);
+procedure TMeStream.WriteString(const Value: AnsiString);
 var
   i: Integer;
 begin
@@ -3165,7 +3459,7 @@ const
   MaxBufSize = $F000;
 var
   BufSize, N: Integer;
-  Buffer: PChar;
+  Buffer: PAnsiChar;
 begin
   if Count = 0 then
   begin
@@ -3188,10 +3482,10 @@ begin
   end;
 end;
 
-procedure TMeStream.WriteResourceHeader(const ResName: string; out FixupInfo: Integer);
+procedure TMeStream.WriteResourceHeader(const ResName: AnsiString; out FixupInfo: Integer);
 var
   HeaderSize: Integer;
-  Header: array[0..79] of Char;
+  Header: array[0..79] of AnsiChar;
 begin
   Byte((@Header[0])^) := $FF;
   Word((@Header[1])^) := 10;
@@ -3215,7 +3509,7 @@ end;
 procedure TMeStream.ReadResHeader;
 var
   ReadCount: Cardinal;
-  Header: array[0..79] of Char;
+  Header: array[0..79] of AnsiChar;
 begin
   FillChar(Header, SizeOf(Header), 0);
   ReadCount := Read(Header, SizeOf(Header) - 1);
@@ -3261,7 +3555,7 @@ begin
   Result := Inherited Get(Index);
 end;
 
-function TMeNamedObjects.Find(const aName: string): PMeNamedObject;
+function TMeNamedObjects.Find(const aName: AnsiString): PMeNamedObject;
 var
   i: integer;
 begin
@@ -3272,7 +3566,7 @@ begin
     Result := nil;
 end;
 
-function TMeNamedObjects.IndexOf(const aName: string; const aBeginIndex: Integer = 0): Integer;
+function TMeNamedObjects.IndexOf(const aName: AnsiString; const aBeginIndex: Integer = 0): Integer;
 begin
   for Result := aBeginIndex to Count - 1 do
   begin
@@ -3283,7 +3577,7 @@ begin
 end;
 
 //[function StrLComp_NoCase]
-function StrLComp_NoCase(const Str1, Str2: PChar; MaxLen: Cardinal): Integer;
+function StrLComp_NoCase(const Str1, Str2: PAnsiChar; MaxLen: Cardinal): Integer;
 asm
   {$IFDEF FPC}
         MOV     EAX, [Str1]
@@ -3717,16 +4011,16 @@ end;
 
 {$IFDEF MeRTTI_SUPPORT}
 const
-  cMeObjectClassName: PChar = 'TMeDynamicObject';
-  cMeInterfacedObjectClassName: PChar = 'TMeInterfacedObject';
-  cMeContainerClassName: PChar = 'TMeContainer';
-  cMeListClassName: PChar = 'TMeList';
-  cMeStringsClassName: PChar = 'TMeStrings';
-  cMeComponentClassName: PChar = 'TMeComponent';
-  cMeDynamicMemoryClassName: PChar = 'TMeDynamicMemory';
+  cMeObjectClassName: PAnsiChar = 'TMeDynamicObject';
+  cMeInterfacedObjectClassName: PAnsiChar = 'TMeInterfacedObject';
+  cMeContainerClassName: PAnsiChar = 'TMeContainer';
+  cMeListClassName: PAnsiChar = 'TMeList';
+  cMeStringsClassName: PAnsiChar = 'TMeStrings';
+  cMeComponentClassName: PAnsiChar = 'TMeComponent';
+  cMeDynamicMemoryClassName: PAnsiChar = 'TMeDynamicMemory';
 {$ENDIF}
 
-Function XorStr(const s: string; key: string): string;
+Function XorStr(const s: AnsiString; key: AnsiString): AnsiString;
 var
   i, j: Integer;
   L: Integer;
@@ -3758,6 +4052,17 @@ begin
   if XorStr(cMeSDKCopyRight, '1234567890'#$0A) = v then
   begin
   //Update the MeObject VMT Table.
+  SetMeVirtualMethod(TypeOf(TMeDynamicObject), ovtVmtParent, nil);
+  SetMeVirtualMethod(TypeOf(TMeInterfacedObject), ovtVmtParent, TypeOf(TMeDynamicObject));
+  SetMeVirtualMethod(TypeOf(TMeContainer), ovtVmtParent, TypeOf(TMeDynamicObject));
+  SetMeVirtualMethod(TypeOf(TMeList), ovtVmtParent, TypeOf(TMeContainer));
+  SetMeVirtualMethod(TypeOf(TMeStrings), ovtVmtParent, TypeOf(TMeContainer));
+  SetMeVirtualMethod(TypeOf(TMeComponent), ovtVmtParent, TypeOf(TMeNamedObject));
+  SetMeVirtualMethod(TypeOf(TMeDynamicMemory), ovtVmtParent, TypeOf(TMeDynamicObject));
+  SetMeVirtualMethod(TypeOf(TMeStream), ovtVmtParent, TypeOf(TMeDynamicObject));
+  SetMeVirtualMethod(TypeOf(TMeNamedObject), ovtVmtParent, TypeOf(TMeDynamicObject));
+  SetMeVirtualMethod(TypeOf(TMeNamedObjects), ovtVmtParent, TypeOf(TMeList));
+
   {$IFDEF MeRTTI_SUPPORT}
   //Make the ovtVmtClassName point to PShortString class name
   SetMeVirtualMethod(TypeOf(TMeDynamicObject), ovtVmtClassName, cMeObjectClassName);
@@ -3771,16 +4076,6 @@ begin
   SetMeVirtualMethod(TypeOf(TMeNamedObject), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TMeNamedObjects), ovtVmtClassName, nil);
   {$ENDIF}
-  SetMeVirtualMethod(TypeOf(TMeDynamicObject), ovtVmtParent, nil);
-  SetMeVirtualMethod(TypeOf(TMeInterfacedObject), ovtVmtParent, TypeOf(TMeDynamicObject));
-  SetMeVirtualMethod(TypeOf(TMeContainer), ovtVmtParent, TypeOf(TMeDynamicObject));
-  SetMeVirtualMethod(TypeOf(TMeList), ovtVmtParent, TypeOf(TMeContainer));
-  SetMeVirtualMethod(TypeOf(TMeStrings), ovtVmtParent, TypeOf(TMeContainer));
-  SetMeVirtualMethod(TypeOf(TMeComponent), ovtVmtParent, TypeOf(TMeNamedObject));
-  SetMeVirtualMethod(TypeOf(TMeDynamicMemory), ovtVmtParent, TypeOf(TMeDynamicObject));
-  SetMeVirtualMethod(TypeOf(TMeStream), ovtVmtParent, TypeOf(TMeDynamicObject));
-  SetMeVirtualMethod(TypeOf(TMeNamedObject), ovtVmtParent, TypeOf(TMeDynamicObject));
-  SetMeVirtualMethod(TypeOf(TMeNamedObjects), ovtVmtParent, TypeOf(TMeList));
 
   {$IFDEF MeRTTI_EXT_SUPPORT}
   FObjectNameList := NewList;
@@ -3793,6 +4088,9 @@ initialization
   SetupInit;
 
 finalization
+  {$IFDEF FPC}
+  FMetaMeClasses.Clear;
+  {$ENDIF FPC}
   {$IFDEF MeRTTI_EXT_SUPPORT}
   FObjectNameList.Free;
   {$ENDIF}

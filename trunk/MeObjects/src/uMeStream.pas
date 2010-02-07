@@ -38,7 +38,8 @@ uses
   //TypInfo,
   SysUtils
   , uMeConsts
-  , uMeSystem
+  //, uMeSystem
+  , uMeException
   , uMeObject
   {$IFDEF DEBUG}
   , DbugIntf
@@ -67,6 +68,12 @@ const
     fmShareExclusive = $0010;
     fmShareDenyWrite = $0020;
     fmShareDenyNone  = $0030;
+  {$ENDIF}
+
+  {$IFDEF FPC}
+  fmOpenRead      = 0;
+  fmOpenWrite     = 1;
+  fmOpenReadWrite = 2;
   {$ENDIF}
 
 type
@@ -170,14 +177,23 @@ end;
 procedure TMeHandleStream.SetSize(const NewSize: Int64);
 begin
   Seek(NewSize, soBeginning);
-{$IFDEF MSWINDOWS}
+{$IFDEF BORLAND}
+ {$IFDEF MSWINDOWS}
   {$WARN SYMBOL_PLATFORM OFF}
   Win32Check(SetEndOfFile(FHandle));
   {$WARN SYMBOL_PLATFORM ON}
-{$ELSE}
+ {$ENDIF MSWINDOWS}
+
+ {$IFDEF LINUX}
   if ftruncate(FHandle, GetPosition) = -1 then
     raise EMeError(sStreamSetSize);
-{$ENDIF}
+ {$ENDIF LINUX}
+{$ENDIF BORLAND}
+
+{$IFDEF FPC}
+  if not FileTruncate(FHandle, GetPosition) then
+    raise EMeError(sStreamSetSize);
+{$ENDIF FPC}
 end;
 
 { TMeFileStream }
@@ -197,10 +213,17 @@ end;
 
 procedure TMeFileStream.Open(const AFileName: string; Mode: Word);
 begin
-{$IFDEF MSWINDOWS}
+{$IFDEF BORLAND}
+ {$IFDEF MSWINDOWS}
   Open(AFilename, Mode, 0);
-{$ELSE LINUX}
+ {$ENDIF}
+ {$IF LINUX}
   OpenEx(AFilename, Mode, FileAccessRights);
+ {$ENDIF}
+{$ENDIF BORLAND}
+
+{$IFDEF FPC}
+  
 {$ENDIF}
 end;
 
@@ -217,13 +240,13 @@ begin
   begin
     inherited Open(FileCreate(AFileName, Rights));
     if FHandle < 0 then
-      raise EMeError.CreateResFmt(@SFCreateErrorEx, [ExpandFileName(AFileName), SysErrorMessage(GetLastError)]);
+      raise EMeError.CreateResFmt(@SFCreateError, [ExpandFileName(AFileName){, SysErrorMessage(GetLastError)}]);
   end
   else
   begin
     inherited Open(FileOpen(AFileName, Mode));
     if FHandle < 0 then
-      raise EMeError.CreateResFmt(@SFOpenErrorEx, [ExpandFileName(AFileName), SysErrorMessage(GetLastError)]);
+      raise EMeError.CreateResFmt(@SFOpenError, [ExpandFileName(AFileName){, SysErrorMessage(GetLastError)}]);
   end;
   FFileName := AFileName;
 end;

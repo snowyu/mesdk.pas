@@ -37,6 +37,7 @@ uses
   {$ENDIF LINUX}
   SysUtils
   , uMeConsts
+  , uMeException
   , uMeDisAsmEngine
   ;
 
@@ -63,17 +64,6 @@ const
   {$IFDEF STATIC_METHOD_SCRAMBLING_CODE_SUPPORT}
   cRedirectCodeRecSize = 32;
   {$ENDIF}
-
-type
-  EMeError  = class(Exception)
-  public
-    ErrorCode: Integer;
-
-    constructor Create(const Msg: string; const aErrorCode: Integer {$IFDEF SUPPORTS_DEFAULTPARAMS} = -1 {$ENDIF});
-    constructor CreateFmt (const Msg: string; const Args: array of const; const aErrorCode: Integer {$IFDEF SUPPORTS_DEFAULTPARAMS} = -1 {$ENDIF});
-    constructor CreateRes (Ident: Integer; const aErrorCode: Integer {$IFDEF SUPPORTS_DEFAULTPARAMS} = -1 {$ENDIF}); overload;
-    constructor CreateRes(ResStringRec: PResStringRec; const aErrorCode: Integer {$IFDEF SUPPORTS_DEFAULTPARAMS} = -1 {$ENDIF}); overload;
-  end;
 
 type
   PShortJumpIfDirective = ^TShortJumpIfDirective;
@@ -1009,31 +999,6 @@ begin
   Result := False;
 end;
 //}
-
-{ EMeError }
-constructor EMeError.Create(const Msg: string; const aErrorCode: Integer);
-begin
-  inherited Create(Msg);
-  ErrorCode := aErrorCode;
-end;
-
-constructor EMeError.CreateFmt(const Msg: string; const Args: array of const; const aErrorCode: Integer);
-begin
-  inherited CreateFmt(Msg, Args);
-  ErrorCode := aErrorCode;
-end;
-
-constructor EMeError.CreateRes(Ident: Integer; const aErrorCode: Integer);
-begin
-  inherited CreateRes(Ident);
-  ErrorCode := aErrorCode;
-end;
-
-constructor EMeError.CreateRes(ResStringRec: PResStringRec; const aErrorCode: Integer);
-begin
-  inherited CreateRes(ResStringRec);
-  ErrorCode := aErrorCode;
-end;
 
 initialization
 {$IFDEF MSWINDOWS}
