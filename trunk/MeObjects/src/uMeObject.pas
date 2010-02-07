@@ -118,7 +118,15 @@ const
   {$ENDIF}
 {$ENDIF}
 {$IFDEF FPC}
-{
+{ 
+FPC Object Virtual Method Table memory layout (32-bit model)
+	
+Offset 	What	
++0 	Size of object type data
++4 	Minus the size of object type data. Enables determining of valid VMT pointers.
++8 	Pointer to ancestor VMT, Nil if no ancestor available.
++12 	Pointers to the virtual methods. 
+
 FPC: ./rtl/inc/objects.pp:
    VMT=RECORD
      Size,NegSize:Longint;
@@ -129,9 +137,11 @@ FPC: ./rtl/inc/objects.pp:
        vmtParent               = sizeof(ptrint)*2;
 }
   ovtInstanceSize         = 0;
-  ovtVmtParent               = sizeof(ptrint)*2;
+  ovtNegInstanceSize      = SizeOf(ptrint);
+  ovtVmtParent            = SizeOf(ptrint)*2;
+  ovtVMTAddress           = SizeOf(ptrint)*3;  { keep the VMT address. here means the address of the ovtVMTInit }
   {$IFDEF MeRTTI_SUPPORT}
-  ovtVmtClassName = 12;    { the class name PAnsiChar. }
+  ovtVmtClassName = 12;    { IT IS NOT THE VMT OFFSET! the class name PAnsiChar. }
   {$ENDIF}
 {$ENDIF}
 
@@ -165,10 +175,17 @@ type
   {Summary the virtual method table contents of TMeDynamicObject .}
   PMeVMTable = ^TMeVMTable;
   TMeVMTable = record
+  {$IFDEF BORLAND}
     VMTAddr: TMeClass;    {-12} //Point to the VMT
     Size: Integer;        {-8}
     VmtPtrOffs: Pointer;  {-4}
     VMT: TMeVMT;
+  {$ENDIF}
+  {$IFDEF FPC}
+     Size,NegSize:Longint;
+     Parent:PMeVMTable;    
+     VMT: TMeVMT;
+  {$ENDIF}
   end;
   
 { TMeStream seek origins }
