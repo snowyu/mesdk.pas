@@ -1,3 +1,7 @@
+2010-11-20
+* [Bug] The Class Name in MetaObject for FPC, So I adjust the unit-test for it.
+!+ [Bug] Can not save to file on FPC.
+
 MeSDK v.1.2 Release Cardinal 2008-11-10 Rev.347
 
 + [DUnit] UnitTest for MeService

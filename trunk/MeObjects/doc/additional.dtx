@@ -14,6 +14,21 @@ procedure RemoveFreeNotification(const aInstance : TObject; const aProc : TFreeN
 @@MeObject
 <GROUP MeObjectsSDK>
 Summary: the Mini TMeObject and derived common MeObjects.
+---FPC Note Begin------
+FPC supports the $STATIC directive. If you specify the {$STATIC ON} directive, then Static methods are allowed for objects. Static objects methods do not require a Self variable. They are equivalent to Class methods for classes. By default, Static methods are not allowed. Class methods are always allowed.
+This directive is equivalent to the -St command line option. 
+
+TMy = object
+  class function a(): Integer;
+end;
+
+TMy.a() it will report error. I do not know what should happen if I switch $STATIC on. : No. IT IS STILL ERROR!
+
+var
+  f: TMy;
+
+f.a(), the passed self is the address of the variable f, not the address of typeOf(Tmy)!!!
+---FPC END----
 
 @@MeInjector
 <GROUP MeObjectsSDK>

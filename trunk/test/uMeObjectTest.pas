@@ -740,8 +740,13 @@ var
   vC: TMeClass;
 begin
   {$IFDEF MeRTTI_SUPPORT}
+  {$IFDEF BORLAND}
   vC := MeTypeOf(aObj^);
   CheckEquals(aClassName, vC.ClassName, 'the ClassName is error.');
+  {$ENDIF BORLAND}
+  {$IFDEF FPC}
+  CheckEquals(aClassName, aObj.ClassName, 'the ClassName is error.');
+  {$ENDIF FPC}
   {$ENDIF}
 end;
 
