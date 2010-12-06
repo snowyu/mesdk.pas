@@ -19,26 +19,26 @@ begin
 end;
 
 var
-  vTransport: TMeIndyServerTransport;
+  vServer: TMeIndyRemoteFunctionServer;
 begin
-  vTransport := TMeIndyServerTransport.Create();
-  with vTransport do
+  vServer := TMeIndyRemoteFunctionServer.Create(nil);
+  with vServer do
   try
    try
-      with Server.Bindings.Add do
+      with Bindings.Add do
       begin
        IP := '127.0.0.1';
        Port := 1111;
       end;
       RemoteFunctions.Register(ToMethod(@Add), 'add', TypeInfo(TAdd));
-      Server.Active := True;
+      Active := True;
       ReadLn;
-      Server.Active := False;
+      Active := False;
     except
       On E: Exception do
         Writeln('Exception(', E.ClassName, '):', E.Message);
     end;
   finally
-    vTransport.Free;
+    vServer.Free;
   end;
 end.

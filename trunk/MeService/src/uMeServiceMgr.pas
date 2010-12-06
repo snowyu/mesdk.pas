@@ -54,6 +54,7 @@ uses
   SysUtils, Classes
   , TypInfo
   , uMeObject
+//  , uMeTypInfo
   , uMeSysUtils
   , uMeStrUtils
   , uMeProcType
@@ -603,7 +604,7 @@ var
   i: Integer;
 begin
   Result := nil;
-  with FEvents.LockList^ do
+  with GetEvents.LockList^ do
   try
     for i := 0 to Count - 1 do
     begin
@@ -625,7 +626,7 @@ var
   vClass: TClass;
 begin
   Result := nil;
-  with FFunctions.LockList^ do
+  with GetFunctions.LockList^ do
   try
     for i := 0 to Count - 1 do
     begin
@@ -637,7 +638,7 @@ begin
     vClass := nil;
     if not Assigned(aProcParams) then
       aProcParams := TypeInfo(TMeServiceMethod);
-    if Assigned(aInstance) and IsObject(aInstance) then
+    if Assigned(aInstance) {and IsObject(aInstance)} then //todo: the IsObject is not work on D7!!!
       vClass := TObject(aInstance).ClassType;
     Result.InitFromType(RegisterProcTypeInfo(aProcParams, vClass));
     Result.Name := aName;

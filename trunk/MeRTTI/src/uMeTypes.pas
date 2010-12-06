@@ -76,6 +76,7 @@ uses
   , uMeConsts
   , uMeSystem
   , uMeObject
+  , uMeException
   , uMeTypInfo //the TCallingConvention
   ;
 

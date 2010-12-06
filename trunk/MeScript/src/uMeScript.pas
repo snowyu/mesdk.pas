@@ -37,6 +37,7 @@ uses
   SysUtils, Classes
   , uMeSystem
   , uMeObject
+  , uMeException
   , uMeScriptConsts
   , uMeTokenizer
   ;

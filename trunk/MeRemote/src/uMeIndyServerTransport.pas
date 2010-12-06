@@ -68,7 +68,7 @@ type
   TMeIndyServerTransport = class
   protected
     FServer: TMeIndyRemoteFunctionServer;
-    FRemoteFunctions: PMeRemmoteFunctions;
+    FRemoteFunctions: PMeRemoteFunctions;
     function SearchCmd(const aCmd: string): Integer;
     procedure ExecuteCmd(const aCmd: Integer; const aParams: PMeStream; var aSuccessful: WordBool);
   public
@@ -76,13 +76,13 @@ type
     destructor Destroy(); override;
 
     property Server: TMeIndyRemoteFunctionServer read FServer;
-    property RemoteFunctions: PMeRemmoteFunctions read FRemoteFunctions;
+    property RemoteFunctions: PMeRemoteFunctions read FRemoteFunctions;
   end;
 
   {TMeIndyRemoteFunctionServer = class
   protected
     FSerer: TMeIndyBinServer
-    FRemoteFunctions: PMeRemmoteFunctions;
+    FRemoteFunctions: PMeRemoteFunctions;
     //procedure iSend(const aCmd: string; const aRequest: PMeStream; const aReply: PMeStream);
   public
     constructor Create();

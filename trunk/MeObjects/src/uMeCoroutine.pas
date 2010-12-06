@@ -37,6 +37,7 @@ uses
   , uMeSystem
   {$IFNDEF YieldClass_Supports}
   , uMeObject
+  , uMeException
   {$ENDIF}
   ;
 

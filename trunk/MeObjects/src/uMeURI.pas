@@ -375,6 +375,7 @@ interface
 uses
   SysUtils
   , uMeObject
+  , uMeException
   ;
 
 type

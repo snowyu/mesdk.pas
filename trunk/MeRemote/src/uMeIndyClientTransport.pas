@@ -38,6 +38,7 @@ uses
   SysUtils, Classes
   , uMeSystem  //EMeError
   , uMeObject
+  , uMeException
   , uMeTransport
   , uMeRemoteUtils
   , IdTCPConnection, IdTCPClient

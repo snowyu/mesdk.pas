@@ -217,7 +217,7 @@ begin
  {$IFDEF MSWINDOWS}
   Open(AFilename, Mode, 0);
  {$ENDIF}
- {$IF LINUX}
+ {$IFDEF LINUX}
   OpenEx(AFilename, Mode, FileAccessRights);
  {$ENDIF}
 {$ENDIF BORLAND}
