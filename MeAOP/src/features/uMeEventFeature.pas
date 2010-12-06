@@ -33,6 +33,7 @@ uses
   SysUtils, Classes
   , uMeSystem
   , uMeObject
+  , uMeException
   , uMeSysUtils
   {$IFDEF MeRTTI_SUPPORT}
   , uMeTypes

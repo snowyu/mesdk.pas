@@ -52,6 +52,7 @@ uses
   SysUtils, Classes, TypInfo
   , uMeConsts
   , uMeSystem
+  , uMeException
   , uMeTypInfo
   ;
 

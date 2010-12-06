@@ -20,6 +20,7 @@ uses
   TestFramework
   , uMeSystem
   , uMeObject
+  , uMeException
   , uMeStrUtils
   , uMeTokenizer
   ;

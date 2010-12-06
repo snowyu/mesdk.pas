@@ -42,6 +42,7 @@ uses
   , uMeConsts
   , uMeSystem
   , uMeObject
+  , uMeException
   , uMeTypInfo
   {$IFDEF MeRTTI_SUPPORT}
   , uMeTypes

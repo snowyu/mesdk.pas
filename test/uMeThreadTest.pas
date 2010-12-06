@@ -326,7 +326,7 @@ begin
 	CheckEquals(i, vTask[i].Id, 'vTask['+IntToStr(i)+'].Id mismatch');
 	//CheckEquals(i+3000 div 100, vTask[i].count, 'vTask['+IntToStr(i)+'].Count mismatch');
 	j := i+3000 div 100;
-	Check((vTask[i].count in [j-2..j+2]), 'vTask['+IntToStr(i)+'].Count not within [' +intToStr(j-2)+ '..'+IntToStr(j+2)+'] err count:'+IntToSTR(vTask[i].count));
+	Check((vTask[i].count in [j-3..j+3]), 'vTask['+IntToStr(i)+'].Count not within [' +intToStr(j-3)+ '..'+IntToStr(j+3)+'] err count:'+IntToSTR(vTask[i].count));
 	vTask[i].Free;
   end;
 end;

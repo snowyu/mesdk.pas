@@ -50,6 +50,7 @@ uses
   SysUtils
   //, Classes
   , uMeObject
+  , uMeException
   , uMeSystem
   , uMeSyncObjs
   , uMeSysUtils

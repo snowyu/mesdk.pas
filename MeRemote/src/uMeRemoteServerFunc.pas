@@ -46,13 +46,13 @@ uses
   ;
 
 type
-  PMeRemmoteFunction = ^ TMeRemmoteFunction;
+  PMeRemoteFunction = ^ TMeRemoteFunction;
 
    {
       New(vParams, Create);
       vParams.InitFromType(); 
    }
-  TMeRemmoteFunction = object(TMeProcParams)
+  TMeRemoteFunction = object(TMeProcParams)
   protected
     //
     FName: string;
@@ -69,10 +69,10 @@ type
     property Proc: Pointer read FProc;
   end;
 
-  PMeRemmoteFunctions = ^ TMeRemmoteFunctions;
-  TMeRemmoteFunctions = object(TMeThreadSafeList)
+  PMeRemoteFunctions = ^ TMeRemoteFunctions;
+  TMeRemoteFunctions = object(TMeThreadSafeList)
   protected
-    function GetItem(const Index: Integer): PMeRemmoteFunction;
+    function GetItem(const Index: Integer): PMeRemoteFunction;
   public
     destructor Destroy;virtual; //override
     procedure Register(const aMethod: TMethod; const aName: string; aProcParams: PTypeInfo = nil);
@@ -82,29 +82,29 @@ type
     function Execute(const aName: string; const aIn, aOut: PMeStream): Integer; overload;
     procedure Execute(const aIndex: Integer; const aIn, aOut: PMeStream); overload;
 
-    property Items[const Index: Integer]: PMeRemmoteFunction read GetItem;
+    property Items[const Index: Integer]: PMeRemoteFunction read GetItem;
   end;
 
 implementation
 
-{ TMeRemmoteFunction }
-procedure TMeRemmoteFunction.Init;
+{ TMeRemoteFunction }
+procedure TMeRemoteFunction.Init;
 begin
   inherited;
 end;
 
-destructor TMeRemmoteFunction.Destroy;
+destructor TMeRemoteFunction.Destroy;
 begin
   FName := '';
   inherited;
 end;
 
-procedure TMeRemmoteFunction.rExecute();
+procedure TMeRemoteFunction.rExecute();
 begin
   inherited Execute(FProc);
 end;
 
-procedure TMeRemmoteFunction.rExecute(const aIn, aOut: PMeStream);
+procedure TMeRemoteFunction.rExecute(const aIn, aOut: PMeStream);
 begin
   LoadParamsFromStream(@Self, aIn);
   rExecute;
@@ -115,8 +115,8 @@ begin
   SaveParamsToStream(@Self, aOut);
 end;
 
-{ TMeRemmoteFunctions }
-destructor TMeRemmoteFunctions.Destroy;
+{ TMeRemoteFunctions }
+destructor TMeRemoteFunctions.Destroy;
 begin
   with LockList^ do
   try
@@ -127,15 +127,15 @@ begin
   inherited;
 end;
 
-procedure TMeRemmoteFunctions.Execute(const aIndex: Integer; const aIn, aOut: PMeStream);
+procedure TMeRemoteFunctions.Execute(const aIndex: Integer; const aIn, aOut: PMeStream);
 var
-  vItem: PMeRemmoteFunction;
+  vItem: PMeRemoteFunction;
 begin
   vItem := Get(aIndex);
   vItem.rExecute(aIn, aOut);
 end;
 
-function TMeRemmoteFunctions.Execute(const aName: string; const aIn, aOut: PMeStream): Integer;
+function TMeRemoteFunctions.Execute(const aName: string; const aIn, aOut: PMeStream): Integer;
 begin
   Result := IndexOfName(aName);
   if Result >= 0 then
@@ -144,14 +144,14 @@ begin
   end;
 end;
 
-function TMeRemmoteFunctions.GetItem(const Index: Integer): PMeRemmoteFunction;
+function TMeRemoteFunctions.GetItem(const Index: Integer): PMeRemoteFunction;
 begin
   Result := inherited Get(Index);
 end;
 
-function TMeRemmoteFunctions.IndexOf(const aMethod: TMethod): Integer;
+function TMeRemoteFunctions.IndexOf(const aMethod: TMethod): Integer;
 var
-  vItem: PMeRemmoteFunction;
+  vItem: PMeRemoteFunction;
 begin
   with LockList^ do
   try
@@ -167,9 +167,9 @@ begin
   Result := -1;
 end;
 
-function TMeRemmoteFunctions.IndexOfName(const aName: string): Integer;
+function TMeRemoteFunctions.IndexOfName(const aName: string): Integer;
 var
-  vItem: PMeRemmoteFunction;
+  vItem: PMeRemoteFunction;
 begin
   with LockList^ do
   try
@@ -185,9 +185,9 @@ begin
   Result := -1;
 end;
 
-function TMeRemmoteFunctions.IsValid(const aName: string; const aMethod: TMethod): Boolean;
+function TMeRemoteFunctions.IsValid(const aName: string; const aMethod: TMethod): Boolean;
 var
-  vItem: PMeRemmoteFunction;
+  vItem: PMeRemoteFunction;
   i: Integer;
 begin
   Result :=  (aName <> '') and Assigned(aMethod.Code);
@@ -208,9 +208,9 @@ begin
   Result := True;
 end;
 
-procedure TMeRemmoteFunctions.Register(const aMethod: TMethod; const aName: string; aProcParams: PTypeInfo);
+procedure TMeRemoteFunctions.Register(const aMethod: TMethod; const aName: string; aProcParams: PTypeInfo);
 var
-  vFunc: PMeRemmoteFunction;
+  vFunc: PMeRemoteFunction;
   vClass: TClass;
 begin
   if IsValid(aName, aMethod) then
@@ -232,11 +232,11 @@ begin
 end;
 
 initialization
-  SetMeVirtualMethod(TypeOf(TMeRemmoteFunction), ovtVmtParent, TypeOf(TMeProcParams));
-  SetMeVirtualMethod(TypeOf(TMeRemmoteFunctions), ovtVmtParent, TypeOf(TMeThreadSafeList));
+  SetMeVirtualMethod(TypeOf(TMeRemoteFunction), ovtVmtParent, TypeOf(TMeProcParams));
+  SetMeVirtualMethod(TypeOf(TMeRemoteFunctions), ovtVmtParent, TypeOf(TMeThreadSafeList));
   {$IFDEF MeRTTI_SUPPORT}
-  SetMeVirtualMethod(TypeOf(TMeRemmoteFunction), ovtVmtClassName, nil);
-  SetMeVirtualMethod(TypeOf(TMeRemmoteFunctions), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeRemoteFunction), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TMeRemoteFunctions), ovtVmtClassName, nil);
   {$ENDIF}
 
 finalization
