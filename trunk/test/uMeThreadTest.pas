@@ -294,6 +294,7 @@ begin
 end;
 
 procedure TTest_MeThreadMgr.Test_Run();
+const cBIAS = 3;
 var
   i,j : Integer;
   vTask: array [1..3] of PMyTask;
@@ -323,11 +324,11 @@ begin
   begin
     //vTask[i].Id := i;
     //vTask[i].Count := i;
-	CheckEquals(i, vTask[i].Id, 'vTask['+IntToStr(i)+'].Id mismatch');
-	//CheckEquals(i+3000 div 100, vTask[i].count, 'vTask['+IntToStr(i)+'].Count mismatch');
-	j := i+3000 div 100;
-	Check((vTask[i].count in [j-3..j+3]), 'vTask['+IntToStr(i)+'].Count not within [' +intToStr(j-3)+ '..'+IntToStr(j+3)+'] err count:'+IntToSTR(vTask[i].count));
-	vTask[i].Free;
+	  CheckEquals(i, vTask[i].Id, 'vTask['+IntToStr(i)+'].Id mismatch');
+	  //CheckEquals(i+3000 div 100, vTask[i].count, 'vTask['+IntToStr(i)+'].Count mismatch');
+	  j := i+3000 div 100;
+	  Check((vTask[i].count in [j-cBIAS..j+cBIAS]), 'vTask['+IntToStr(i)+'].Count not within [' +intToStr(j-cBIAS)+ '..'+IntToStr(j+cBIAS)+'] err count:'+IntToSTR(vTask[i].count));
+	  vTask[i].Free;
   end;
 end;
 
